@@ -17,6 +17,49 @@ COLLATE utf8mb4_unicode_ci;
 USE mindmap_system;
 
 -- ==============================================================================
+-- CURRENCIES TABLE
+-- ==============================================================================
+-- Description: Supported currencies for multi-currency support
+CREATE TABLE currencies (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(3) NOT NULL UNIQUE COMMENT 'ISO 4217 currency code (USD, EUR, VND, etc.)',
+    name VARCHAR(100) NOT NULL,
+    symbol VARCHAR(10) NOT NULL COMMENT 'Currency symbol ($, €, ₫, etc.)',
+    decimal_places TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT 'Number of decimal places',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    display_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_code (code),
+    INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================================
+-- EXCHANGE RATES TABLE
+-- ==============================================================================
+-- Description: Exchange rates between currencies (relative to base currency USD)
+CREATE TABLE exchange_rates (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    from_currency_id INT UNSIGNED NOT NULL,
+    to_currency_id INT UNSIGNED NOT NULL,
+    rate DECIMAL(20, 8) NOT NULL COMMENT 'Exchange rate (1 from_currency = rate to_currency)',
+    source VARCHAR(100) NULL COMMENT 'Rate source (API provider, manual, etc.)',
+    valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    valid_until TIMESTAMP NULL COMMENT 'NULL means currently active',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (from_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
+    FOREIGN KEY (to_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
+    INDEX idx_currencies (from_currency_id, to_currency_id),
+    INDEX idx_active (is_active, valid_from, valid_until),
+    INDEX idx_valid_dates (valid_from, valid_until),
+    UNIQUE KEY unique_active_rate (from_currency_id, to_currency_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================================
 -- USERS TABLE
 -- ==============================================================================
 -- Description: Store user information, support both email and OAuth login
@@ -37,15 +80,22 @@ CREATE TABLE users (
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     email_verified_at TIMESTAMP NULL,
     
+    -- User preferences
+    preferred_currency_id INT UNSIGNED NULL COMMENT 'User preferred currency for display',
+    preferred_language VARCHAR(10) DEFAULT 'en' COMMENT 'Language code (en, vi, etc.)',
+    timezone VARCHAR(50) DEFAULT 'UTC',
+    
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP NULL,
     
+    FOREIGN KEY (preferred_currency_id) REFERENCES currencies(id) ON DELETE SET NULL,
     INDEX idx_email (email),
     INDEX idx_oauth (oauth_provider, oauth_id),
     INDEX idx_role (role),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_preferred_currency (preferred_currency_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
@@ -112,9 +162,9 @@ CREATE TABLE packages (
     description TEXT NULL,
     slug VARCHAR(100) NOT NULL UNIQUE,
     
-    -- Pricing
-    price DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT 'Price in USD',
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    -- Pricing (base price for reference, actual prices in package_prices table)
+    base_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT 'Base price in USD for reference',
+    base_currency_id INT UNSIGNED NOT NULL COMMENT 'Base currency (usually USD)',
     duration_days INT UNSIGNED NOT NULL DEFAULT 30 COMMENT 'Package duration in days',
     
     -- Limits
@@ -133,7 +183,35 @@ CREATE TABLE packages (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
+    FOREIGN KEY (base_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
     INDEX idx_slug (slug),
+    INDEX idx_active (is_active),
+    INDEX idx_base_currency (base_currency_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================================
+-- PACKAGE PRICES TABLE
+-- ==============================================================================
+-- Description: Multi-currency pricing for packages
+CREATE TABLE package_prices (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    package_id BIGINT UNSIGNED NOT NULL,
+    currency_id INT UNSIGNED NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    
+    -- Optional promotional pricing
+    promotional_price DECIMAL(10, 2) NULL COMMENT 'Discounted price if promotion active',
+    promotion_start_date TIMESTAMP NULL,
+    promotion_end_date TIMESTAMP NULL,
+    
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
+    UNIQUE KEY unique_package_currency (package_id, currency_id),
+    INDEX idx_package_currency (package_id, currency_id),
     INDEX idx_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -199,7 +277,10 @@ CREATE TABLE payments (
     
     -- Payment details
     amount DECIMAL(10, 2) NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    currency_id INT UNSIGNED NOT NULL COMMENT 'Currency used for payment',
+    original_amount DECIMAL(10, 2) NULL COMMENT 'Original amount if currency conversion occurred',
+    original_currency_id INT UNSIGNED NULL COMMENT 'Original currency before conversion',
+    exchange_rate DECIMAL(20, 8) NULL COMMENT 'Exchange rate used at time of payment',
     payment_method ENUM('qr_banking', 'paypal', 'stripe', 'manual') NOT NULL,
     payment_status ENUM('pending', 'completed', 'failed', 'refunded', 'cancelled') NOT NULL DEFAULT 'pending',
     
@@ -227,10 +308,13 @@ CREATE TABLE payments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE RESTRICT,
     FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
+    FOREIGN KEY (original_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
     INDEX idx_user_id (user_id),
     INDEX idx_transaction_id (transaction_id),
     INDEX idx_status (payment_status),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_currency (currency_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
@@ -284,9 +368,42 @@ CREATE TABLE system_settings (
 -- INITIAL DATA
 -- ==============================================================================
 
+-- Insert supported currencies
+INSERT INTO currencies (code, name, symbol, decimal_places, is_active, display_order) VALUES
+('USD', 'US Dollar', '$', 2, TRUE, 1),
+('EUR', 'Euro', '€', 2, TRUE, 2),
+('GBP', 'British Pound', '£', 2, TRUE, 3),
+('JPY', 'Japanese Yen', '¥', 0, TRUE, 4),
+('VND', 'Vietnamese Dong', '₫', 0, TRUE, 5),
+('SGD', 'Singapore Dollar', 'S$', 2, TRUE, 6),
+('AUD', 'Australian Dollar', 'A$', 2, TRUE, 7),
+('CAD', 'Canadian Dollar', 'C$', 2, TRUE, 8),
+('CNY', 'Chinese Yuan', '¥', 2, TRUE, 9),
+('INR', 'Indian Rupee', '₹', 2, TRUE, 10),
+('THB', 'Thai Baht', '฿', 2, TRUE, 11),
+('MYR', 'Malaysian Ringgit', 'RM', 2, TRUE, 12);
+
+-- Insert exchange rates (base: USD)
+-- Note: These are example rates. In production, update regularly from API
+INSERT INTO exchange_rates (from_currency_id, to_currency_id, rate, source, is_active) VALUES
+-- USD to other currencies
+(1, 1, 1.00000000, 'base', TRUE),          -- USD to USD
+(1, 2, 0.92000000, 'manual', TRUE),        -- USD to EUR
+(1, 3, 0.79000000, 'manual', TRUE),        -- USD to GBP
+(1, 4, 149.50000000, 'manual', TRUE),      -- USD to JPY
+(1, 5, 24500.00000000, 'manual', TRUE),    -- USD to VND
+(1, 6, 1.35000000, 'manual', TRUE),        -- USD to SGD
+(1, 7, 1.52000000, 'manual', TRUE),        -- USD to AUD
+(1, 8, 1.37000000, 'manual', TRUE),        -- USD to CAD
+(1, 9, 7.24000000, 'manual', TRUE),        -- USD to CNY
+(1, 10, 83.12000000, 'manual', TRUE),      -- USD to INR
+(1, 11, 35.75000000, 'manual', TRUE),      -- USD to THB
+(1, 12, 4.72000000, 'manual', TRUE);       -- USD to MYR
+
 -- Insert default admin user (password: Admin@123 - hash generated with bcrypt)
-INSERT INTO users (email, password_hash, full_name, role, email_verified, email_verified_at) VALUES
-('admin@mindmap.com', '$2b$10$rGHcY6Y6KdGj5pXZOXK4xOGQjqZ.x5m3tV8HxNQXJNc9LYvL6LY8i', 'System Administrator', 'admin', TRUE, NOW());
+-- Set preferred currency to USD
+INSERT INTO users (email, password_hash, full_name, role, email_verified, email_verified_at, preferred_currency_id) VALUES
+('admin@mindmap.com', '$2b$10$rGHcY6Y6KdGj5pXZOXK4xOGQjqZ.x5m3tV8HxNQXJNc9LYvL6LY8i', 'System Administrator', 'admin', TRUE, NOW(), 1);
 
 -- Insert default package features
 INSERT INTO package_features (feature_key, feature_name, description, category) VALUES
@@ -304,9 +421,9 @@ INSERT INTO package_features (feature_key, feature_name, description, category) 
 ('api_access', 'API Access', 'Access to REST API', 'developer');
 
 -- Insert default packages
-INSERT INTO packages (name, description, slug, price, currency, duration_days, max_mindmaps, max_collaborators, max_storage_mb, features, is_active, display_order) VALUES
+INSERT INTO packages (name, description, slug, base_price, base_currency_id, duration_days, max_mindmaps, max_collaborators, max_storage_mb, features, is_active, display_order) VALUES
 -- Free Plan
-('Free', 'Perfect for getting started', 'free', 0.00, 'USD', 365, 3, 2, 50, 
+('Free', 'Perfect for getting started', 'free', 0.00, 1, 365, 3, 2, 50, 
 JSON_OBJECT(
     'real_time_collaboration', true,
     'unlimited_mindmaps', false,
@@ -323,7 +440,7 @@ JSON_OBJECT(
 ), TRUE, 1),
 
 -- Pro Plan
-('Pro', 'For professionals and small teams', 'pro', 9.99, 'USD', 30, 50, 10, 500,
+('Pro', 'For professionals and small teams', 'pro', 9.99, 1, 30, 50, 10, 500,
 JSON_OBJECT(
     'real_time_collaboration', true,
     'unlimited_mindmaps', false,
@@ -340,7 +457,7 @@ JSON_OBJECT(
 ), TRUE, 2),
 
 -- Enterprise Plan
-('Enterprise', 'For large organizations', 'enterprise', 49.99, 'USD', 30, 0, 0, 0,
+('Enterprise', 'For large organizations', 'enterprise', 49.99, 1, 30, 0, 0, 0,
 JSON_OBJECT(
     'real_time_collaboration', true,
     'unlimited_mindmaps', true,
@@ -355,6 +472,52 @@ JSON_OBJECT(
     'custom_branding', true,
     'api_access', true
 ), TRUE, 3);
+
+-- Insert package prices in multiple currencies
+-- Free package (ID: 1) - always 0 in all currencies
+INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
+(1, 1, 0.00, TRUE),    -- USD
+(1, 2, 0.00, TRUE),    -- EUR
+(1, 3, 0.00, TRUE),    -- GBP
+(1, 4, 0.00, TRUE),    -- JPY
+(1, 5, 0.00, TRUE),    -- VND
+(1, 6, 0.00, TRUE),    -- SGD
+(1, 7, 0.00, TRUE),    -- AUD
+(1, 8, 0.00, TRUE),    -- CAD
+(1, 9, 0.00, TRUE),    -- CNY
+(1, 10, 0.00, TRUE),   -- INR
+(1, 11, 0.00, TRUE),   -- THB
+(1, 12, 0.00, TRUE);   -- MYR
+
+-- Pro package (ID: 2) - $9.99 base price
+INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
+(2, 1, 9.99, TRUE),      -- USD
+(2, 2, 9.19, TRUE),      -- EUR (≈ $9.99)
+(2, 3, 7.89, TRUE),      -- GBP
+(2, 4, 1490, TRUE),      -- JPY (no decimals)
+(2, 5, 245000, TRUE),    -- VND (no decimals)
+(2, 6, 13.49, TRUE),     -- SGD
+(2, 7, 15.18, TRUE),     -- AUD
+(2, 8, 13.68, TRUE),     -- CAD
+(2, 9, 72.33, TRUE),     -- CNY
+(2, 10, 830, TRUE),      -- INR
+(2, 11, 357, TRUE),      -- THB
+(2, 12, 47.15, TRUE);    -- MYR
+
+-- Enterprise package (ID: 3) - $49.99 base price
+INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
+(3, 1, 49.99, TRUE),     -- USD
+(3, 2, 45.99, TRUE),     -- EUR
+(3, 3, 39.49, TRUE),     -- GBP
+(3, 4, 7470, TRUE),      -- JPY
+(3, 5, 1225000, TRUE),   -- VND
+(3, 6, 67.48, TRUE),     -- SGD
+(3, 7, 75.98, TRUE),     -- AUD
+(3, 8, 68.48, TRUE),     -- CAD
+(3, 9, 362, TRUE),       -- CNY
+(3, 10, 4155, TRUE),     -- INR
+(3, 11, 1787, TRUE),     -- THB
+(3, 12, 235.95, TRUE);   -- MYR
 
 -- Insert default system settings
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
@@ -400,7 +563,11 @@ SELECT
     u.full_name,
     pkg.name AS package_name,
     p.amount,
-    p.currency,
+    c.code AS currency_code,
+    c.symbol AS currency_symbol,
+    p.original_amount,
+    oc.code AS original_currency_code,
+    p.exchange_rate,
     p.payment_method,
     p.payment_status,
     p.transaction_id,
@@ -408,7 +575,9 @@ SELECT
     p.completed_at
 FROM payments p
 INNER JOIN users u ON p.user_id = u.id
-INNER JOIN packages pkg ON p.package_id = pkg.id;
+INNER JOIN packages pkg ON p.package_id = pkg.id
+INNER JOIN currencies c ON p.currency_id = c.id
+LEFT JOIN currencies oc ON p.original_currency_id = oc.id;
 
 -- ==============================================================================
 -- STORED PROCEDURES
@@ -460,6 +629,130 @@ BEGIN
     AND us.end_date > NOW()
     ORDER BY us.end_date DESC
     LIMIT 1;
+END //
+
+-- Procedure: Convert amount between currencies
+CREATE PROCEDURE sp_convert_currency(
+    IN p_amount DECIMAL(10, 2),
+    IN p_from_currency_id INT UNSIGNED,
+    IN p_to_currency_id INT UNSIGNED,
+    OUT p_converted_amount DECIMAL(10, 2),
+    OUT p_exchange_rate DECIMAL(20, 8)
+)
+BEGIN
+    DECLARE v_rate DECIMAL(20, 8);
+    
+    -- If same currency, no conversion needed
+    IF p_from_currency_id = p_to_currency_id THEN
+        SET p_converted_amount = p_amount;
+        SET p_exchange_rate = 1.00000000;
+    ELSE
+        -- Get exchange rate
+        SELECT rate INTO v_rate
+        FROM exchange_rates
+        WHERE from_currency_id = p_from_currency_id
+        AND to_currency_id = p_to_currency_id
+        AND is_active = TRUE
+        AND (valid_until IS NULL OR valid_until > NOW())
+        ORDER BY valid_from DESC
+        LIMIT 1;
+        
+        IF v_rate IS NOT NULL THEN
+            SET p_converted_amount = p_amount * v_rate;
+            SET p_exchange_rate = v_rate;
+        ELSE
+            -- Try reverse conversion (to -> from) and invert
+            SELECT 1 / rate INTO v_rate
+            FROM exchange_rates
+            WHERE from_currency_id = p_to_currency_id
+            AND to_currency_id = p_from_currency_id
+            AND is_active = TRUE
+            AND (valid_until IS NULL OR valid_until > NOW())
+            ORDER BY valid_from DESC
+            LIMIT 1;
+            
+            IF v_rate IS NOT NULL THEN
+                SET p_converted_amount = p_amount * v_rate;
+                SET p_exchange_rate = v_rate;
+            ELSE
+                -- No exchange rate found, return NULL
+                SET p_converted_amount = NULL;
+                SET p_exchange_rate = NULL;
+            END IF;
+        END IF;
+    END IF;
+END //
+
+-- Procedure: Get package price in specific currency
+CREATE PROCEDURE sp_get_package_price(
+    IN p_package_id BIGINT UNSIGNED,
+    IN p_currency_id INT UNSIGNED,
+    OUT p_price DECIMAL(10, 2),
+    OUT p_promotional_price DECIMAL(10, 2),
+    OUT p_has_promotion BOOLEAN
+)
+BEGIN
+    DECLARE v_promo_start TIMESTAMP;
+    DECLARE v_promo_end TIMESTAMP;
+    DECLARE v_promo_price DECIMAL(10, 2);
+    
+    -- Get price for specific currency
+    SELECT 
+        price,
+        promotional_price,
+        promotion_start_date,
+        promotion_end_date
+    INTO 
+        p_price,
+        v_promo_price,
+        v_promo_start,
+        v_promo_end
+    FROM package_prices
+    WHERE package_id = p_package_id
+    AND currency_id = p_currency_id
+    AND is_active = TRUE
+    LIMIT 1;
+    
+    -- Check if promotion is active
+    IF v_promo_price IS NOT NULL 
+       AND (v_promo_start IS NULL OR v_promo_start <= NOW())
+       AND (v_promo_end IS NULL OR v_promo_end >= NOW()) THEN
+        SET p_promotional_price = v_promo_price;
+        SET p_has_promotion = TRUE;
+    ELSE
+        SET p_promotional_price = NULL;
+        SET p_has_promotion = FALSE;
+    END IF;
+END //
+
+-- Procedure: Get active exchange rate between currencies
+CREATE PROCEDURE sp_get_exchange_rate(
+    IN p_from_currency_id INT UNSIGNED,
+    IN p_to_currency_id INT UNSIGNED,
+    OUT p_rate DECIMAL(20, 8)
+)
+BEGIN
+    -- Get direct exchange rate
+    SELECT rate INTO p_rate
+    FROM exchange_rates
+    WHERE from_currency_id = p_from_currency_id
+    AND to_currency_id = p_to_currency_id
+    AND is_active = TRUE
+    AND (valid_until IS NULL OR valid_until > NOW())
+    ORDER BY valid_from DESC
+    LIMIT 1;
+    
+    -- If no direct rate, try reverse and invert
+    IF p_rate IS NULL THEN
+        SELECT 1 / rate INTO p_rate
+        FROM exchange_rates
+        WHERE from_currency_id = p_to_currency_id
+        AND to_currency_id = p_from_currency_id
+        AND is_active = TRUE
+        AND (valid_until IS NULL OR valid_until > NOW())
+        ORDER BY valid_from DESC
+        LIMIT 1;
+    END IF;
 END //
 
 DELIMITER ;
