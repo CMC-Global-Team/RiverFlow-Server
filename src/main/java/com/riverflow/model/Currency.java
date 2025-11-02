@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_code", columnList = "code"),
     @Index(name = "idx_active", columnList = "is_active")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -25,28 +26,24 @@ public class Currency {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
     
     /**
      * ISO 4217 currency code (USD, EUR, VND, etc.)
      */
     @Column(nullable = false, unique = true, length = 3)
-    @NotBlank(message = "Currency code is required")
-    @Size(min = 3, max = 3, message = "Currency code must be 3 characters")
     private String code;
     
     /**
      * Full name of the currency
      */
     @Column(nullable = false, length = 100)
-    @NotBlank(message = "Currency name is required")
     private String name;
     
     /**
      * Currency symbol ($, €, ₫, etc.)
      */
     @Column(nullable = false, length = 10)
-    @NotBlank(message = "Currency symbol is required")
     private String symbol;
     
     /**
@@ -54,8 +51,6 @@ public class Currency {
      * E.g., 2 for USD, 0 for JPY
      */
     @Column(name = "decimal_places", nullable = false)
-    @Min(value = 0, message = "Decimal places must be at least 0")
-    @Max(value = 8, message = "Decimal places must be at most 8")
     private Integer decimalPlaces = 2;
     
     /**
