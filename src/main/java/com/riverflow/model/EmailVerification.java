@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +17,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_token", columnList = "token"),
     @Index(name = "idx_user_id", columnList = "user_id")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -30,21 +33,19 @@ public class EmailVerification {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_email_verification_user"))
-    @NotNull(message = "User is required")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
     
     /**
      * Unique verification token
      */
     @Column(nullable = false, unique = true)
-    @NotBlank(message = "Token is required")
     private String token;
     
     /**
      * Token expiration timestamp
      */
     @Column(name = "expires_at", nullable = false)
-    @NotNull(message = "Expiration time is required")
     private LocalDateTime expiresAt;
     
     /**
