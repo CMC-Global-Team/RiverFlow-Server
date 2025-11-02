@@ -51,7 +51,7 @@ public class Currency {
      * E.g., 2 for USD, 0 for JPY
      */
     @Column(name = "decimal_places", nullable = false)
-    private Integer decimalPlaces = 2;
+    private Byte decimalPlaces = 2;
     
     /**
      * Whether this currency is currently active
