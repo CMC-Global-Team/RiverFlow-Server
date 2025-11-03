@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/auth") // Đặt URL gốc cho tất cả API trong file này
+@RequestMapping("/auth") // Đặt URL gốc cho tất cả API trong file này
 public class AuthController {
 
     private final AuthService authService;
