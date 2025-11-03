@@ -21,7 +21,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_preferred_currency", columnList = "preferred_currency_id"),
     @Index(name = "idx_users_created_at", columnList = "created_at")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -35,8 +36,6 @@ public class User {
      * User's email address (unique identifier)
      */
     @Column(nullable = false, unique = true)
-    @NotBlank(message = "Email is required")
-    @Email(message = "Invalid email format")
     private String email;
     
     /**
@@ -49,7 +48,6 @@ public class User {
      * User's full name
      */
     @Column(name = "full_name", nullable = false)
-    @NotBlank(message = "Full name is required")
     private String fullName;
     
     /**
@@ -63,14 +61,14 @@ public class User {
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private UserRole role = UserRole.USER;
+    private UserRole role = UserRole.user;
     
     /**
      * Account status
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private UserStatus status = UserStatus.ACTIVE;
+    private UserStatus status = UserStatus.active;
     
     // OAuth fields
     
@@ -79,7 +77,7 @@ public class User {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "oauth_provider", nullable = false, length = 20)
-    private OAuthProvider oauthProvider = OAuthProvider.EMAIL;
+    private OAuthProvider oauthProvider = OAuthProvider.email;
     
     /**
      * ID from OAuth provider
@@ -141,20 +139,20 @@ public class User {
     // Enums
     
     public enum UserRole {
-        ADMIN,
-        USER
+        admin,
+        user
     }
     
     public enum UserStatus {
-        ACTIVE,
-        SUSPENDED,
-        DELETED
+        active,
+        suspended,
+        deleted
     }
     
     public enum OAuthProvider {
-        EMAIL,
-        GOOGLE,
-        GITHUB
+        email,
+        google,
+        github
     }
 }
 
