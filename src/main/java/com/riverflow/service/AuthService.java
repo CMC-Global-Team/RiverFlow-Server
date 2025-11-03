@@ -1,6 +1,7 @@
 package com.riverflow.service;
 
 import com.riverflow.dto.auth.RegisterRequest;
+import com.riverflow.dto.auth.ResendVerificationRequest;
 import com.riverflow.model.User;
 
 public interface AuthService {
@@ -17,4 +18,9 @@ public interface AuthService {
      * @param token Token từ link xác thực
      */
     void verifyEmail(String token);
+
+    /**
+     * Gửi lại email xác minh cho người dùng chưa xác minh.
+     */
+    void resendVerification(ResendVerificationRequest request);
 }
