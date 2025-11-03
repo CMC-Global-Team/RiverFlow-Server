@@ -1,5 +1,6 @@
 package com.riverflow.service;
 
+import com.riverflow.dto.PasswordResetRequestDTO;
 import com.riverflow.model.PasswordReset;
 import com.riverflow.model.User;
 import com.riverflow.repository.PasswordResetRepository;
@@ -21,11 +22,16 @@ public class PasswordResetService {
     private final PasswordResetRepository passwordResetRepository;
     private final UserRepository userRepository;
     @Transactional
-    public void changePassword(String token, String newPassword) {
-        Objects.requireNonNull(token, "Token must not be null");
-        Objects.requireNonNull(newPassword, "New password must not be null");
+    public void changePassword(PasswordResetRequestDTO request) {
+        String token = request.getToken();
+        String newPassword = request.getNewPassword();
+        String confirmPassword = request.getConfirmPassword();
 
-        // Find an unused token that has not expired
+        if (!newPassword.equals(confirmPassword)) {
+            throw new IllegalArgumentException("New password and confirm password do not match");
+        }
+
+        // Find valid token
         PasswordReset reset = passwordResetRepository
                 .findByTokenAndUsedAtIsNullAndExpiresAtAfter(token, LocalDateTime.now())
                 .orElseThrow(() -> {
