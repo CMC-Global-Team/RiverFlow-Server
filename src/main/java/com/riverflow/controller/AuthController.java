@@ -2,6 +2,7 @@ package com.riverflow.controller;
 
 import com.riverflow.dto.MessageResponse;
 import com.riverflow.dto.auth.RegisterRequest;
+import com.riverflow.dto.auth.ResendVerificationRequest;
 import com.riverflow.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,5 +46,23 @@ public class AuthController {
 
         // Trả về thông báo thành công (HTTP 200 OK)
         return ResponseEntity.ok(new MessageResponse("Xác thực email thành công! Bạn có thể đăng nhập."));
+    }
+
+    /**
+     * Alias theo yêu cầu: /api/auth/verify?token=...
+     */
+    @GetMapping("/verify")
+    public ResponseEntity<MessageResponse> verifyEmailAlias(@RequestParam("token") String token) {
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(new MessageResponse("Xác thực email thành công! Bạn có thể đăng nhập."));
+    }
+
+    /**
+     * Gửi lại email xác minh
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<MessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerification(request);
+        return ResponseEntity.ok(new MessageResponse("Đã gửi lại email xác minh. Vui lòng kiểm tra hộp thư."));
     }
 }
