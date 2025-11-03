@@ -1,6 +1,7 @@
 package com.riverflow.service;
 
 import com.riverflow.dto.auth.RegisterRequest;
+import com.riverflow.dto.auth.ResendVerificationRequest;
 import com.riverflow.exception.EmailAlreadyExistsException;
 import com.riverflow.exception.InvalidTokenException;
 import com.riverflow.model.EmailVerification;
@@ -28,6 +29,12 @@ public class AuthServiceImpl implements AuthService {
     // Đọc URL frontend từ application.properties
     @Value("${app.frontend.url}")
     private String frontendUrl;
+
+    @Value("${app.backend.url:http://localhost:8080/api}")
+    private String backendUrl;
+
+    @Value("${app.verification.expire-minutes:15}")
+    private int verificationExpireMinutes;
 
     @Autowired
     public AuthServiceImpl(UserRepository userRepository,
@@ -68,12 +75,13 @@ public class AuthServiceImpl implements AuthService {
         EmailVerification verificationToken = new EmailVerification(
                 savedUser,
                 token,
-                LocalDateTime.now().plusHours(24) // Hết hạn sau 24h
+                LocalDateTime.now().plusMinutes(verificationExpireMinutes)
         );
 
         emailVerificationRepository.save(verificationToken);
 
-        String verificationLink = frontendUrl + "/verify-email?token=" + token;
+        // Gửi link backend để backend xử lý xác minh như yêu cầu
+        String verificationLink = backendUrl + "/auth/verify?token=" + token;
 
         String emailBody = "Chào " + savedUser.getFullName() + ",\n\n"
                 + "Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào đường link bên dưới để kích hoạt tài khoản của bạn:\n"
@@ -113,5 +121,41 @@ public class AuthServiceImpl implements AuthService {
         //Đánh dấu token đã sử dụng
         verificationToken.setVerifiedAt(LocalDateTime.now());
         emailVerificationRepository.save(verificationToken);
+    }
+
+    /**
+     * Gửi lại email xác minh cho user chưa được xác minh
+     */
+    @Override
+    @Transactional
+    public void resendVerification(ResendVerificationRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new InvalidTokenException("Không tìm thấy người dùng với email này."));
+
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new InvalidTokenException("Email đã được xác minh trước đó.");
+        }
+
+        // Xóa tất cả token cũ
+        emailVerificationRepository.deleteAllByUser(user);
+
+        // Tạo token mới
+        String token = UUID.randomUUID().toString();
+        EmailVerification verificationToken = new EmailVerification(
+                user,
+                token,
+                LocalDateTime.now().plusMinutes(verificationExpireMinutes)
+        );
+        emailVerificationRepository.save(verificationToken);
+
+        String verificationLink = backendUrl + "/auth/verify?token=" + token;
+
+        String emailBody = "Chào " + user.getFullName() + ",\n\n"
+                + "Bạn vừa yêu cầu gửi lại liên kết xác minh. Vui lòng nhấn vào đường link bên dưới để xác minh email:\n"
+                + verificationLink + "\n\n"
+                + "Liên kết sẽ hết hạn sau " + verificationExpireMinutes + " phút.\n\n"
+                + "Trân trọng,\nĐội ngũ RiverFlow.";
+
+        emailService.sendSimpleMessage(user.getEmail(), "Gửi lại liên kết xác minh RiverFlow", emailBody);
     }
 }
