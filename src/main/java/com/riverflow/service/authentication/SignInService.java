@@ -3,6 +3,7 @@ package com.riverflow.service.authentication;
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.authentication.SignInRequest;
 import com.riverflow.dto.authentication.SignInResponse;
+import com.riverflow.exception.EmailNotVerifiedException;
 import com.riverflow.model.User;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.util.authentication.JwtUtil;
@@ -51,7 +52,7 @@ public class SignInService {
 
             // Check if email is verified
             if (!user.getEmailVerified()) {
-                throw new BadCredentialsException("Email chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.");
+                throw new EmailNotVerifiedException("Email chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.");
             }
 
             // Generate tokens
