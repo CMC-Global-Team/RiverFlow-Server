@@ -69,6 +69,9 @@ public class SecurityConfig {
 
                 // Cấu hình phân quyền cho các request
                 .authorizeHttpRequests(authz -> authz
+                        // Cho phép tất cả OPTIONS requests (CORS preflight)
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
+                        
                         // Cho phép truy cập công khai vào các đường dẫn này
                         // Lưu ý: Do có context-path=/api, nên path ở đây không cần /api prefix
                         .requestMatchers(
