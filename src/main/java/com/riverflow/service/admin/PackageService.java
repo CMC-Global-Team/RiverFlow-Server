@@ -74,16 +74,23 @@ public class PackageService {
         long activePackages = packageRepository.countByIsActiveTrue();
         long activeSubscribers = userSubscriptionRepository.countActiveSubscriptions();
         
-        // Calculate MRR (simplified calculation)
+        // Calculate MRR
         BigDecimal mrr = calculateMRR();
+        
+        // Calculate conversion rate (active subscribers / total users who visited pricing)
+        // For now, calculate as: active subscribers / (active + cancelled subscriptions)
+        double conversionRate = calculateConversionRate();
+        
+        // Calculate growth percentage compared to last month
+        double growthPercentage = calculateGrowthPercentage();
         
         return PackageStatsResponse.builder()
                 .totalPackages(totalPackages)
                 .activePackages(activePackages)
                 .activeSubscribers(activeSubscribers)
                 .monthlyRecurringRevenue(mrr)
-                .conversionRate(23.5) // Mock data - should be calculated
-                .growthPercentage(12.5) // Mock data - should be calculated from historical data
+                .conversionRate(conversionRate)
+                .growthPercentage(growthPercentage)
                 .build();
     }
     
@@ -341,12 +348,50 @@ public class PackageService {
      * Calculate Monthly Recurring Revenue
      */
     private BigDecimal calculateMRR() {
-        // Simplified calculation - in real implementation, this should:
-        // 1. Get all active subscriptions
-        // 2. Normalize to monthly amount (30 days)
-        // 3. Sum all amounts
-        // For now, return mock data
-        return BigDecimal.valueOf(45231.00);
+        // Get all active subscriptions
+        List<Package> packages = packageRepository.findAll();
+        BigDecimal totalMRR = BigDecimal.ZERO;
+        
+        for (Package pkg : packages) {
+            long subscribers = userSubscriptionRepository.countActiveSubscriptionsByPackageId(pkg.getId());
+            
+            if (subscribers > 0) {
+                // Normalize price to monthly (30 days)
+                BigDecimal monthlyPrice = pkg.getBasePrice()
+                        .multiply(BigDecimal.valueOf(30))
+                        .divide(BigDecimal.valueOf(pkg.getDurationDays()), 2, BigDecimal.ROUND_HALF_UP);
+                
+                // MRR = monthly price * number of subscribers
+                BigDecimal packageMRR = monthlyPrice.multiply(BigDecimal.valueOf(subscribers));
+                totalMRR = totalMRR.add(packageMRR);
+            }
+        }
+        
+        return totalMRR;
+    }
+    
+    /**
+     * Calculate conversion rate
+     */
+    private double calculateConversionRate() {
+        long activeSubscribers = userSubscriptionRepository.countActiveSubscriptions();
+        long totalSubscriptions = userSubscriptionRepository.count();
+        
+        if (totalSubscriptions == 0) {
+            return 0.0;
+        }
+        
+        return ((double) activeSubscribers / totalSubscriptions) * 100;
+    }
+    
+    /**
+     * Calculate growth percentage
+     * TODO: Implement proper historical comparison
+     */
+    private double calculateGrowthPercentage() {
+        // For now, return 0.0
+        // In real implementation, this should compare current month vs last month
+        return 0.0;
     }
 }
 
