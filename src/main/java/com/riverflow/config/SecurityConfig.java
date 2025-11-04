@@ -1,6 +1,7 @@
 package com.riverflow.config;
 
 import com.riverflow.config.jwt.JwtAuthenticationFilter;
+import com.riverflow.security.jwt.AuthEntryPointJwt;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +29,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
+    private final AuthEntryPointJwt unauthorizedHandler;
 
     /**
      * Bean này cung cấp một trình mã hóa mật khẩu (BCrypt)
@@ -68,6 +70,8 @@ public class SecurityConfig {
 
                 // Tắt CSRF (Cross-Site Request Forgery) vì chúng ta dùng API stateless
                 .csrf(csrf -> csrf.disable())
+
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(unauthorizedHandler))
 
                 // Cấu hình phân quyền cho các request
                 .authorizeHttpRequests(authz -> authz
