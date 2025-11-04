@@ -55,6 +55,18 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Xử lý EmailNotVerifiedException (Forbidden)
+     * Khi user cố gắng đăng nhập với email chưa xác thực
+     */
+    @ExceptionHandler(EmailNotVerifiedException.class)
+    public ResponseEntity<MessageResponse> handleEmailNotVerifiedException(EmailNotVerifiedException ex) {
+        log.error("EmailNotVerifiedException: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new MessageResponse(ex.getMessage()));
+    }
+
+    /**
      * Xử lý BadCredentialsException (Unauthorized)
      * Spring Security throw khi đăng nhập sai email/password
      */
