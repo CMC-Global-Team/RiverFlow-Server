@@ -22,22 +22,16 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendSimpleMessage(String to, String subject, String body) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
+        SimpleMailMessage message = new SimpleMailMessage();
 
-            // Lấy email "Người gửi" đã cấu hình
-            message.setFrom(fromEmail);
-            message.setTo(to);
-            message.setSubject(subject);
-            message.setText(body);
+        // Lấy email "Người gửi" đã cấu hình
+        message.setFrom(fromEmail);
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
 
-            // Gửi mail
-            mailSender.send(message);
-
-        } catch (Exception e) {
-            // Nếu gửi thất bại (ví dụ: Brevo sập), nó sẽ in lỗi ra console
-            // nhưng không làm sập toàn bộ luồng đăng ký
-            System.err.println("Lỗi khi gửi email: " + e.getMessage());
-        }
+        // Gửi mail - throw exception nếu thất bại
+        // Điều này đảm bảo transaction sẽ rollback nếu gửi email thất bại
+        mailSender.send(message);
     }
 }
