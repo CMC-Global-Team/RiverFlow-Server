@@ -43,7 +43,8 @@ public class WebConfig {
         configuration.setAllowedHeaders(List.of("*"));
         
         // Cho phép gửi credentials (cookies, authorization headers, etc.)
-        configuration.setAllowCredentials(true);
+        // Tạm thời comment để test CORS
+        // configuration.setAllowCredentials(true);
         
         // Cho phép browser cache preflight request trong 1 giờ
         configuration.setMaxAge(3600L);
