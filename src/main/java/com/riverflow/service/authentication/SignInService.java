@@ -77,6 +77,10 @@ public class SignInService {
                     .role(user.getRole().name())
                     .build();
 
+        } catch (EmailNotVerifiedException e) {
+            // Re-throw EmailNotVerifiedException để GlobalExceptionHandler xử lý
+            log.error("Sign in failed for user {}: Email not verified", request.getEmail());
+            throw e;
         } catch (BadCredentialsException e) {
             log.error("Sign in failed for user {}: {}", request.getEmail(), e.getMessage());
             throw new BadCredentialsException("Email hoặc mật khẩu không chính xác");
