@@ -12,9 +12,8 @@ import org.springframework.web.bind.annotation.*;
  * Controller for user sign-in
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
-@org.springframework.web.bind.annotation.CrossOrigin(origins = "*", allowedHeaders = "*")
 public class SignInController {
 
     private final SignInService signInService;

@@ -12,9 +12,8 @@ import org.springframework.web.bind.annotation.*;
  * Controller for forgot password
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
-@org.springframework.web.bind.annotation.CrossOrigin(origins = "*", allowedHeaders = "*")
 public class ForgotPasswordController {
 
     private final ForgotPasswordService forgotPasswordService;

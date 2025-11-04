@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
  * Controller for reset password
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class ResetPasswordController {
 

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
  * Controller for email verification
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 public class EmailVerificationController {
 
