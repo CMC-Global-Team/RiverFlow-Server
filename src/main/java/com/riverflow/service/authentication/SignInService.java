@@ -1,14 +1,17 @@
 package com.riverflow.service.authentication;
 
-import com.riverflow.config.jwt.CustomUserDetailsService;
+import com.riverflow.config.jwt.CustomUserDetailsService; // Giả định tên
 import com.riverflow.dto.authentication.SignInRequest;
 import com.riverflow.dto.authentication.SignInResponse;
 import com.riverflow.exception.EmailNotVerifiedException;
+import com.riverflow.model.RefreshToken;
 import com.riverflow.model.User;
+import com.riverflow.repository.RefreshTokenRepository;
 import com.riverflow.repository.UserRepository;
-import com.riverflow.util.authentication.JwtUtil;
-import lombok.RequiredArgsConstructor;
+import com.riverflow.util.authentication.JwtUtil; // Giả định tên
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired; // <-- THÊM IMPORT
+import org.springframework.beans.factory.annotation.Value; // <-- THÊM IMPORT
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,12 +21,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit; // <-- 1. THÊM IMPORT NÀY
 
 /**
  * Service for handling user sign-in
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SignInService {
 
@@ -31,6 +34,26 @@ public class SignInService {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final long accessTokenExpirationMs;
+    private final long refreshTokenExpirationMs;
+
+    @Autowired
+    public SignInService(AuthenticationManager authenticationManager,
+                         JwtUtil jwtUtil,
+                         CustomUserDetailsService userDetailsService,
+                         UserRepository userRepository,
+                         RefreshTokenRepository refreshTokenRepository,
+                         @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs,
+                         @Value("${app.jwt.refresh-token-expiration-ms}") long refreshTokenExpirationMs) {
+        this.authenticationManager = authenticationManager;
+        this.jwtUtil = jwtUtil;
+        this.userDetailsService = userDetailsService;
+        this.userRepository = userRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.accessTokenExpirationMs = accessTokenExpirationMs;
+        this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+    }
 
     /**
      * Authenticate user and generate JWT tokens
@@ -38,7 +61,6 @@ public class SignInService {
     @Transactional
     public SignInResponse signIn(SignInRequest request) {
         try {
-            // Authenticate user
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
@@ -46,20 +68,24 @@ public class SignInService {
                     )
             );
 
-            // Load user details
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             User user = userDetailsService.loadUserEntityByEmail(userDetails.getUsername());
 
-            // Check if email is verified
             if (!user.getEmailVerified()) {
                 throw new EmailNotVerifiedException("Email chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.");
             }
 
-            // Generate tokens
             String accessToken = jwtUtil.generateAccessToken(userDetails);
-            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+            String refreshTokenString = jwtUtil.generateRefreshToken(userDetails);
 
-            // Update last login time
+            // Lưu Refresh Token
+            RefreshToken newRefreshToken = new RefreshToken();
+            newRefreshToken.setUser(user);
+            newRefreshToken.setToken(refreshTokenString);
+            newRefreshToken.setExpiresAt(LocalDateTime.now().plus(refreshTokenExpirationMs, ChronoUnit.MILLIS));
+            newRefreshToken.setIsRevoked(false);
+            refreshTokenRepository.save(newRefreshToken);
+
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
@@ -68,9 +94,9 @@ public class SignInService {
             // Build response
             return SignInResponse.builder()
                     .accessToken(accessToken)
-                    .refreshToken(refreshToken)
+                    .refreshToken(refreshTokenString)
                     .tokenType("Bearer")
-                    .expiresIn(3600L) // 1 hour in seconds
+                    .expiresIn(accessTokenExpirationMs / 1000)
                     .userId(user.getId())
                     .email(user.getEmail())
                     .fullName(user.getFullName())
@@ -78,7 +104,6 @@ public class SignInService {
                     .build();
 
         } catch (EmailNotVerifiedException e) {
-            // Re-throw EmailNotVerifiedException để GlobalExceptionHandler xử lý
             log.error("Sign in failed for user {}: Email not verified", request.getEmail());
             throw e;
         } catch (BadCredentialsException e) {
@@ -87,4 +112,3 @@ public class SignInService {
         }
     }
 }
-
