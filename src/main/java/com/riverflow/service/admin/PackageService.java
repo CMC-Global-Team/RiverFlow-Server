@@ -295,7 +295,7 @@ public class PackageService {
                 .code(currency.getCode())
                 .name(currency.getName())
                 .symbol(currency.getSymbol())
-                .decimalPlaces(currency.getDecimalPlaces())
+                .decimalPlaces(currency.getDecimalPlaces().intValue())
                 .isActive(currency.getIsActive())
                 .build();
     }
