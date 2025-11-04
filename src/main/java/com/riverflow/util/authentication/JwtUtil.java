@@ -83,6 +83,10 @@ public class JwtUtil {
      */
     public String generateAccessToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
+        // Add role/authorities to JWT claims
+        claims.put("authorities", userDetails.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .toList());
         return createToken(claims, userDetails.getUsername(), jwtConfig.getAccessTokenExpirationMs());
     }
 
