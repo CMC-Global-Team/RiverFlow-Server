@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +18,8 @@ import java.time.LocalDateTime;
     @Index(name = "idx_user_id", columnList = "user_id"),
     @Index(name = "idx_expires", columnList = "expires_at")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -31,27 +34,26 @@ public class RefreshToken {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_refresh_token_user"))
-    @NotNull(message = "User is required")
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User user;
     
     /**
      * The refresh token string
      */
     @Column(nullable = false, unique = true, length = 500)
-    @NotBlank(message = "Token is required")
     private String token;
     
     /**
      * Token expiration timestamp
      */
     @Column(name = "expires_at", nullable = false)
-    @NotNull(message = "Expiration time is required")
     private LocalDateTime expiresAt;
     
     /**
      * Whether this token has been revoked
      */
     @Column(name = "is_revoked", nullable = false)
+    @Builder.Default
     private Boolean isRevoked = false;
     
     /**
