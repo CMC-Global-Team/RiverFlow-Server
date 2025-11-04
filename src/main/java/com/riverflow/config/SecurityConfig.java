@@ -70,8 +70,9 @@ public class SecurityConfig {
                 // Cấu hình phân quyền cho các request
                 .authorizeHttpRequests(authz -> authz
                         // Cho phép truy cập công khai vào các đường dẫn này
+                        // Lưu ý: Do có context-path=/api, nên path ở đây không cần /api prefix
                         .requestMatchers(
-                                "/api/auth/**",         // API xác thực
+                                "/auth/**",             // API xác thực (context-path đã có /api)
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
