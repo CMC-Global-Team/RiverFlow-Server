@@ -169,11 +169,9 @@ public class PackageService {
         Package updatedPackage = packageRepository.save(pkg);
         log.info("Updated package: {} (ID: {})", updatedPackage.getName(), updatedPackage.getId());
         
-        // Update prices
-        if (request.getPrices() != null) {
-            // Delete existing prices and create new ones
-            packagePriceRepository.deleteByPackageEntityId(id);
-            createPackagePrices(updatedPackage, request.getPrices());
+        // Update prices (upsert logic)
+        if (request.getPrices() != null && !request.getPrices().isEmpty()) {
+            updatePackagePrices(updatedPackage, request.getPrices());
         }
         
         return convertToResponse(updatedPackage);
@@ -326,6 +324,47 @@ public class PackageService {
                     .build();
             
             packagePriceRepository.save(packagePrice);
+        }
+    }
+    
+    /**
+     * Update package prices (upsert logic to avoid duplicate key errors)
+     */
+    private void updatePackagePrices(Package pkg, List<PackageRequest.PriceData> pricesData) {
+        // Get existing prices
+        List<PackagePrice> existingPrices = packagePriceRepository.findByPackageEntityId(pkg.getId());
+        
+        for (PackageRequest.PriceData priceData : pricesData) {
+            Currency currency = currencyRepository.findByCode(priceData.getCurrencyCode())
+                    .orElseThrow(() -> new InvalidTokenException("Currency not found: " + priceData.getCurrencyCode()));
+            
+            // Find existing price for this currency
+            PackagePrice existingPrice = existingPrices.stream()
+                    .filter(p -> p.getCurrency().getId().equals(currency.getId()))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (existingPrice != null) {
+                // Update existing price
+                existingPrice.setPrice(priceData.getPrice());
+                existingPrice.setPromotionalPrice(priceData.getPromotionalPrice());
+                existingPrice.setPromotionStartDate(parseDateTime(priceData.getPromotionStartDate()));
+                existingPrice.setPromotionEndDate(parseDateTime(priceData.getPromotionEndDate()));
+                existingPrice.setIsActive(true);
+                packagePriceRepository.save(existingPrice);
+            } else {
+                // Create new price
+                PackagePrice newPrice = PackagePrice.builder()
+                        .packageEntity(pkg)
+                        .currency(currency)
+                        .price(priceData.getPrice())
+                        .promotionalPrice(priceData.getPromotionalPrice())
+                        .promotionStartDate(parseDateTime(priceData.getPromotionStartDate()))
+                        .promotionEndDate(parseDateTime(priceData.getPromotionEndDate()))
+                        .isActive(true)
+                        .build();
+                packagePriceRepository.save(newPrice);
+            }
         }
     }
     
