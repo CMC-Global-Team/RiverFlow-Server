@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import io.jsonwebtoken.io.Decoders;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,7 @@ public class JwtUtil {
      * Get signing key from secret
      */
     private SecretKey getSigningKey() {
-        byte[] keyBytes = jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = Decoders.BASE64.decode(jwtConfig.getSecret());
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
