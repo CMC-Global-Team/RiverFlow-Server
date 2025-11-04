@@ -25,7 +25,7 @@ public class ForgotPasswordController {
     @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         forgotPasswordService.sendPasswordResetEmail(request);
-        return ResponseEntity.ok(new MessageResponse("Nếu email tồn tại, link đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư."));
+        return ResponseEntity.ok(new MessageResponse("Link đặt lại mật khẩu đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư."));
     }
 }
 

@@ -40,14 +40,10 @@ public class ForgotPasswordService {
     public void sendPasswordResetEmail(ForgotPasswordRequest request) {
         // Find user
         User user = userRepository.findByEmail(request.getEmail())
-                .orElse(null);
-
-        // For security reasons, don't reveal if email exists or not
-        if (user == null) {
-            log.warn("Password reset requested for non-existent email: {}", request.getEmail());
-            // Still return success to prevent email enumeration
-            return;
-        }
+                .orElseThrow(() -> {
+                    log.warn("Password reset requested for non-existent email: {}", request.getEmail());
+                    return new IllegalArgumentException("Tài khoản với email này chưa được đăng ký");
+                });
 
         // Generate reset token
         String token = UUID.randomUUID().toString();
