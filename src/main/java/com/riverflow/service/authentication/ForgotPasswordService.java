@@ -27,8 +27,8 @@ public class ForgotPasswordService {
     private final PasswordResetRepository passwordResetRepository;
     private final EmailService emailService;
 
-    @Value("${app.backend.url:http://localhost:8080/api}")
-    private String backendUrl;
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
 
     @Value("${app.verification.expire-minutes:15}")
     private int resetTokenExpireMinutes;
@@ -56,7 +56,7 @@ public class ForgotPasswordService {
         passwordResetRepository.save(resetToken);
 
         // Send reset email
-        String resetLink = backendUrl + "/auth/reset-password?token=" + token;
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
         String emailBody = "Chào " + user.getFullName() + ",\n\n"
                 + "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.\n"
                 + "Vui lòng nhấn vào đường link bên dưới để đặt lại mật khẩu:\n"
