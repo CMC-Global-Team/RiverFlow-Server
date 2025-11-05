@@ -34,7 +34,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getEmail())
                 .password(user.getPasswordHash())
-                .authorities(Collections.singleton(new SimpleGrantedAuthority("ROLE_" + user.getRole().name().toUpperCase())))
+                .authorities(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")))
                 .accountExpired(false)
                 .accountLocked(user.getStatus() == User.UserStatus.suspended)
                 .credentialsExpired(false)
