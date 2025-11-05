@@ -15,10 +15,8 @@ import java.time.LocalDateTime;
 @Table(name = "users", indexes = {
     @Index(name = "idx_email", columnList = "email"),
     @Index(name = "idx_oauth", columnList = "oauth_provider, oauth_id"),
-    @Index(name = "idx_role", columnList = "role"),
     @Index(name = "idx_status", columnList = "status"),
-    @Index(name = "idx_preferred_currency", columnList = "preferred_currency_id"),
-    @Index(name = "idx_users_created_at", columnList = "created_at")
+    @Index(name = "idx_created_at", columnList = "created_at")
 })
 @Getter
 @Setter
@@ -54,13 +52,6 @@ public class User {
      */
     @Column(length = 500)
     private String avatar;
-    
-    /**
-     * User role in the system
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private UserRole role = UserRole.user;
     
     /**
      * Account status
@@ -101,13 +92,6 @@ public class User {
     // User preferences
     
     /**
-     * User's preferred currency for display
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "preferred_currency_id", foreignKey = @ForeignKey(name = "fk_user_preferred_currency"))
-    private Currency preferredCurrency;
-    
-    /**
      * Preferred language code (en, vi, etc.)
      */
     @Column(name = "preferred_language", length = 10)
@@ -118,6 +102,13 @@ public class User {
      */
     @Column(length = 50)
     private String timezone = "UTC";
+    
+    /**
+     * UI theme preference
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Theme theme = Theme.light;
     
     // Timestamps
     
@@ -137,10 +128,6 @@ public class User {
     
     // Enums
     
-    public enum UserRole {
-        user
-    }
-    
     public enum UserStatus {
         active,
         suspended,
@@ -150,7 +137,14 @@ public class User {
     public enum OAuthProvider {
         email,
         google,
-        github
+        github,
+        facebook
+    }
+    
+    public enum Theme {
+        light,
+        dark,
+        auto
     }
 }
 
