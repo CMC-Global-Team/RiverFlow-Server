@@ -14,7 +14,6 @@ import java.util.Map;
 
 /**
  * Entity representing service packages (Free, Pro, Enterprise, etc.)
- * Created and managed by administrators
  */
 @Entity
 @Table(name = "packages", indexes = {

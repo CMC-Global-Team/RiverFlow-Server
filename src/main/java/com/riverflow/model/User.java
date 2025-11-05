@@ -1,7 +1,6 @@
 package com.riverflow.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -139,7 +138,6 @@ public class User {
     // Enums
     
     public enum UserRole {
-        admin,
         user
     }
     

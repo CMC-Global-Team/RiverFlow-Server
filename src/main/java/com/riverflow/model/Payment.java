@@ -141,27 +141,6 @@ public class Payment {
     @Column(columnDefinition = "JSON")
     private Map<String, Object> metadata;
     
-    // Admin actions
-    
-    /**
-     * Admin who verified this payment
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "verified_by", foreignKey = @ForeignKey(name = "fk_payment_verified_by"))
-    private User verifiedBy;
-    
-    /**
-     * Timestamp when payment was verified
-     */
-    @Column(name = "verified_at")
-    private LocalDateTime verifiedAt;
-    
-    /**
-     * Admin notes about the payment
-     */
-    @Column(columnDefinition = "TEXT")
-    private String notes;
-    
     // Timestamps
     
     @CreationTimestamp
