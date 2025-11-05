@@ -1,9 +1,9 @@
 // ==============================================================================
-// FILE: mongodb_schema.js
+// FILE: mongo.js
 // ==============================================================================
-// MongoDB Schema for RiverFlow Mindmap Real-time System (using Mongoose)
-// Version: 2.0 (Optimized)
-// Description: Mindmap data, nodes, collaboration, history, real-time sessions
+// MongoDB Schema for RiverFlow Mindmap (ReactFlow Compatible)
+// Version: 3.0 (ReactFlow Optimized)
+// Description: Optimized for ReactFlow - nodes, edges, collaboration, real-time
 // ==============================================================================
 
 const mongoose = require('mongoose');
@@ -14,7 +14,8 @@ const Schema = mongoose.Schema;
 // ==============================================================================
 
 /**
- * Node Schema - Individual node in mindmap
+ * Node Schema - Compatible with ReactFlow
+ * ReactFlow format: { id, type, position: {x, y}, data: {...}, style, ... }
  */
 const nodeSchema = new Schema({
   id: {
@@ -24,74 +25,81 @@ const nodeSchema = new Schema({
   },
   type: {
     type: String,
-    enum: ['root', 'branch', 'leaf', 'floating'],
-    default: 'branch',
-    description: 'Type of node in the mindmap'
-  },
-  content: {
-    text: { type: String, required: true },
-    html: { type: String }, // Rich text content
-    format: {
-      fontSize: { type: Number, default: 14 },
-      fontFamily: { type: String, default: 'Arial' },
-      fontWeight: { type: String, default: 'normal' },
-      fontStyle: { type: String, default: 'normal' },
-      color: { type: String, default: '#000000' },
-      backgroundColor: { type: String, default: '#FFFFFF' },
-      borderColor: { type: String, default: '#CCCCCC' },
-      borderWidth: { type: Number, default: 1 },
-      borderRadius: { type: Number, default: 4 }
-    }
+    default: 'default',
+    description: 'ReactFlow node type: default, input, output, or custom'
   },
   position: {
     x: { type: Number, required: true, default: 0 },
-    y: { type: Number, required: true, default: 0 },
-    z: { type: Number, default: 0 } // Layer order
+    y: { type: Number, required: true, default: 0 }
   },
-  size: {
-    width: { type: Number, default: 150 },
-    height: { type: Number, default: 50 }
-  },
-  parent: {
-    type: String,
-    default: null,
-    description: 'Parent node ID'
-  },
-  children: [{
-    type: String,
-    description: 'Array of child node IDs'
-  }],
-  metadata: {
-    icon: { type: String }, // Icon name or URL
-    image: { type: String }, // Image URL
-    link: { type: String }, // External link
-    tags: [{ type: String }], // Tags for categorization
-    notes: { type: String }, // Additional notes
-    priority: { type: Number, min: 1, max: 5, default: 3 },
-    completed: { type: Boolean, default: false }
-  },
-  collapsed: {
-    type: Boolean,
-    default: false,
-    description: 'Whether children are collapsed'
-  },
-  createdBy: {
-    type: Number,
+  data: {
+    type: Schema.Types.Mixed,
     required: true,
-    description: 'MySQL user ID who created this node'
+    description: 'Node data object (label, content, icons, etc.)'
+    // Typical structure:
+    // {
+    //   label: 'Node text',
+    //   content: 'Full content',
+    //   icon: 'icon-name',
+    //   color: '#fff',
+    //   backgroundColor: '#000',
+    //   metadata: {...}
+    // }
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  // Optional ReactFlow fields
+  style: {
+    type: Schema.Types.Mixed,
+    description: 'CSS style object for the node'
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  className: {
+    type: String,
+    description: 'CSS class name'
+  },
+  draggable: {
+    type: Boolean,
+    default: true
+  },
+  selectable: {
+    type: Boolean,
+    default: true
+  },
+  connectable: {
+    type: Boolean,
+    default: true
+  },
+  deletable: {
+    type: Boolean,
+    default: true
+  },
+  dragHandle: {
+    type: String,
+    description: 'CSS selector for drag handle'
+  },
+  // Custom fields for mindmap features
+  parentNode: {
+    type: String,
+    description: 'Parent node ID for grouping'
+  },
+  extent: {
+    type: String,
+    enum: ['parent'],
+    description: 'Node movement extent'
+  },
+  expandParent: {
+    type: Boolean,
+    default: false
+  },
+  // Mindmap-specific metadata
+  metadata: {
+    createdBy: { type: Number, description: 'MySQL user ID' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
   }
 }, { _id: false });
 
 /**
- * Edge Schema - Connection between nodes
+ * Edge Schema - Compatible with ReactFlow
+ * ReactFlow format: { id, source, target, type, animated, label, style, ... }
  */
 const edgeSchema = new Schema({
   id: {
@@ -109,49 +117,88 @@ const edgeSchema = new Schema({
     required: true,
     description: 'Target node ID'
   },
+  sourceHandle: {
+    type: String,
+    description: 'Source handle ID (for multiple connection points)'
+  },
+  targetHandle: {
+    type: String,
+    description: 'Target handle ID'
+  },
   type: {
     type: String,
-    enum: ['straight', 'curved', 'bezier', 'step'],
-    default: 'curved'
-  },
-  style: {
-    strokeColor: { type: String, default: '#999999' },
-    strokeWidth: { type: Number, default: 2 },
-    strokeStyle: {
-      type: String,
-      enum: ['solid', 'dashed', 'dotted'],
-      default: 'solid'
-    }
-  },
-  label: {
-    text: { type: String },
-    position: { type: Number, default: 0.5 } // 0-1, position along the edge
+    default: 'default',
+    description: 'ReactFlow edge type: default, straight, step, smoothstep, or custom'
   },
   animated: {
     type: Boolean,
     default: false
+  },
+  label: {
+    type: String,
+    description: 'Edge label text'
+  },
+  labelStyle: {
+    type: Schema.Types.Mixed,
+    description: 'CSS style for label'
+  },
+  labelShowBg: {
+    type: Boolean,
+    default: true
+  },
+  labelBgStyle: {
+    type: Schema.Types.Mixed,
+    description: 'CSS style for label background'
+  },
+  labelBgPadding: {
+    type: [Number],
+    description: 'Label background padding [x, y]'
+  },
+  labelBgBorderRadius: {
+    type: Number,
+    description: 'Label background border radius'
+  },
+  style: {
+    type: Schema.Types.Mixed,
+    description: 'CSS style object for the edge'
+  },
+  markerStart: {
+    type: Schema.Types.Mixed,
+    description: 'Marker at the start of the edge'
+  },
+  markerEnd: {
+    type: Schema.Types.Mixed,
+    description: 'Marker at the end of the edge'
+  },
+  // Custom fields
+  data: {
+    type: Schema.Types.Mixed,
+    description: 'Custom edge data'
+  },
+  // Mindmap-specific metadata
+  metadata: {
+    createdBy: { type: Number, description: 'MySQL user ID' },
+    createdAt: { type: Date, default: Date.now }
   }
 }, { _id: false });
 
 /**
- * Collaborator Schema - Users who can access the mindmap
+ * Collaborator Schema
  */
 const collaboratorSchema = new Schema({
   mysqlUserId: {
     type: Number,
     required: true,
-    description: 'MySQL user ID of the collaborator'
+    description: 'MySQL user ID'
   },
   role: {
     type: String,
     enum: ['owner', 'editor', 'viewer'],
-    required: true,
-    description: 'Permission level for this collaborator'
+    required: true
   },
   invitedBy: {
     type: Number,
-    required: true,
-    description: 'MySQL user ID who sent the invitation'
+    required: true
   },
   invitedAt: {
     type: Date,
@@ -169,18 +216,15 @@ const collaboratorSchema = new Schema({
 }, { _id: false });
 
 // ==============================================================================
-// MAIN SCHEMAS
+// MAIN MINDMAP SCHEMA
 // ==============================================================================
 
-/**
- * Mindmap Schema - Main document for storing mindmaps
- */
 const MindmapSchema = new Schema({
   mysqlUserId: {
     type: Number,
     required: true,
     index: true,
-    description: 'Owner user ID from MySQL database'
+    description: 'Owner user ID from MySQL'
   },
   title: {
     type: String,
@@ -196,78 +240,74 @@ const MindmapSchema = new Schema({
   },
   thumbnail: {
     type: String,
-    description: 'URL to mindmap thumbnail image'
+    description: 'URL to thumbnail'
   },
+  
+  // ReactFlow data
   nodes: {
     type: [nodeSchema],
     default: [],
-    description: 'Array of nodes in the mindmap'
+    description: 'ReactFlow nodes array'
   },
   edges: {
     type: [edgeSchema],
     default: [],
-    description: 'Array of edges connecting nodes'
+    description: 'ReactFlow edges array'
   },
+  
+  // ReactFlow viewport settings
+  viewport: {
+    x: { type: Number, default: 0 },
+    y: { type: Number, default: 0 },
+    zoom: { type: Number, default: 1, min: 0.1, max: 4 }
+  },
+  
+  // Canvas settings
   settings: {
-    theme: {
+    fitView: { type: Boolean, default: true },
+    snapToGrid: { type: Boolean, default: false },
+    snapGrid: {
+      type: [Number],
+      default: [15, 15],
+      description: 'Grid size [x, y]'
+    },
+    nodesDraggable: { type: Boolean, default: true },
+    nodesConnectable: { type: Boolean, default: true },
+    elementsSelectable: { type: Boolean, default: true },
+    panOnDrag: { type: Boolean, default: true },
+    panOnScroll: { type: Boolean, default: false },
+    zoomOnScroll: { type: Boolean, default: true },
+    zoomOnPinch: { type: Boolean, default: true },
+    zoomOnDoubleClick: { type: Boolean, default: true },
+    defaultEdgeOptions: {
+      type: Schema.Types.Mixed,
+      description: 'Default edge configuration'
+    },
+    connectionMode: {
       type: String,
-      enum: ['light', 'dark', 'auto'],
-      default: 'light'
-    },
-    layout: {
-      type: String,
-      enum: ['tree', 'mind', 'org', 'radial', 'free'],
-      default: 'mind'
-    },
-    direction: {
-      type: String,
-      enum: ['horizontal', 'vertical'],
-      default: 'horizontal'
-    },
-    gridEnabled: {
-      type: Boolean,
-      default: true
-    },
-    snapToGrid: {
-      type: Boolean,
-      default: false
-    },
-    gridSize: {
-      type: Number,
-      default: 20
-    },
-    zoom: {
-      type: Number,
-      default: 1,
-      min: 0.1,
-      max: 3
-    },
-    canvasSize: {
-      width: { type: Number, default: 5000 },
-      height: { type: Number, default: 5000 }
+      enum: ['strict', 'loose'],
+      default: 'strict'
     }
   },
+  
+  // Sharing & Collaboration
   isPublic: {
     type: Boolean,
     default: false,
-    index: true,
-    description: 'Whether mindmap is publicly accessible'
+    index: true
   },
   shareToken: {
     type: String,
     unique: true,
-    sparse: true,
-    description: 'Token for public sharing link'
+    sparse: true
   },
   collaborators: {
     type: [collaboratorSchema],
-    default: [],
-    description: 'Users who have access to this mindmap'
+    default: []
   },
-  tags: [{
-    type: String,
-    trim: true
-  }],
+  
+  // Organization
+  tags: [{ type: String, trim: true }],
   category: {
     type: String,
     enum: ['work', 'personal', 'education', 'project', 'brainstorming', 'ai-generated', 'other'],
@@ -275,13 +315,11 @@ const MindmapSchema = new Schema({
   },
   isFavorite: {
     type: Boolean,
-    default: false,
-    description: 'Marked as favorite by owner'
+    default: false
   },
   isTemplate: {
     type: Boolean,
-    default: false,
-    description: 'Can be used as a template'
+    default: false
   },
   status: {
     type: String,
@@ -289,37 +327,37 @@ const MindmapSchema = new Schema({
     default: 'active',
     index: true
   },
+  
   // AI Integration
   aiGenerated: {
     type: Boolean,
-    default: false,
-    description: 'Generated by AI workflow'
+    default: false
   },
   aiWorkflowId: {
     type: Number,
-    description: 'MySQL AI workflow ID if generated by AI'
+    description: 'MySQL AI workflow ID'
   },
   aiMetadata: {
-    type: Schema.Types.Mixed,
-    description: 'AI generation metadata (prompt, parameters, etc.)'
+    type: Schema.Types.Mixed
   },
+  
   // Metadata
   metadata: {
     nodeCount: { type: Number, default: 0 },
     edgeCount: { type: Number, default: 0 },
-    lastEditedBy: { type: Number }, // MySQL user ID
+    lastEditedBy: { type: Number },
     viewCount: { type: Number, default: 0 },
     forkCount: { type: Number, default: 0 },
     forkedFrom: { type: Schema.Types.ObjectId, ref: 'Mindmap' }
   }
 }, {
-  timestamps: true, // Automatically adds createdAt and updatedAt
+  timestamps: true,
   collection: 'mindmaps'
 });
 
-// Indexes for performance
+// Indexes
 MindmapSchema.index({ mysqlUserId: 1, status: 1 });
-MindmapSchema.index({ title: 'text', description: 'text' }); // Full-text search
+MindmapSchema.index({ title: 'text', description: 'text' });
 MindmapSchema.index({ tags: 1 });
 MindmapSchema.index({ isPublic: 1, status: 1 });
 MindmapSchema.index({ 'collaborators.mysqlUserId': 1 });
@@ -328,12 +366,12 @@ MindmapSchema.index({ updatedAt: -1 });
 MindmapSchema.index({ aiWorkflowId: 1 });
 MindmapSchema.index({ category: 1 });
 
-// Virtual for getting collaborator count
+// Virtuals
 MindmapSchema.virtual('collaboratorCount').get(function() {
   return this.collaborators.filter(c => c.status === 'accepted').length;
 });
 
-// Pre-save hook to update metadata
+// Pre-save hook
 MindmapSchema.pre('save', function(next) {
   this.metadata.nodeCount = this.nodes.length;
   this.metadata.edgeCount = this.edges.length;
@@ -341,11 +379,9 @@ MindmapSchema.pre('save', function(next) {
 });
 
 // ==============================================================================
-// MINDMAP HISTORY SCHEMA
+// HISTORY SCHEMA
 // ==============================================================================
-/**
- * Track all changes to mindmaps for undo/redo and audit trail
- */
+
 const MindmapHistorySchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -356,38 +392,28 @@ const MindmapHistorySchema = new Schema({
   mysqlUserId: {
     type: Number,
     required: true,
-    index: true,
-    description: 'User who made the change'
+    index: true
   },
   action: {
     type: String,
     enum: [
-      'create',
-      'update',
-      'delete',
-      'node_add',
-      'node_update',
-      'node_delete',
-      'node_move',
-      'edge_add',
-      'edge_update',
-      'edge_delete',
-      'settings_update',
-      'collaborator_add',
-      'collaborator_remove',
-      'restore',
-      'ai_generate'
+      'create', 'update', 'delete',
+      'node_add', 'node_update', 'node_delete', 'node_move',
+      'edge_add', 'edge_update', 'edge_delete',
+      'viewport_change', 'settings_update',
+      'collaborator_add', 'collaborator_remove',
+      'restore', 'ai_generate'
     ],
     required: true,
     index: true
   },
   changes: {
     type: Schema.Types.Mixed,
-    description: 'Delta/diff of what changed (for efficient storage)'
+    description: 'Delta/diff of changes'
   },
   snapshot: {
     type: Schema.Types.Mixed,
-    description: 'Full snapshot (stored periodically, not for every change)'
+    description: 'Periodic full snapshot'
   },
   metadata: {
     ip: { type: String },
@@ -399,23 +425,14 @@ const MindmapHistorySchema = new Schema({
   collection: 'mindmap_history'
 });
 
-// Indexes
 MindmapHistorySchema.index({ mindmapId: 1, createdAt: -1 });
 MindmapHistorySchema.index({ mysqlUserId: 1, createdAt: -1 });
-MindmapHistorySchema.index({ action: 1 });
-
-// TTL index - automatically delete history older than 90 days (configurable)
-MindmapHistorySchema.index(
-  { createdAt: 1 }, 
-  { expireAfterSeconds: 7776000 } // 90 days
-);
+MindmapHistorySchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 days
 
 // ==============================================================================
-// MINDMAP VERSIONS SCHEMA
+// VERSION SCHEMA
 // ==============================================================================
-/**
- * Store major versions of mindmaps (snapshots)
- */
+
 const MindmapVersionSchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -425,14 +442,12 @@ const MindmapVersionSchema = new Schema({
   },
   version: {
     type: Number,
-    required: true,
-    description: 'Version number (incremental)'
+    required: true
   },
   name: {
     type: String,
     trim: true,
-    maxlength: 255,
-    description: 'Optional version name/label'
+    maxlength: 255
   },
   description: {
     type: String,
@@ -442,39 +457,29 @@ const MindmapVersionSchema = new Schema({
   snapshot: {
     type: Schema.Types.Mixed,
     required: true,
-    description: 'Complete snapshot of the mindmap at this version'
+    description: 'Full mindmap snapshot'
   },
   createdBy: {
     type: Number,
-    required: true,
-    description: 'MySQL user ID who created this version'
+    required: true
   },
-  tags: [{
-    type: String,
-    description: 'Version tags like "stable", "draft", "reviewed"'
-  }],
+  tags: [String],
   isAutoSave: {
     type: Boolean,
-    default: false,
-    description: 'Whether this was an automatic save'
+    default: false
   }
 }, {
   timestamps: { createdAt: true, updatedAt: false },
   collection: 'mindmap_versions'
 });
 
-// Indexes
 MindmapVersionSchema.index({ mindmapId: 1, version: -1 });
-MindmapVersionSchema.index({ mindmapId: 1, createdAt: -1 });
 MindmapVersionSchema.index({ mindmapId: 1, version: 1 }, { unique: true });
 
 // ==============================================================================
-// REALTIME SESSIONS SCHEMA
+// REALTIME SESSION SCHEMA
 // ==============================================================================
-/**
- * Track active real-time editing sessions
- * Used for showing who's online and cursor positions
- */
+
 const RealtimeSessionSchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -491,23 +496,23 @@ const RealtimeSessionSchema = new Schema({
     type: String,
     required: true,
     index: true,
-    description: 'Socket.IO connection ID'
+    unique: true
   },
   userInfo: {
-    email: { type: String },
-    fullName: { type: String },
-    avatar: { type: String },
-    color: { type: String, description: 'Assigned color for cursor and selections' }
+    email: String,
+    fullName: String,
+    avatar: String,
+    color: String
   },
   cursor: {
-    x: { type: Number },
-    y: { type: Number },
-    nodeId: { type: String, description: 'Currently selected/editing node' }
+    x: Number,
+    y: Number,
+    nodeId: String
   },
   viewport: {
-    x: { type: Number },
-    y: { type: Number },
-    zoom: { type: Number }
+    x: Number,
+    y: Number,
+    zoom: Number
   },
   isActive: {
     type: Boolean,
@@ -516,8 +521,7 @@ const RealtimeSessionSchema = new Schema({
   },
   isEditing: {
     type: Boolean,
-    default: false,
-    description: 'Currently making changes'
+    default: false
   },
   lastActivity: {
     type: Date,
@@ -529,23 +533,13 @@ const RealtimeSessionSchema = new Schema({
   collection: 'realtime_sessions'
 });
 
-// Indexes
 RealtimeSessionSchema.index({ mindmapId: 1, isActive: 1 });
-RealtimeSessionSchema.index({ socketId: 1 }, { unique: true });
-
-// TTL index - automatically remove inactive sessions after 1 hour
-RealtimeSessionSchema.index(
-  { lastActivity: 1 },
-  { expireAfterSeconds: 3600 }
-);
+RealtimeSessionSchema.index({ lastActivity: 1 }, { expireAfterSeconds: 3600 }); // 1 hour
 
 // ==============================================================================
-// COLLABORATION INVITATIONS SCHEMA
+// COLLABORATION INVITATION SCHEMA
 // ==============================================================================
-/**
- * Track collaboration invitations (separate from embedded collaborators)
- * Useful for managing pending invitations and notifications
- */
+
 const CollaborationInvitationSchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -555,8 +549,7 @@ const CollaborationInvitationSchema = new Schema({
   },
   invitedByUserId: {
     type: Number,
-    required: true,
-    description: 'MySQL user ID who sent invitation'
+    required: true
   },
   invitedEmail: {
     type: String,
@@ -566,8 +559,7 @@ const CollaborationInvitationSchema = new Schema({
     index: true
   },
   invitedUserId: {
-    type: Number,
-    description: 'MySQL user ID if user exists'
+    type: Number
   },
   role: {
     type: String,
@@ -583,25 +575,21 @@ const CollaborationInvitationSchema = new Schema({
   token: {
     type: String,
     unique: true,
-    required: true,
-    description: 'Invitation token for email link'
+    required: true
   },
   message: {
     type: String,
-    maxlength: 500,
-    description: 'Personal message from inviter'
+    maxlength: 500
   },
   expiresAt: {
     type: Date,
     required: true,
     index: true
   },
-  acceptedAt: {
-    type: Date
-  },
+  acceptedAt: Date,
   metadata: {
     sentViaEmail: { type: Boolean, default: false },
-    emailSentAt: { type: Date },
+    emailSentAt: Date,
     reminderCount: { type: Number, default: 0 }
   }
 }, {
@@ -609,23 +597,13 @@ const CollaborationInvitationSchema = new Schema({
   collection: 'collaboration_invitations'
 });
 
-// Indexes
 CollaborationInvitationSchema.index({ mindmapId: 1, invitedEmail: 1 });
-CollaborationInvitationSchema.index({ invitedUserId: 1, status: 1 });
-CollaborationInvitationSchema.index({ token: 1 });
-
-// TTL index - automatically delete expired invitations
-CollaborationInvitationSchema.index(
-  { expiresAt: 1 },
-  { expireAfterSeconds: 0 }
-);
+CollaborationInvitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 // ==============================================================================
-// MINDMAP COMMENTS SCHEMA
+// COMMENT SCHEMA
 // ==============================================================================
-/**
- * Comments on mindmap nodes (for collaboration)
- */
+
 const CommentSchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -636,63 +614,46 @@ const CommentSchema = new Schema({
   nodeId: {
     type: String,
     required: true,
-    index: true,
-    description: 'Node this comment is attached to'
+    index: true
   },
   mysqlUserId: {
     type: Number,
-    required: true,
-    description: 'Comment author'
+    required: true
   },
   content: {
     type: String,
     required: true,
     maxlength: 2000
   },
-  mentions: [{
-    type: Number,
-    description: 'MySQL user IDs mentioned in comment'
-  }],
+  mentions: [Number],
   resolved: {
     type: Boolean,
     default: false
   },
-  resolvedBy: {
-    type: Number,
-    description: 'MySQL user ID who resolved'
-  },
-  resolvedAt: {
-    type: Date
-  },
+  resolvedBy: Number,
+  resolvedAt: Date,
   parentCommentId: {
     type: Schema.Types.ObjectId,
-    ref: 'Comment',
-    description: 'For threaded replies'
+    ref: 'Comment'
   },
   isEdited: {
     type: Boolean,
     default: false
   },
-  editedAt: {
-    type: Date
-  }
+  editedAt: Date
 }, {
   timestamps: true,
   collection: 'comments'
 });
 
-// Indexes
 CommentSchema.index({ mindmapId: 1, nodeId: 1, createdAt: -1 });
 CommentSchema.index({ mysqlUserId: 1 });
 CommentSchema.index({ resolved: 1 });
-CommentSchema.index({ mentions: 1 });
 
 // ==============================================================================
-// MINDMAP ACTIVITIES SCHEMA
+// ACTIVITY SCHEMA
 // ==============================================================================
-/**
- * Activity feed for mindmaps (for notifications and activity log)
- */
+
 const MindmapActivitySchema = new Schema({
   mindmapId: {
     type: Schema.Types.ObjectId,
@@ -708,52 +669,27 @@ const MindmapActivitySchema = new Schema({
   activityType: {
     type: String,
     enum: [
-      'created',
-      'updated',
-      'viewed',
-      'shared',
-      'forked',
-      'commented',
-      'collaborator_added',
-      'collaborator_removed',
-      'version_created',
-      'exported',
-      'ai_generated',
-      'template_used'
+      'created', 'updated', 'viewed', 'shared', 'forked',
+      'commented', 'collaborator_added', 'collaborator_removed',
+      'version_created', 'exported', 'ai_generated', 'template_used'
     ],
     required: true,
     index: true
   },
-  description: {
-    type: String,
-    description: 'Human-readable description of the activity'
-  },
-  metadata: {
-    type: Schema.Types.Mixed,
-    description: 'Additional context about the activity'
-  }
+  description: String,
+  metadata: Schema.Types.Mixed
 }, {
   timestamps: { createdAt: true, updatedAt: false },
   collection: 'mindmap_activities'
 });
 
-// Indexes
 MindmapActivitySchema.index({ mindmapId: 1, createdAt: -1 });
-MindmapActivitySchema.index({ mysqlUserId: 1, createdAt: -1 });
-MindmapActivitySchema.index({ activityType: 1, createdAt: -1 });
-
-// TTL index - delete activities older than 180 days
-MindmapActivitySchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: 15552000 } // 180 days
-);
+MindmapActivitySchema.index({ createdAt: 1 }, { expireAfterSeconds: 15552000 }); // 180 days
 
 // ==============================================================================
-// TEMPLATES SCHEMA
+// TEMPLATE SCHEMA
 // ==============================================================================
-/**
- * Mindmap templates for quick start
- */
+
 const TemplateSchema = new Schema({
   name: {
     type: String,
@@ -766,51 +702,40 @@ const TemplateSchema = new Schema({
     trim: true,
     maxlength: 2000
   },
-  thumbnail: {
-    type: String,
-    description: 'URL to template thumbnail'
-  },
+  thumbnail: String,
   category: {
     type: String,
     enum: ['work', 'personal', 'education', 'project', 'brainstorming', 'ai-generated', 'other'],
     default: 'other'
   },
-  tags: [{ type: String, trim: true }],
+  tags: [String],
   
-  // Template content (same structure as mindmap)
+  // ReactFlow template data
   templateData: {
     nodes: [nodeSchema],
     edges: [edgeSchema],
-    settings: { type: Schema.Types.Mixed }
+    viewport: {
+      x: { type: Number, default: 0 },
+      y: { type: Number, default: 0 },
+      zoom: { type: Number, default: 1 }
+    },
+    settings: Schema.Types.Mixed
   },
   
-  // Template metadata
-  createdBy: {
-    type: Number,
-    description: 'MySQL user ID who created the template'
-  },
+  createdBy: Number,
   isOfficial: {
     type: Boolean,
-    default: false,
-    description: 'Official template from system'
+    default: false
   },
   isPublic: {
     type: Boolean,
     default: true
   },
-  
-  // AI Integration
-  aiWorkflowId: {
-    type: Number,
-    description: 'Associated AI workflow ID'
-  },
-  
-  // Usage statistics
+  aiWorkflowId: Number,
   usageCount: {
     type: Number,
     default: 0
   },
-  
   status: {
     type: String,
     enum: ['active', 'archived', 'deleted'],
@@ -821,12 +746,10 @@ const TemplateSchema = new Schema({
   collection: 'templates'
 });
 
-// Indexes
 TemplateSchema.index({ category: 1, status: 1 });
 TemplateSchema.index({ tags: 1 });
 TemplateSchema.index({ isOfficial: 1, isPublic: 1 });
 TemplateSchema.index({ usageCount: -1 });
-TemplateSchema.index({ aiWorkflowId: 1 });
 
 // ==============================================================================
 // CREATE MODELS
@@ -869,181 +792,156 @@ async function initializeDatabase() {
 }
 
 /**
- * Clean up expired sessions
+ * Transform ReactFlow data for MongoDB
  */
-async function cleanupExpiredSessions() {
-  try {
-    const oneHourAgo = new Date(Date.now() - 3600000);
-    
-    const result = await RealtimeSession.deleteMany({
-      lastActivity: { $lt: oneHourAgo }
-    });
-    
-    console.log(`Cleaned up ${result.deletedCount} expired sessions`);
-    return result;
-  } catch (error) {
-    console.error('Error cleaning up sessions:', error);
-    throw error;
-  }
+function prepareForSave(reactFlowData) {
+  const { nodes, edges, viewport } = reactFlowData;
+  
+  return {
+    nodes: nodes.map(node => ({
+      id: node.id,
+      type: node.type || 'default',
+      position: node.position,
+      data: node.data,
+      style: node.style,
+      className: node.className,
+      draggable: node.draggable,
+      selectable: node.selectable,
+      connectable: node.connectable,
+      deletable: node.deletable,
+      dragHandle: node.dragHandle,
+      parentNode: node.parentNode,
+      extent: node.extent,
+      expandParent: node.expandParent
+    })),
+    edges: edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: edge.sourceHandle,
+      targetHandle: edge.targetHandle,
+      type: edge.type || 'default',
+      animated: edge.animated,
+      label: edge.label,
+      labelStyle: edge.labelStyle,
+      labelShowBg: edge.labelShowBg,
+      labelBgStyle: edge.labelBgStyle,
+      labelBgPadding: edge.labelBgPadding,
+      labelBgBorderRadius: edge.labelBgBorderRadius,
+      style: edge.style,
+      markerStart: edge.markerStart,
+      markerEnd: edge.markerEnd,
+      data: edge.data
+    })),
+    viewport: viewport || { x: 0, y: 0, zoom: 1 }
+  };
 }
 
 /**
- * Create a new version snapshot
+ * Transform MongoDB data for ReactFlow
  */
-async function createVersionSnapshot(mindmapId, userId, versionName, description) {
-  try {
-    const mindmap = await Mindmap.findById(mindmapId);
-    if (!mindmap) {
-      throw new Error('Mindmap not found');
-    }
-    
-    // Get latest version number
-    const latestVersion = await MindmapVersion
-      .findOne({ mindmapId })
-      .sort({ version: -1 })
-      .limit(1);
-    
-    const newVersionNumber = latestVersion ? latestVersion.version + 1 : 1;
-    
-    const version = new MindmapVersion({
-      mindmapId,
-      version: newVersionNumber,
-      name: versionName,
-      description,
-      snapshot: mindmap.toObject(),
-      createdBy: userId
-    });
-    
-    await version.save();
-    console.log(`Created version ${newVersionNumber} for mindmap ${mindmapId}`);
-    return version;
-  } catch (error) {
-    console.error('Error creating version:', error);
-    throw error;
-  }
+function prepareForReactFlow(mindmapDoc) {
+  return {
+    nodes: mindmapDoc.nodes.map(node => ({
+      id: node.id,
+      type: node.type,
+      position: node.position,
+      data: node.data,
+      ...(node.style && { style: node.style }),
+      ...(node.className && { className: node.className }),
+      ...(node.draggable !== undefined && { draggable: node.draggable }),
+      ...(node.selectable !== undefined && { selectable: node.selectable }),
+      ...(node.connectable !== undefined && { connectable: node.connectable }),
+      ...(node.deletable !== undefined && { deletable: node.deletable }),
+      ...(node.dragHandle && { dragHandle: node.dragHandle }),
+      ...(node.parentNode && { parentNode: node.parentNode }),
+      ...(node.extent && { extent: node.extent }),
+      ...(node.expandParent !== undefined && { expandParent: node.expandParent })
+    })),
+    edges: mindmapDoc.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      ...(edge.sourceHandle && { sourceHandle: edge.sourceHandle }),
+      ...(edge.targetHandle && { targetHandle: edge.targetHandle }),
+      type: edge.type,
+      ...(edge.animated !== undefined && { animated: edge.animated }),
+      ...(edge.label && { label: edge.label }),
+      ...(edge.labelStyle && { labelStyle: edge.labelStyle }),
+      ...(edge.labelShowBg !== undefined && { labelShowBg: edge.labelShowBg }),
+      ...(edge.labelBgStyle && { labelBgStyle: edge.labelBgStyle }),
+      ...(edge.labelBgPadding && { labelBgPadding: edge.labelBgPadding }),
+      ...(edge.labelBgBorderRadius !== undefined && { labelBgBorderRadius: edge.labelBgBorderRadius }),
+      ...(edge.style && { style: edge.style }),
+      ...(edge.markerStart && { markerStart: edge.markerStart }),
+      ...(edge.markerEnd && { markerEnd: edge.markerEnd }),
+      ...(edge.data && { data: edge.data })
+    })),
+    viewport: mindmapDoc.viewport
+  };
 }
 
 /**
- * Get active collaborators for a mindmap
+ * Get user's mindmaps
  */
-async function getActiveCollaborators(mindmapId) {
-  try {
-    const sessions = await RealtimeSession.find({
-      mindmapId,
-      isActive: true,
-      lastActivity: { $gt: new Date(Date.now() - 300000) } // Last 5 minutes
-    }).sort({ connectedAt: -1 });
-    
-    return sessions;
-  } catch (error) {
-    console.error('Error getting active collaborators:', error);
-    throw error;
-  }
+async function getUserMindmaps(userId, options = {}) {
+  const {
+    status = 'active',
+    limit = 20,
+    skip = 0,
+    sortBy = 'updatedAt',
+    sortOrder = -1,
+    category = null,
+    searchQuery = null
+  } = options;
+  
+  const query = {
+    $or: [
+      { mysqlUserId: userId },
+      { 'collaborators.mysqlUserId': userId, 'collaborators.status': 'accepted' }
+    ],
+    status
+  };
+  
+  if (category) query.category = category;
+  if (searchQuery) query.$text = { $search: searchQuery };
+  
+  return await Mindmap.find(query)
+    .sort({ [sortBy]: sortOrder })
+    .limit(limit)
+    .skip(skip)
+    .select('-nodes -edges'); // Exclude large arrays for list view
 }
 
 /**
  * Create mindmap from template
  */
 async function createMindmapFromTemplate(templateId, userId, title) {
-  try {
-    const template = await Template.findById(templateId);
-    if (!template) {
-      throw new Error('Template not found');
-    }
-    
-    const mindmap = new Mindmap({
+  const template = await Template.findById(templateId);
+  if (!template) throw new Error('Template not found');
+  
+  const mindmap = new Mindmap({
+    mysqlUserId: userId,
+    title: title || template.name,
+    description: template.description,
+    nodes: template.templateData.nodes,
+    edges: template.templateData.edges,
+    viewport: template.templateData.viewport,
+    settings: template.templateData.settings,
+    category: template.category,
+    tags: template.tags,
+    collaborators: [{
       mysqlUserId: userId,
-      title: title || template.name,
-      description: template.description,
-      nodes: template.templateData.nodes,
-      edges: template.templateData.edges,
-      settings: template.templateData.settings,
-      category: template.category,
-      tags: template.tags,
-      collaborators: [{
-        mysqlUserId: userId,
-        role: 'owner',
-        invitedBy: userId,
-        status: 'accepted'
-      }]
-    });
-    
-    await mindmap.save();
-    
-    // Update template usage count
-    await Template.findByIdAndUpdate(templateId, { $inc: { usageCount: 1 } });
-    
-    console.log(`Created mindmap from template ${templateId}`);
-    return mindmap;
-  } catch (error) {
-    console.error('Error creating mindmap from template:', error);
-    throw error;
-  }
-}
-
-/**
- * Get user's mindmaps (owned + collaborated)
- */
-async function getUserMindmaps(userId, options = {}) {
-  try {
-    const {
-      status = 'active',
-      limit = 20,
-      skip = 0,
-      sortBy = 'updatedAt',
-      sortOrder = -1,
-      category = null,
-      searchQuery = null
-    } = options;
-    
-    const query = {
-      $or: [
-        { mysqlUserId: userId },
-        { 'collaborators.mysqlUserId': userId, 'collaborators.status': 'accepted' }
-      ],
-      status
-    };
-    
-    if (category) {
-      query.category = category;
-    }
-    
-    if (searchQuery) {
-      query.$text = { $search: searchQuery };
-    }
-    
-    const mindmaps = await Mindmap.find(query)
-      .sort({ [sortBy]: sortOrder })
-      .limit(limit)
-      .skip(skip)
-      .select('-nodes -edges'); // Exclude large arrays for list view
-    
-    return mindmaps;
-  } catch (error) {
-    console.error('Error getting user mindmaps:', error);
-    throw error;
-  }
-}
-
-/**
- * Record activity
- */
-async function recordActivity(mindmapId, userId, activityType, description, metadata = {}) {
-  try {
-    const activity = new MindmapActivity({
-      mindmapId,
-      mysqlUserId: userId,
-      activityType,
-      description,
-      metadata
-    });
-    
-    await activity.save();
-    return activity;
-  } catch (error) {
-    console.error('Error recording activity:', error);
-    throw error;
-  }
+      role: 'owner',
+      invitedBy: userId,
+      status: 'accepted'
+    }]
+  });
+  
+  await mindmap.save();
+  await Template.findByIdAndUpdate(templateId, { $inc: { usageCount: 1 } });
+  
+  return mindmap;
 }
 
 // ==============================================================================
@@ -1063,119 +961,65 @@ module.exports = {
   
   // Helper functions
   initializeDatabase,
-  cleanupExpiredSessions,
-  createVersionSnapshot,
-  getActiveCollaborators,
-  createMindmapFromTemplate,
+  prepareForSave,
+  prepareForReactFlow,
   getUserMindmaps,
-  recordActivity
+  createMindmapFromTemplate
 };
 
 // ==============================================================================
-// USAGE EXAMPLES
+// USAGE EXAMPLES WITH REACTFLOW
 // ==============================================================================
 /*
 
-// 1. Connect to MongoDB
-const mongoose = require('mongoose');
+// 1. Save ReactFlow data to MongoDB
+const { prepareForSave, Mindmap } = require('./mongo');
 
-mongoose.connect('mongodb://localhost:27017/riverflow_mindmap', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('Connected to MongoDB');
-  return initializeDatabase();
-})
-.catch(err => console.error('MongoDB connection error:', err));
+// ReactFlow instance data
+const reactFlowInstance = reactFlowInstanceRef.current;
+const { nodes, edges, viewport } = reactFlowInstance.toObject();
 
+const mindmapData = prepareForSave({ nodes, edges, viewport });
 
-// 2. Create a new mindmap
-const { Mindmap } = require('./mongodb_schema');
-
-const newMindmap = new Mindmap({
-  mysqlUserId: 1,
-  title: 'My First Mindmap',
-  description: 'A simple example mindmap',
-  nodes: [
-    {
-      id: 'node-1',
-      type: 'root',
-      content: {
-        text: 'Central Idea',
-        format: {
-          fontSize: 18,
-          fontWeight: 'bold',
-          backgroundColor: '#4A90E2'
-        }
-      },
-      position: { x: 0, y: 0 },
-      size: { width: 200, height: 60 },
-      createdBy: 1
-    }
-  ],
-  collaborators: [
-    {
-      mysqlUserId: 1,
-      role: 'owner',
-      invitedBy: 1,
-      status: 'accepted'
-    }
-  ]
-});
-
-await newMindmap.save();
-
-
-// 3. Create mindmap from AI workflow
-const aiMindmap = new Mindmap({
-  mysqlUserId: 1,
-  title: 'AI Generated: Skill Development Plan',
-  aiGenerated: true,
-  aiWorkflowId: 123, // MySQL workflow ID
-  aiMetadata: {
-    prompt: 'Create skill development plan for React',
-    workflow: 'skill-development-plan'
-  },
-  nodes: [...], // Generated nodes
+const mindmap = new Mindmap({
+  mysqlUserId: userId,
+  title: 'My Mindmap',
+  ...mindmapData,
   collaborators: [{
-    mysqlUserId: 1,
+    mysqlUserId: userId,
     role: 'owner',
-    invitedBy: 1,
+    invitedBy: userId,
     status: 'accepted'
   }]
 });
 
-await aiMindmap.save();
+await mindmap.save();
 
 
-// 4. Get user's mindmaps
-const mindmaps = await getUserMindmaps(userId, {
-  limit: 10,
-  category: 'work',
-  searchQuery: 'project planning'
+// 2. Load mindmap for ReactFlow
+const { prepareForReactFlow, Mindmap } = require('./mongo');
+
+const mindmap = await Mindmap.findById(mindmapId);
+const reactFlowData = prepareForReactFlow(mindmap);
+
+// Use in ReactFlow
+setNodes(reactFlowData.nodes);
+setEdges(reactFlowData.edges);
+setViewport(reactFlowData.viewport);
+
+
+// 3. Update mindmap from ReactFlow changes
+const { nodes, edges, viewport } = reactFlowInstance.toObject();
+const updateData = prepareForSave({ nodes, edges, viewport });
+
+await Mindmap.findByIdAndUpdate(mindmapId, {
+  ...updateData,
+  'metadata.lastEditedBy': userId
 });
 
 
-// 5. Create from template
-const mindmap = await createMindmapFromTemplate(
-  templateId,
-  userId,
-  'My Custom Title'
-);
-
-
-// 6. Record activity
-await recordActivity(
-  mindmapId,
-  userId,
-  'ai_generated',
-  'Generated mindmap using AI workflow',
-  { workflowId: 123, workflowName: 'Skill Development Plan' }
-);
+// 4. Create from template
+const mindmap = await createMindmapFromTemplate(templateId, userId, 'My Custom Title');
+const reactFlowData = prepareForReactFlow(mindmap);
 
 */
-
-// ==============================================================================
-// END OF SCHEMA
-// ==============================================================================
