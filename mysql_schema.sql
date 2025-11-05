@@ -2,12 +2,9 @@
 -- FILE: mysql_schema.sql
 -- ==============================================================================
 -- MySQL Database Schema for Mindmap Online Real-time System
--- Version: 1.0
--- Description: User management, authentication, authorization, payments, packages
+-- Version: 2.0 (Optimized)
+-- Description: User management, authentication, AI workflows
 -- ==============================================================================
-
--- Drop existing database if exists (use with caution in production)
--- DROP DATABASE IF EXISTS mindmap_system;
 
 -- Create database
 CREATE DATABASE IF NOT EXISTS mindmap_system 
@@ -15,49 +12,6 @@ CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
 USE mindmap_system;
-
--- ==============================================================================
--- CURRENCIES TABLE
--- ==============================================================================
--- Description: Supported currencies for multi-currency support
-CREATE TABLE currencies (
-    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    code VARCHAR(3) NOT NULL UNIQUE COMMENT 'ISO 4217 currency code (USD, EUR, VND, etc.)',
-    name VARCHAR(100) NOT NULL,
-    symbol VARCHAR(10) NOT NULL COMMENT 'Currency symbol ($, €, ₫, etc.)',
-    decimal_places TINYINT UNSIGNED NOT NULL DEFAULT 2 COMMENT 'Number of decimal places',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    display_order INT NOT NULL DEFAULT 0,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    INDEX idx_code (code),
-    INDEX idx_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ==============================================================================
--- EXCHANGE RATES TABLE
--- ==============================================================================
--- Description: Exchange rates between currencies (relative to base currency USD)
-CREATE TABLE exchange_rates (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    from_currency_id INT UNSIGNED NOT NULL,
-    to_currency_id INT UNSIGNED NOT NULL,
-    rate DECIMAL(20, 8) NOT NULL COMMENT 'Exchange rate (1 from_currency = rate to_currency)',
-    source VARCHAR(100) NULL COMMENT 'Rate source (API provider, manual, etc.)',
-    valid_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    valid_until TIMESTAMP NULL COMMENT 'NULL means currently active',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (from_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
-    FOREIGN KEY (to_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
-    INDEX idx_currencies (from_currency_id, to_currency_id),
-    INDEX idx_active (is_active, valid_from, valid_until),
-    INDEX idx_valid_dates (valid_from, valid_until),
-    UNIQUE KEY unique_active_rate (from_currency_id, to_currency_id, is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
 -- USERS TABLE
@@ -69,11 +23,10 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NULL COMMENT 'NULL for OAuth users',
     full_name VARCHAR(255) NOT NULL,
     avatar VARCHAR(500) NULL COMMENT 'URL to user avatar',
-    role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     status ENUM('active', 'suspended', 'deleted') NOT NULL DEFAULT 'active',
     
     -- OAuth fields
-    oauth_provider ENUM('email', 'google', 'github') NOT NULL DEFAULT 'email',
+    oauth_provider ENUM('email', 'google', 'github', 'facebook') NOT NULL DEFAULT 'email',
     oauth_id VARCHAR(255) NULL COMMENT 'ID from OAuth provider',
     
     -- Email verification
@@ -81,21 +34,19 @@ CREATE TABLE users (
     email_verified_at TIMESTAMP NULL,
     
     -- User preferences
-    preferred_currency_id INT UNSIGNED NULL COMMENT 'User preferred currency for display',
     preferred_language VARCHAR(10) DEFAULT 'en' COMMENT 'Language code (en, vi, etc.)',
     timezone VARCHAR(50) DEFAULT 'UTC',
+    theme ENUM('light', 'dark', 'auto') DEFAULT 'light',
     
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP NULL,
     
-    FOREIGN KEY (preferred_currency_id) REFERENCES currencies(id) ON DELETE SET NULL,
     INDEX idx_email (email),
     INDEX idx_oauth (oauth_provider, oauth_id),
-    INDEX idx_role (role),
     INDEX idx_status (status),
-    INDEX idx_preferred_currency (preferred_currency_id)
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
@@ -112,7 +63,8 @@ CREATE TABLE email_verifications (
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_token (token),
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
@@ -129,7 +81,8 @@ CREATE TABLE password_resets (
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_token (token),
-    INDEX idx_user_id (user_id)
+    INDEX idx_user_id (user_id),
+    INDEX idx_expires_at (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
@@ -149,197 +102,160 @@ CREATE TABLE refresh_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_token (token),
     INDEX idx_user_id (user_id),
-    INDEX idx_expires (expires_at)
+    INDEX idx_expires (expires_at),
+    INDEX idx_revoked (is_revoked)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
--- PACKAGES TABLE
+-- AI WORKFLOW CATEGORIES TABLE
 -- ==============================================================================
--- Description: Service packages created by admin (Free, Pro, Enterprise, etc.)
-CREATE TABLE packages (
+-- Description: Categories for AI workflows
+CREATE TABLE ai_workflow_categories (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT NULL,
-    slug VARCHAR(100) NOT NULL UNIQUE,
-    
-    -- Pricing (base price for reference, actual prices in package_prices table)
-    base_price DECIMAL(10, 2) NOT NULL DEFAULT 0.00 COMMENT 'Base price in USD for reference',
-    base_currency_id INT UNSIGNED NOT NULL COMMENT 'Base currency (usually USD)',
-    duration_days INT UNSIGNED NOT NULL DEFAULT 30 COMMENT 'Package duration in days',
-    
-    -- Limits
-    max_mindmaps INT UNSIGNED NOT NULL DEFAULT 10 COMMENT '0 = unlimited',
-    max_collaborators INT UNSIGNED NOT NULL DEFAULT 5 COMMENT '0 = unlimited',
-    max_storage_mb INT UNSIGNED NOT NULL DEFAULT 100 COMMENT 'Storage limit in MB',
-    
-    -- Features (stored as JSON for flexible checkbox configuration)
-    features JSON NULL COMMENT 'Package features: {"real_time": true, "export_pdf": true, "templates": true, ...}',
-    
-    -- Status
+    icon VARCHAR(100) NULL COMMENT 'Icon name or emoji',
+    color VARCHAR(7) NULL COMMENT 'Hex color code',
+    display_order INT NOT NULL DEFAULT 0,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    display_order INT NOT NULL DEFAULT 0 COMMENT 'Order to display on pricing page',
-    
-    -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (base_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
     INDEX idx_slug (slug),
     INDEX idx_active (is_active),
-    INDEX idx_base_currency (base_currency_id)
+    INDEX idx_order (display_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
--- PACKAGE PRICES TABLE
+-- AI WORKFLOWS TABLE
 -- ==============================================================================
--- Description: Multi-currency pricing for packages
-CREATE TABLE package_prices (
+-- Description: Store AI workflow templates (50 workflows for employee development)
+CREATE TABLE ai_workflows (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    package_id BIGINT UNSIGNED NOT NULL,
-    currency_id INT UNSIGNED NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    
-    -- Optional promotional pricing
-    promotional_price DECIMAL(10, 2) NULL COMMENT 'Discounted price if promotion active',
-    promotion_start_date TIMESTAMP NULL,
-    promotion_end_date TIMESTAMP NULL,
-    
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
-    FOREIGN KEY (currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
-    UNIQUE KEY unique_package_currency (package_id, currency_id),
-    INDEX idx_package_currency (package_id, currency_id),
-    INDEX idx_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ==============================================================================
--- PACKAGE FEATURES TABLE
--- ==============================================================================
--- Description: Define available features that can be assigned to packages
-CREATE TABLE package_features (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    feature_key VARCHAR(100) NOT NULL UNIQUE COMMENT 'e.g., real_time, export_pdf, ai_suggestions',
-    feature_name VARCHAR(255) NOT NULL,
+    category_id BIGINT UNSIGNED NULL,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
     description TEXT NULL,
-    category VARCHAR(100) NOT NULL DEFAULT 'general' COMMENT 'e.g., collaboration, export, advanced',
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_feature_key (feature_key),
-    INDEX idx_category (category)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ==============================================================================
--- USER SUBSCRIPTIONS TABLE
--- ==============================================================================
--- Description: Track user subscriptions to packages
-CREATE TABLE user_subscriptions (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
-    package_id BIGINT UNSIGNED NOT NULL,
-    payment_id BIGINT UNSIGNED NULL COMMENT 'Reference to payment record',
+    -- Workflow configuration
+    prompt_template TEXT NOT NULL COMMENT 'AI prompt template with variables',
+    input_schema JSON NULL COMMENT 'Schema for required inputs: {"field": "type"}',
+    output_format ENUM('text', 'json', 'mindmap', 'list') DEFAULT 'mindmap',
     
-    -- Subscription period
-    start_date TIMESTAMP NOT NULL,
-    end_date TIMESTAMP NOT NULL,
+    -- Metadata
+    tags JSON NULL COMMENT 'Array of tags for search',
+    difficulty_level ENUM('beginner', 'intermediate', 'advanced') DEFAULT 'beginner',
+    estimated_time INT NULL COMMENT 'Estimated time in minutes',
+    
+    -- Usage tracking
+    usage_count BIGINT UNSIGNED DEFAULT 0,
+    rating_average DECIMAL(3, 2) DEFAULT 0.00 COMMENT 'Average rating 0-5',
+    rating_count INT UNSIGNED DEFAULT 0,
     
     -- Status
-    status ENUM('active', 'expired', 'cancelled', 'pending') NOT NULL DEFAULT 'pending',
-    auto_renew BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+    display_order INT NOT NULL DEFAULT 0,
     
-    -- Cancellation
-    cancelled_at TIMESTAMP NULL,
-    cancellation_reason TEXT NULL,
-    
-    -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE RESTRICT,
-    INDEX idx_user_id (user_id),
-    INDEX idx_package_id (package_id),
-    INDEX idx_status (status),
-    INDEX idx_dates (start_date, end_date)
+    FOREIGN KEY (category_id) REFERENCES ai_workflow_categories(id) ON DELETE SET NULL,
+    INDEX idx_slug (slug),
+    INDEX idx_category (category_id),
+    INDEX idx_active (is_active),
+    INDEX idx_featured (is_featured),
+    INDEX idx_usage (usage_count),
+    INDEX idx_rating (rating_average)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
--- PAYMENTS TABLE
+-- USER WORKFLOW HISTORY TABLE
 -- ==============================================================================
--- Description: Store payment transactions (QR Banking, PayPal, etc.)
-CREATE TABLE payments (
+-- Description: Track user's AI workflow usage
+CREATE TABLE user_workflow_history (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT UNSIGNED NOT NULL,
-    package_id BIGINT UNSIGNED NOT NULL,
+    workflow_id BIGINT UNSIGNED NOT NULL,
     
-    -- Payment details
-    amount DECIMAL(10, 2) NOT NULL,
-    currency_id INT UNSIGNED NOT NULL COMMENT 'Currency used for payment',
-    original_amount DECIMAL(10, 2) NULL COMMENT 'Original amount if currency conversion occurred',
-    original_currency_id INT UNSIGNED NULL COMMENT 'Original currency before conversion',
-    exchange_rate DECIMAL(20, 8) NULL COMMENT 'Exchange rate used at time of payment',
-    payment_method ENUM('qr_banking', 'paypal', 'stripe', 'manual') NOT NULL,
-    payment_status ENUM('pending', 'completed', 'failed', 'refunded', 'cancelled') NOT NULL DEFAULT 'pending',
+    -- Input/Output
+    input_data JSON NULL COMMENT 'User inputs for the workflow',
+    output_data JSON NULL COMMENT 'Generated output',
     
-    -- Transaction info
-    transaction_id VARCHAR(255) NULL COMMENT 'External transaction ID from payment gateway',
-    payment_gateway_response JSON NULL COMMENT 'Full response from payment gateway',
+    -- Performance
+    execution_time_ms INT NULL COMMENT 'Execution time in milliseconds',
+    token_count INT NULL COMMENT 'AI tokens used',
     
-    -- QR Banking specific
-    qr_code_url VARCHAR(500) NULL COMMENT 'URL to generated QR code',
-    bank_transaction_ref VARCHAR(255) NULL COMMENT 'Bank transaction reference',
+    -- Feedback
+    rating TINYINT NULL COMMENT 'User rating 1-5',
+    feedback TEXT NULL,
     
-    -- Payment metadata
-    metadata JSON NULL COMMENT 'Additional payment information',
+    -- Associated mindmap
+    mindmap_id VARCHAR(50) NULL COMMENT 'MongoDB mindmap ID if created',
     
-    -- Admin actions
-    verified_by BIGINT UNSIGNED NULL COMMENT 'Admin who verified the payment',
-    verified_at TIMESTAMP NULL,
-    notes TEXT NULL COMMENT 'Admin notes about the payment',
-    
-    -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP NULL,
     
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE RESTRICT,
-    FOREIGN KEY (verified_by) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
-    FOREIGN KEY (original_currency_id) REFERENCES currencies(id) ON DELETE RESTRICT,
+    FOREIGN KEY (workflow_id) REFERENCES ai_workflows(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
-    INDEX idx_transaction_id (transaction_id),
-    INDEX idx_status (payment_status),
+    INDEX idx_workflow_id (workflow_id),
     INDEX idx_created_at (created_at),
-    INDEX idx_currency (currency_id)
+    INDEX idx_mindmap_id (mindmap_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
--- AUDIT LOG TABLE
+-- SAAS PLATFORM INTEGRATIONS TABLE
 -- ==============================================================================
--- Description: Track important system actions for security and debugging
-CREATE TABLE audit_logs (
+-- Description: Store SaaS platform integration configurations
+CREATE TABLE saas_integrations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NULL,
-    action VARCHAR(100) NOT NULL COMMENT 'e.g., user.login, user.register, payment.completed',
-    entity_type VARCHAR(50) NULL COMMENT 'e.g., user, payment, subscription',
-    entity_id BIGINT UNSIGNED NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    platform_name VARCHAR(100) NOT NULL COMMENT 'e.g., Slack, Teams, Notion, etc.',
+    
+    -- Integration config
+    config JSON NULL COMMENT 'Platform-specific configuration',
+    access_token TEXT NULL COMMENT 'Encrypted access token',
+    refresh_token TEXT NULL COMMENT 'Encrypted refresh token',
+    token_expires_at TIMESTAMP NULL,
+    
+    -- Status
+    status ENUM('active', 'inactive', 'error') DEFAULT 'active',
+    last_sync_at TIMESTAMP NULL,
+    error_message TEXT NULL,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_platform (platform_name),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================================
+-- USER ACTIVITIES TABLE
+-- ==============================================================================
+-- Description: Track user activities for analytics and audit
+CREATE TABLE user_activities (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    activity_type VARCHAR(100) NOT NULL COMMENT 'e.g., login, logout, mindmap.create',
+    entity_type VARCHAR(50) NULL COMMENT 'e.g., mindmap, workflow',
+    entity_id VARCHAR(100) NULL COMMENT 'ID of the entity (can be MongoDB ID)',
     
     -- Request info
     ip_address VARCHAR(45) NULL,
     user_agent VARCHAR(500) NULL,
     
     -- Details
-    details JSON NULL COMMENT 'Additional context about the action',
+    details JSON NULL COMMENT 'Additional context about the activity',
     
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
-    INDEX idx_action (action),
+    INDEX idx_activity_type (activity_type),
     INDEX idx_entity (entity_type, entity_id),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -355,229 +271,172 @@ CREATE TABLE system_settings (
     setting_type ENUM('string', 'number', 'boolean', 'json') NOT NULL DEFAULT 'string',
     description TEXT NULL,
     is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Can be accessed by frontend',
-    updated_by BIGINT UNSIGNED NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
-    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_setting_key (setting_key),
     INDEX idx_is_public (is_public)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==============================================================================
+-- NOTIFICATIONS TABLE
+-- ==============================================================================
+-- Description: Store user notifications
+CREATE TABLE notifications (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    type VARCHAR(100) NOT NULL COMMENT 'e.g., collaboration_invite, comment_mention',
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    
+    -- Related entity
+    entity_type VARCHAR(50) NULL COMMENT 'e.g., mindmap, comment',
+    entity_id VARCHAR(100) NULL,
+    
+    -- Actions
+    action_url VARCHAR(500) NULL COMMENT 'URL to navigate when clicked',
+    action_label VARCHAR(100) NULL,
+    
+    -- Status
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    read_at TIMESTAMP NULL,
+    
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_type (type),
+    INDEX idx_read (is_read),
+    INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
 -- INITIAL DATA
 -- ==============================================================================
 
--- Insert supported currencies
-INSERT INTO currencies (code, name, symbol, decimal_places, is_active, display_order) VALUES
-('USD', 'US Dollar', '$', 2, TRUE, 1),
-('EUR', 'Euro', '€', 2, TRUE, 2),
-('GBP', 'British Pound', '£', 2, TRUE, 3),
-('JPY', 'Japanese Yen', '¥', 0, TRUE, 4),
-('VND', 'Vietnamese Dong', '₫', 0, TRUE, 5),
-('SGD', 'Singapore Dollar', 'S$', 2, TRUE, 6),
-('AUD', 'Australian Dollar', 'A$', 2, TRUE, 7),
-('CAD', 'Canadian Dollar', 'C$', 2, TRUE, 8),
-('CNY', 'Chinese Yuan', '¥', 2, TRUE, 9),
-('INR', 'Indian Rupee', '₹', 2, TRUE, 10),
-('THB', 'Thai Baht', '฿', 2, TRUE, 11),
-('MYR', 'Malaysian Ringgit', 'RM', 2, TRUE, 12);
+-- Insert AI Workflow Categories
+INSERT INTO ai_workflow_categories (name, slug, description, icon, color, display_order) VALUES
+('Phát triển kỹ năng', 'skill-development', 'Workflows về phát triển kỹ năng cá nhân', '🎯', '#4A90E2', 1),
+('Quản lý thời gian', 'time-management', 'Workflows về quản lý thời gian hiệu quả', '⏰', '#F5A623', 2),
+('Lãnh đạo & Quản lý', 'leadership-management', 'Workflows về kỹ năng lãnh đạo', '👔', '#7B61FF', 3),
+('Giao tiếp & Hợp tác', 'communication-collaboration', 'Workflows về giao tiếp và làm việc nhóm', '💬', '#50E3C2', 4),
+('Sáng tạo & Đổi mới', 'creativity-innovation', 'Workflows về tư duy sáng tạo', '💡', '#F8E71C', 5),
+('Sức khỏe & Cân bằng', 'health-balance', 'Workflows về sức khỏe và work-life balance', '🧘', '#BD10E0', 6),
+('Nghề nghiệp & Phát triển', 'career-growth', 'Workflows về phát triển sự nghiệp', '📈', '#B8E986', 7),
+('Học tập & Tư duy', 'learning-thinking', 'Workflows về phương pháp học tập', '📚', '#FF6B6B', 8);
 
--- Insert exchange rates (base: USD)
--- Note: These are example rates. In production, update regularly from API
-INSERT INTO exchange_rates (from_currency_id, to_currency_id, rate, source, is_active) VALUES
--- USD to other currencies
-(1, 1, 1.00000000, 'base', TRUE),          -- USD to USD
-(1, 2, 0.92000000, 'manual', TRUE),        -- USD to EUR
-(1, 3, 0.79000000, 'manual', TRUE),        -- USD to GBP
-(1, 4, 149.50000000, 'manual', TRUE),      -- USD to JPY
-(1, 5, 24500.00000000, 'manual', TRUE),    -- USD to VND
-(1, 6, 1.35000000, 'manual', TRUE),        -- USD to SGD
-(1, 7, 1.52000000, 'manual', TRUE),        -- USD to AUD
-(1, 8, 1.37000000, 'manual', TRUE),        -- USD to CAD
-(1, 9, 7.24000000, 'manual', TRUE),        -- USD to CNY
-(1, 10, 83.12000000, 'manual', TRUE),      -- USD to INR
-(1, 11, 35.75000000, 'manual', TRUE),      -- USD to THB
-(1, 12, 4.72000000, 'manual', TRUE);       -- USD to MYR
+-- Insert Sample AI Workflows (một số ví dụ, bạn có thể thêm 50 workflows)
+INSERT INTO ai_workflows (category_id, name, slug, description, prompt_template, input_schema, output_format, tags, difficulty_level, estimated_time, is_featured) VALUES
+-- Skill Development
+(1, 'Lập kế hoạch phát triển kỹ năng', 'skill-development-plan', 'Tạo roadmap phát triển kỹ năng cụ thể cho bản thân', 
+'Tạo một mindmap chi tiết về kế hoạch phát triển kỹ năng {{skill_name}} trong {{timeframe}}. Bao gồm: 1) Đánh giá năng lực hiện tại, 2) Mục tiêu cụ thể, 3) Các bước học tập, 4) Tài nguyên cần thiết, 5) Cách đo lường tiến độ.',
+'{"skill_name": "string", "timeframe": "string", "current_level": "string"}',
+'mindmap', '["kỹ năng", "phát triển", "học tập"]', 'beginner', 15, TRUE),
 
--- Insert default admin user (password: Admin@123 - hash generated with bcrypt)
--- Set preferred currency to USD
-INSERT INTO users (email, password_hash, full_name, role, email_verified, email_verified_at, preferred_currency_id) VALUES
-('admin@mindmap.com', '$2b$10$rGHcY6Y6KdGj5pXZOXK4xOGQjqZ.x5m3tV8HxNQXJNc9LYvL6LY8i', 'System Administrator', 'admin', TRUE, NOW(), 1);
+(1, 'Đánh giá SWOT cá nhân', 'personal-swot-analysis', 'Phân tích điểm mạnh, điểm yếu, cơ hội và thách thức', 
+'Tạo mindmap phân tích SWOT cá nhân cho {{job_role}}. Bao gồm: Strengths (điểm mạnh), Weaknesses (điểm yếu), Opportunities (cơ hội), Threats (thách thức). Đưa ra ít nhất 4-5 điểm cho mỗi mục.',
+'{"job_role": "string", "industry": "string"}',
+'mindmap', '["swot", "tự đánh giá", "phát triển"]', 'intermediate', 20, TRUE),
 
--- Insert default package features
-INSERT INTO package_features (feature_key, feature_name, description, category) VALUES
-('real_time_collaboration', 'Real-time Collaboration', 'Edit mindmaps together in real-time', 'collaboration'),
-('unlimited_mindmaps', 'Unlimited Mindmaps', 'Create unlimited number of mindmaps', 'storage'),
-('unlimited_collaborators', 'Unlimited Collaborators', 'Invite unlimited collaborators', 'collaboration'),
-('export_pdf', 'Export to PDF', 'Export mindmaps as PDF files', 'export'),
-('export_png', 'Export to PNG', 'Export mindmaps as PNG images', 'export'),
-('export_json', 'Export to JSON', 'Export mindmaps as JSON data', 'export'),
-('custom_templates', 'Custom Templates', 'Create and use custom templates', 'advanced'),
-('version_history', 'Version History', 'Access full version history', 'advanced'),
-('ai_suggestions', 'AI Suggestions', 'Get AI-powered mindmap suggestions', 'advanced'),
-('priority_support', 'Priority Support', '24/7 priority customer support', 'support'),
-('custom_branding', 'Custom Branding', 'Remove branding and add your own', 'advanced'),
-('api_access', 'API Access', 'Access to REST API', 'developer');
+-- Time Management
+(2, 'Ma trận Eisenhower', 'eisenhower-matrix', 'Sắp xếp công việc theo độ ưu tiên', 
+'Tạo mindmap Ma trận Eisenhower để phân loại công việc. Chia thành 4 nhóm: 1) Quan trọng & Khẩn cấp, 2) Quan trọng & Không khẩn cấp, 3) Không quan trọng & Khẩn cấp, 4) Không quan trọng & Không khẩn cấp. Gợi ý cách xử lý mỗi nhóm.',
+'{"tasks": "array"}',
+'mindmap', '["quản lý thời gian", "ưu tiên", "hiệu quả"]', 'beginner', 10, TRUE),
 
--- Insert default packages
-INSERT INTO packages (name, description, slug, base_price, base_currency_id, duration_days, max_mindmaps, max_collaborators, max_storage_mb, features, is_active, display_order) VALUES
--- Free Plan
-('Free', 'Perfect for getting started', 'free', 0.00, 1, 365, 3, 2, 50, 
-JSON_OBJECT(
-    'real_time_collaboration', true,
-    'unlimited_mindmaps', false,
-    'unlimited_collaborators', false,
-    'export_pdf', false,
-    'export_png', true,
-    'export_json', true,
-    'custom_templates', false,
-    'version_history', false,
-    'ai_suggestions', false,
-    'priority_support', false,
-    'custom_branding', false,
-    'api_access', false
-), TRUE, 1),
+(2, 'Kế hoạch tuần hiệu quả', 'weekly-planning', 'Lập kế hoạch tuần làm việc', 
+'Tạo mindmap kế hoạch tuần làm việc cho {{week_goal}}. Bao gồm: Mục tiêu tuần, Phân bổ thời gian theo ngày, Thời gian deep work, Thời gian nghỉ ngơi, Đánh giá cuối tuần.',
+'{"week_goal": "string", "work_hours_per_day": "number"}',
+'mindmap', '["kế hoạch", "tuần", "năng suất"]', 'beginner', 15, FALSE),
 
--- Pro Plan
-('Pro', 'For professionals and small teams', 'pro', 9.99, 1, 30, 50, 10, 500,
-JSON_OBJECT(
-    'real_time_collaboration', true,
-    'unlimited_mindmaps', false,
-    'unlimited_collaborators', false,
-    'export_pdf', true,
-    'export_png', true,
-    'export_json', true,
-    'custom_templates', true,
-    'version_history', true,
-    'ai_suggestions', true,
-    'priority_support', false,
-    'custom_branding', false,
-    'api_access', false
-), TRUE, 2),
+-- Leadership
+(3, 'Kỹ năng lãnh đạo 360°', '360-leadership-skills', 'Phát triển kỹ năng lãnh đạo toàn diện', 
+'Tạo mindmap về kỹ năng lãnh đạo 360° bao gồm: Self-leadership (tự lãnh đạo), Leading up (lãnh đạo cấp trên), Leading across (lãnh đạo đồng nghiệp), Leading down (lãnh đạo cấp dưới). Chi tiết các kỹ năng cần thiết cho từng hướng.',
+'{"leadership_level": "string", "team_size": "number"}',
+'mindmap', '["lãnh đạo", "quản lý", "kỹ năng"]', 'advanced', 25, TRUE),
 
--- Enterprise Plan
-('Enterprise', 'For large organizations', 'enterprise', 49.99, 1, 30, 0, 0, 0,
-JSON_OBJECT(
-    'real_time_collaboration', true,
-    'unlimited_mindmaps', true,
-    'unlimited_collaborators', true,
-    'export_pdf', true,
-    'export_png', true,
-    'export_json', true,
-    'custom_templates', true,
-    'version_history', true,
-    'ai_suggestions', true,
-    'priority_support', true,
-    'custom_branding', true,
-    'api_access', true
-), TRUE, 3);
+-- Communication
+(4, 'Kỹ năng trình bày hiệu quả', 'effective-presentation', 'Cải thiện kỹ năng thuyết trình', 
+'Tạo mindmap về kỹ năng trình bày cho chủ đề {{presentation_topic}}. Bao gồm: Chuẩn bị nội dung, Cấu trúc bài thuyết trình, Kỹ thuật truyền đạt, Xử lý câu hỏi, Ngôn ngữ cơ thể.',
+'{"presentation_topic": "string", "audience_type": "string", "duration_minutes": "number"}',
+'mindmap', '["thuyết trình", "giao tiếp", "kỹ năng mềm"]', 'intermediate', 20, FALSE),
 
--- Insert package prices in multiple currencies
--- Free package (ID: 1) - always 0 in all currencies
-INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
-(1, 1, 0.00, TRUE),    -- USD
-(1, 2, 0.00, TRUE),    -- EUR
-(1, 3, 0.00, TRUE),    -- GBP
-(1, 4, 0.00, TRUE),    -- JPY
-(1, 5, 0.00, TRUE),    -- VND
-(1, 6, 0.00, TRUE),    -- SGD
-(1, 7, 0.00, TRUE),    -- AUD
-(1, 8, 0.00, TRUE),    -- CAD
-(1, 9, 0.00, TRUE),    -- CNY
-(1, 10, 0.00, TRUE),   -- INR
-(1, 11, 0.00, TRUE),   -- THB
-(1, 12, 0.00, TRUE);   -- MYR
+-- Creativity
+(5, 'Tư duy sáng tạo Design Thinking', 'design-thinking-process', 'Áp dụng quy trình Design Thinking', 
+'Tạo mindmap quy trình Design Thinking cho vấn đề {{problem_statement}}. Bao gồm 5 giai đoạn: Empathize (đồng cảm), Define (định nghĩa), Ideate (ý tưởng), Prototype (nguyên mẫu), Test (thử nghiệm).',
+'{"problem_statement": "string", "target_users": "string"}',
+'mindmap', '["sáng tạo", "design thinking", "đổi mới"]', 'advanced', 30, TRUE),
 
--- Pro package (ID: 2) - $9.99 base price
-INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
-(2, 1, 9.99, TRUE),      -- USD
-(2, 2, 9.19, TRUE),      -- EUR (≈ $9.99)
-(2, 3, 7.89, TRUE),      -- GBP
-(2, 4, 1490, TRUE),      -- JPY (no decimals)
-(2, 5, 245000, TRUE),    -- VND (no decimals)
-(2, 6, 13.49, TRUE),     -- SGD
-(2, 7, 15.18, TRUE),     -- AUD
-(2, 8, 13.68, TRUE),     -- CAD
-(2, 9, 72.33, TRUE),     -- CNY
-(2, 10, 830, TRUE),      -- INR
-(2, 11, 357, TRUE),      -- THB
-(2, 12, 47.15, TRUE);    -- MYR
+-- Health & Balance
+(6, 'Work-Life Balance', 'work-life-balance', 'Cân bằng công việc và cuộc sống', 
+'Tạo mindmap về cân bằng công việc và cuộc sống. Bao gồm: Thiết lập ranh giới, Quản lý năng lượng, Chăm sóc sức khỏe, Thời gian gia đình, Sở thích cá nhân, Thiền và mindfulness.',
+'{"current_situation": "string", "goals": "string"}',
+'mindmap', '["cân bằng", "sức khỏe", "hạnh phúc"]', 'beginner', 15, FALSE),
 
--- Enterprise package (ID: 3) - $49.99 base price
-INSERT INTO package_prices (package_id, currency_id, price, is_active) VALUES
-(3, 1, 49.99, TRUE),     -- USD
-(3, 2, 45.99, TRUE),     -- EUR
-(3, 3, 39.49, TRUE),     -- GBP
-(3, 4, 7470, TRUE),      -- JPY
-(3, 5, 1225000, TRUE),   -- VND
-(3, 6, 67.48, TRUE),     -- SGD
-(3, 7, 75.98, TRUE),     -- AUD
-(3, 8, 68.48, TRUE),     -- CAD
-(3, 9, 362, TRUE),       -- CNY
-(3, 10, 4155, TRUE),     -- INR
-(3, 11, 1787, TRUE),     -- THB
-(3, 12, 235.95, TRUE);   -- MYR
+-- Career Growth
+(7, 'Lộ trình sự nghiệp 5 năm', '5-year-career-roadmap', 'Vạch ra lộ trình phát triển sự nghiệp', 
+'Tạo mindmap lộ trình sự nghiệp 5 năm từ vị trí {{current_position}} đến {{target_position}}. Bao gồm: Năm 1-5 với mục tiêu cụ thể, Kỹ năng cần học, Kinh nghiệm cần tích lũy, Mạng lưới quan hệ, Chứng chỉ/Bằng cấp.',
+'{"current_position": "string", "target_position": "string", "industry": "string"}',
+'mindmap', '["sự nghiệp", "phát triển", "kế hoạch"]', 'intermediate', 25, TRUE),
 
--- Insert default system settings
+-- Learning
+(8, 'Phương pháp học Feynman', 'feynman-learning-technique', 'Học hiệu quả với kỹ thuật Feynman', 
+'Tạo mindmap áp dụng phương pháp học Feynman cho chủ đề {{learning_topic}}. Bao gồm: 1) Chọn khái niệm, 2) Giải thích đơn giản, 3) Xác định khoảng trống kiến thức, 4) Đơn giản hóa và sử dụng ẩn dụ.',
+'{"learning_topic": "string", "difficulty_level": "string"}',
+'mindmap', '["học tập", "phương pháp", "hiệu quả"]', 'intermediate', 20, FALSE);
+
+-- Insert system settings
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
-('site_name', 'Mindmap System', 'string', 'Website name', TRUE),
+('site_name', 'RiverFlow Mindmap', 'string', 'Website name', TRUE),
 ('max_upload_size_mb', '10', 'number', 'Maximum file upload size in MB', FALSE),
 ('email_verification_required', 'true', 'boolean', 'Require email verification for new users', FALSE),
 ('maintenance_mode', 'false', 'boolean', 'Enable maintenance mode', TRUE),
-('default_package_id', '1', 'number', 'Default package ID for new users', FALSE);
+('max_mindmaps_per_user', '100', 'number', 'Maximum mindmaps per user (0 = unlimited)', FALSE),
+('max_collaborators_per_mindmap', '10', 'number', 'Maximum collaborators per mindmap', FALSE),
+('enable_ai_features', 'true', 'boolean', 'Enable AI workflow features', TRUE),
+('ai_daily_limit_per_user', '20', 'number', 'Daily AI workflow usage limit per user', FALSE);
 
 -- ==============================================================================
 -- VIEWS FOR COMMON QUERIES
 -- ==============================================================================
 
--- View: Active user subscriptions with package details
-CREATE VIEW v_active_subscriptions AS
+-- View: User summary
+CREATE VIEW v_user_summary AS
 SELECT 
-    us.id AS subscription_id,
-    us.user_id,
+    u.id,
     u.email,
     u.full_name,
-    p.id AS package_id,
-    p.name AS package_name,
-    p.slug AS package_slug,
-    p.features AS package_features,
-    us.start_date,
-    us.end_date,
-    us.status,
-    us.auto_renew,
-    DATEDIFF(us.end_date, NOW()) AS days_remaining
-FROM user_subscriptions us
-INNER JOIN users u ON us.user_id = u.id
-INNER JOIN packages p ON us.package_id = p.id
-WHERE us.status = 'active' 
-AND us.end_date > NOW()
-AND u.status = 'active';
+    u.avatar,
+    u.status,
+    u.oauth_provider,
+    u.email_verified,
+    u.preferred_language,
+    u.timezone,
+    u.theme,
+    u.last_login_at,
+    u.created_at
+FROM users u
+WHERE u.status = 'active';
 
--- View: Payment summary for reports
-CREATE VIEW v_payment_summary AS
+-- View: AI Workflow usage statistics
+CREATE VIEW v_workflow_stats AS
 SELECT 
-    p.id AS payment_id,
-    p.user_id,
-    u.email,
-    u.full_name,
-    pkg.name AS package_name,
-    p.amount,
-    c.code AS currency_code,
-    c.symbol AS currency_symbol,
-    p.original_amount,
-    oc.code AS original_currency_code,
-    p.exchange_rate,
-    p.payment_method,
-    p.payment_status,
-    p.transaction_id,
-    p.created_at,
-    p.completed_at
-FROM payments p
-INNER JOIN users u ON p.user_id = u.id
-INNER JOIN packages pkg ON p.package_id = pkg.id
-INNER JOIN currencies c ON p.currency_id = c.id
-LEFT JOIN currencies oc ON p.original_currency_id = oc.id;
+    w.id AS workflow_id,
+    w.name AS workflow_name,
+    w.slug,
+    c.name AS category_name,
+    w.usage_count,
+    w.rating_average,
+    w.rating_count,
+    w.difficulty_level,
+    w.is_featured,
+    COUNT(DISTINCT uwh.user_id) AS unique_users,
+    AVG(uwh.execution_time_ms) AS avg_execution_time_ms
+FROM ai_workflows w
+LEFT JOIN ai_workflow_categories c ON w.category_id = c.id
+LEFT JOIN user_workflow_history uwh ON w.id = uwh.workflow_id
+WHERE w.is_active = TRUE
+GROUP BY w.id, w.name, w.slug, c.name, w.usage_count, w.rating_average, w.rating_count, w.difficulty_level, w.is_featured;
 
 -- ==============================================================================
 -- STORED PROCEDURES
@@ -585,174 +444,107 @@ LEFT JOIN currencies oc ON p.original_currency_id = oc.id;
 
 DELIMITER //
 
--- Procedure: Check if user has feature access
-CREATE PROCEDURE sp_check_user_feature(
+-- Procedure: Get user's unread notification count
+CREATE PROCEDURE sp_get_unread_notification_count(
     IN p_user_id BIGINT UNSIGNED,
-    IN p_feature_key VARCHAR(100),
-    OUT p_has_access BOOLEAN
+    OUT p_count INT
 )
 BEGIN
-    DECLARE v_features JSON;
-    
-    -- Get active subscription features
-    SELECT p.features INTO v_features
-    FROM user_subscriptions us
-    INNER JOIN packages p ON us.package_id = p.id
-    WHERE us.user_id = p_user_id
-    AND us.status = 'active'
-    AND us.end_date > NOW()
-    ORDER BY us.end_date DESC
-    LIMIT 1;
-    
-    -- Check if feature exists and is enabled
-    IF v_features IS NOT NULL THEN
-        SET p_has_access = JSON_EXTRACT(v_features, CONCAT('$.', p_feature_key)) = true;
-    ELSE
-        SET p_has_access = FALSE;
-    END IF;
+    SELECT COUNT(*) INTO p_count
+    FROM notifications
+    WHERE user_id = p_user_id
+    AND is_read = FALSE;
 END //
 
--- Procedure: Get user package limits
-CREATE PROCEDURE sp_get_user_limits(
+-- Procedure: Mark all notifications as read
+CREATE PROCEDURE sp_mark_all_notifications_read(
     IN p_user_id BIGINT UNSIGNED
 )
 BEGIN
-    SELECT 
-        p.max_mindmaps,
-        p.max_collaborators,
-        p.max_storage_mb,
-        p.features
-    FROM user_subscriptions us
-    INNER JOIN packages p ON us.package_id = p.id
-    WHERE us.user_id = p_user_id
-    AND us.status = 'active'
-    AND us.end_date > NOW()
-    ORDER BY us.end_date DESC
-    LIMIT 1;
+    UPDATE notifications
+    SET is_read = TRUE, read_at = NOW()
+    WHERE user_id = p_user_id
+    AND is_read = FALSE;
 END //
 
--- Procedure: Convert amount between currencies
-CREATE PROCEDURE sp_convert_currency(
-    IN p_amount DECIMAL(10, 2),
-    IN p_from_currency_id INT UNSIGNED,
-    IN p_to_currency_id INT UNSIGNED,
-    OUT p_converted_amount DECIMAL(10, 2),
-    OUT p_exchange_rate DECIMAL(20, 8)
+-- Procedure: Get popular AI workflows
+CREATE PROCEDURE sp_get_popular_workflows(
+    IN p_limit INT,
+    IN p_category_id BIGINT UNSIGNED
 )
 BEGIN
-    DECLARE v_rate DECIMAL(20, 8);
-    
-    -- If same currency, no conversion needed
-    IF p_from_currency_id = p_to_currency_id THEN
-        SET p_converted_amount = p_amount;
-        SET p_exchange_rate = 1.00000000;
+    IF p_category_id IS NULL THEN
+        SELECT * FROM ai_workflows
+        WHERE is_active = TRUE
+        ORDER BY usage_count DESC, rating_average DESC
+        LIMIT p_limit;
     ELSE
-        -- Get exchange rate
-        SELECT rate INTO v_rate
-        FROM exchange_rates
-        WHERE from_currency_id = p_from_currency_id
-        AND to_currency_id = p_to_currency_id
-        AND is_active = TRUE
-        AND (valid_until IS NULL OR valid_until > NOW())
-        ORDER BY valid_from DESC
-        LIMIT 1;
-        
-        IF v_rate IS NOT NULL THEN
-            SET p_converted_amount = p_amount * v_rate;
-            SET p_exchange_rate = v_rate;
-        ELSE
-            -- Try reverse conversion (to -> from) and invert
-            SELECT 1 / rate INTO v_rate
-            FROM exchange_rates
-            WHERE from_currency_id = p_to_currency_id
-            AND to_currency_id = p_from_currency_id
-            AND is_active = TRUE
-            AND (valid_until IS NULL OR valid_until > NOW())
-            ORDER BY valid_from DESC
-            LIMIT 1;
-            
-            IF v_rate IS NOT NULL THEN
-                SET p_converted_amount = p_amount * v_rate;
-                SET p_exchange_rate = v_rate;
-            ELSE
-                -- No exchange rate found, return NULL
-                SET p_converted_amount = NULL;
-                SET p_exchange_rate = NULL;
-            END IF;
-        END IF;
+        SELECT * FROM ai_workflows
+        WHERE is_active = TRUE
+        AND category_id = p_category_id
+        ORDER BY usage_count DESC, rating_average DESC
+        LIMIT p_limit;
     END IF;
 END //
 
--- Procedure: Get package price in specific currency
-CREATE PROCEDURE sp_get_package_price(
-    IN p_package_id BIGINT UNSIGNED,
-    IN p_currency_id INT UNSIGNED,
-    OUT p_price DECIMAL(10, 2),
-    OUT p_promotional_price DECIMAL(10, 2),
-    OUT p_has_promotion BOOLEAN
+-- Procedure: Record AI workflow usage
+CREATE PROCEDURE sp_record_workflow_usage(
+    IN p_user_id BIGINT UNSIGNED,
+    IN p_workflow_id BIGINT UNSIGNED,
+    IN p_input_data JSON,
+    IN p_output_data JSON,
+    IN p_execution_time_ms INT,
+    IN p_mindmap_id VARCHAR(50)
 )
 BEGIN
-    DECLARE v_promo_start TIMESTAMP;
-    DECLARE v_promo_end TIMESTAMP;
-    DECLARE v_promo_price DECIMAL(10, 2);
+    -- Insert usage record
+    INSERT INTO user_workflow_history (
+        user_id, workflow_id, input_data, output_data, 
+        execution_time_ms, mindmap_id
+    ) VALUES (
+        p_user_id, p_workflow_id, p_input_data, p_output_data,
+        p_execution_time_ms, p_mindmap_id
+    );
     
-    -- Get price for specific currency
-    SELECT 
-        price,
-        promotional_price,
-        promotion_start_date,
-        promotion_end_date
-    INTO 
-        p_price,
-        v_promo_price,
-        v_promo_start,
-        v_promo_end
-    FROM package_prices
-    WHERE package_id = p_package_id
-    AND currency_id = p_currency_id
-    AND is_active = TRUE
-    LIMIT 1;
-    
-    -- Check if promotion is active
-    IF v_promo_price IS NOT NULL 
-       AND (v_promo_start IS NULL OR v_promo_start <= NOW())
-       AND (v_promo_end IS NULL OR v_promo_end >= NOW()) THEN
-        SET p_promotional_price = v_promo_price;
-        SET p_has_promotion = TRUE;
-    ELSE
-        SET p_promotional_price = NULL;
-        SET p_has_promotion = FALSE;
-    END IF;
+    -- Update workflow usage count
+    UPDATE ai_workflows
+    SET usage_count = usage_count + 1
+    WHERE id = p_workflow_id;
 END //
 
--- Procedure: Get active exchange rate between currencies
-CREATE PROCEDURE sp_get_exchange_rate(
-    IN p_from_currency_id INT UNSIGNED,
-    IN p_to_currency_id INT UNSIGNED,
-    OUT p_rate DECIMAL(20, 8)
+-- Procedure: Rate AI workflow
+CREATE PROCEDURE sp_rate_workflow(
+    IN p_history_id BIGINT UNSIGNED,
+    IN p_rating TINYINT,
+    IN p_feedback TEXT
 )
 BEGIN
-    -- Get direct exchange rate
-    SELECT rate INTO p_rate
-    FROM exchange_rates
-    WHERE from_currency_id = p_from_currency_id
-    AND to_currency_id = p_to_currency_id
-    AND is_active = TRUE
-    AND (valid_until IS NULL OR valid_until > NOW())
-    ORDER BY valid_from DESC
-    LIMIT 1;
+    DECLARE v_workflow_id BIGINT UNSIGNED;
     
-    -- If no direct rate, try reverse and invert
-    IF p_rate IS NULL THEN
-        SELECT 1 / rate INTO p_rate
-        FROM exchange_rates
-        WHERE from_currency_id = p_to_currency_id
-        AND to_currency_id = p_from_currency_id
-        AND is_active = TRUE
-        AND (valid_until IS NULL OR valid_until > NOW())
-        ORDER BY valid_from DESC
-        LIMIT 1;
-    END IF;
+    -- Update the history record
+    UPDATE user_workflow_history
+    SET rating = p_rating, feedback = p_feedback
+    WHERE id = p_history_id;
+    
+    -- Get workflow_id
+    SELECT workflow_id INTO v_workflow_id
+    FROM user_workflow_history
+    WHERE id = p_history_id;
+    
+    -- Recalculate workflow rating
+    UPDATE ai_workflows w
+    SET 
+        rating_count = (
+            SELECT COUNT(*) 
+            FROM user_workflow_history 
+            WHERE workflow_id = v_workflow_id AND rating IS NOT NULL
+        ),
+        rating_average = (
+            SELECT AVG(rating) 
+            FROM user_workflow_history 
+            WHERE workflow_id = v_workflow_id AND rating IS NOT NULL
+        )
+    WHERE w.id = v_workflow_id;
 END //
 
 DELIMITER ;
@@ -762,11 +554,10 @@ DELIMITER ;
 -- ==============================================================================
 
 -- Additional indexes for better query performance
-CREATE INDEX idx_users_created_at ON users(created_at);
-CREATE INDEX idx_payments_completed_at ON payments(completed_at);
-CREATE INDEX idx_subscriptions_end_date ON user_subscriptions(end_date);
+CREATE INDEX idx_users_last_login ON users(last_login_at);
+CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX idx_workflow_history_created ON user_workflow_history(created_at);
 
 -- ==============================================================================
 -- END OF SCHEMA
 -- ==============================================================================
-
