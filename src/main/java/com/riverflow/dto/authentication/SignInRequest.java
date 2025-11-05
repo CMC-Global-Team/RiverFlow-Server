@@ -1,0 +1,24 @@
+package com.riverflow.dto.authentication;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * DTO for user sign-in request
+ */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class SignInRequest {
+
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Email không đúng định dạng")
+    private String email;
+
+    @NotBlank(message = "Mật khẩu không được để trống")
+    private String password;
+}
+
