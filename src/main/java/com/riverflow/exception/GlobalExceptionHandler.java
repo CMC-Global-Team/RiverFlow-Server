@@ -1,6 +1,9 @@
 package com.riverflow.exception;
 
 import com.riverflow.dto.MessageResponse;
+import com.riverflow.exception.mindmap.InvalidMindmapDataException;
+import com.riverflow.exception.mindmap.MindmapAccessDeniedException;
+import com.riverflow.exception.mindmap.MindmapNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -99,6 +102,39 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(response);
+    }
+
+    /**
+     * Xử lý MindmapNotFoundException (Not Found)
+     */
+    @ExceptionHandler(MindmapNotFoundException.class)
+    public ResponseEntity<MessageResponse> handleMindmapNotFoundException(MindmapNotFoundException ex) {
+        log.error("MindmapNotFoundException: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new MessageResponse(ex.getMessage()));
+    }
+
+    /**
+     * Xử lý MindmapAccessDeniedException (Forbidden)
+     */
+    @ExceptionHandler(MindmapAccessDeniedException.class)
+    public ResponseEntity<MessageResponse> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
+        log.error("MindmapAccessDeniedException: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new MessageResponse(ex.getMessage()));
+    }
+
+    /**
+     * Xử lý InvalidMindmapDataException (Bad Request)
+     */
+    @ExceptionHandler(InvalidMindmapDataException.class)
+    public ResponseEntity<MessageResponse> handleInvalidMindmapDataException(InvalidMindmapDataException ex) {
+        log.error("InvalidMindmapDataException: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(new MessageResponse(ex.getMessage()));
     }
 
     /**
