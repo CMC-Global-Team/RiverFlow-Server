@@ -37,13 +37,27 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         
         // Try LLM mode first if available
         if (llmService.isAvailable()) {
+            log.info("LLM service is available, using AI generation");
             try {
                 String jsonResponse = llmService.generateMindmapContent(request);
-                return parseLlmResponse(jsonResponse);
+                log.info("LLM response: {}", jsonResponse);
+                if (jsonResponse != null && !jsonResponse.equals("{}") && !jsonResponse.trim().isEmpty()) {
+                    AiMindmapResponse response = parseLlmResponse(jsonResponse);
+                    if (response.getNodes() != null && !response.getNodes().isEmpty()) {
+                        log.info("Successfully generated {} nodes using LLM", response.getNodes().size());
+                        return response;
+                    } else {
+                        log.warn("LLM returned empty nodes, falling back to rule-based logic");
+                    }
+                } else {
+                    log.warn("LLM returned empty response, falling back to rule-based logic");
+                }
             } catch (Exception e) {
-                log.warn("LLM service failed, falling back to rule-based logic: {}", e.getMessage());
+                log.warn("LLM service failed, falling back to rule-based logic: {}", e.getMessage(), e);
                 // Fall through to rule-based logic
             }
+        } else {
+            log.info("LLM service not available, using rule-based logic");
         }
         
         // Fallback to rule-based logic
@@ -162,10 +176,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (request.getContextNodes() != null && !request.getContextNodes().isEmpty()) {
             int keyPointCount = Math.min(3, request.getContextNodes().size());
             for (int i = 0; i < keyPointCount; i++) {
-                Map<String, String> contextNode = request.getContextNodes().get(i);
+                com.riverflow.dto.mindmap.ContextNode contextNode = request.getContextNodes().get(i);
                 String keyPointId = "keypoint-" + i;
-                String keyPointText = contextNode.get("summary") != null 
-                    ? contextNode.get("summary") 
+                String keyPointText = contextNode.getSummary() != null 
+                    ? contextNode.getSummary() 
                     : "Key Point " + (i + 1);
                 
                 Map<String, Object> keyPointNode = createNode(
@@ -274,10 +288,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 int endIdx = Math.min(startIdx + nodesPerGroup, request.getContextNodes().size());
                 
                 for (int i = startIdx; i < endIdx; i++) {
-                    Map<String, String> contextNode = request.getContextNodes().get(i);
+                    com.riverflow.dto.mindmap.ContextNode contextNode = request.getContextNodes().get(i);
                     String childId = "node-" + i;
-                    String childLabel = contextNode.get("summary") != null 
-                        ? contextNode.get("summary") 
+                    String childLabel = contextNode.getSummary() != null 
+                        ? contextNode.getSummary() 
                         : "Node " + (i + 1);
                     
                     Map<String, Object> childNode = createNode(
@@ -375,9 +389,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         // If context nodes exist, use their summaries
         if (request.getContextNodes() != null && !request.getContextNodes().isEmpty()) {
             List<String> labels = new ArrayList<>();
-            for (Map<String, String> contextNode : request.getContextNodes()) {
+            for (com.riverflow.dto.mindmap.ContextNode contextNode : request.getContextNodes()) {
                 if (labels.size() >= 4) break;
-                String summary = contextNode.get("summary");
+                String summary = contextNode.getSummary();
                 if (summary != null && !summary.isEmpty()) {
                     labels.add(summary.length() > 30 ? summary.substring(0, 30) + "..." : summary);
                 }
