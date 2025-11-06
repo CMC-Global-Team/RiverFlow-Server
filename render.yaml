@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: riverflow-server
+    runtime: docker
+    region: singapore
+    plan: free
+    branch: docker-deploy
+    
+    # Docker configuration
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    
+    # Environment variables (Optional - có default values từ application-prod.properties)
+    # Uncomment và set nếu muốn override giá trị mặc định
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      
+      # Uncomment để override production URLs
+      # - key: APP_FRONTEND_URL
+      #   value: https://riverflow-client.vercel.app
+      
+      # - key: APP_BACKEND_URL
+      #   value: https://riverflow-server.onrender.com/api
+    
+    # Health check
+    healthCheckPath: /api/actuator/health
+    
+    # Auto-deploy on push
+    autoDeploy: true
+
