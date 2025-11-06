@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Request DTO for AI Mindmap Assistant
@@ -43,7 +42,7 @@ public class AiMindmapRequest {
      * Format: [{"id":"...","summary":"..."}]
      */
     @JsonProperty("context_nodes")
-    private List<Map<String, String>> contextNodes;
+    private List<ContextNode> contextNodes;
     
     /**
      * User instruction: expand, summarize, add new idea, restructure, etc.

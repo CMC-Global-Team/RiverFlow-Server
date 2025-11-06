@@ -266,10 +266,17 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("AI assist request from user: {} - instruction: {}", 
-            userId, request.getUserInstruction());
+        log.info("=== AI ASSIST API CALLED ===");
+        log.info("User ID: {}", userId);
+        log.info("Instruction: {}", request.getUserInstruction());
+        log.info("Node Title: {}", request.getNodeTitle());
+        log.info("Context Nodes Count: {}", request.getContextNodes() != null ? request.getContextNodes().size() : 0);
         
         AiMindmapResponse response = aiMindmapService.processAiRequest(request);
+        log.info("=== AI ASSIST RESPONSE: {} nodes, {} edges ===", 
+            response.getNodes() != null ? response.getNodes().size() : 0,
+            response.getEdges() != null ? response.getEdges().size() : 0);
+        
         return ResponseEntity.ok(response);
     }
     
