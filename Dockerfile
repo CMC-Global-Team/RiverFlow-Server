@@ -11,8 +11,9 @@ RUN mvn dependency:go-offline -B
 # Copy source code
 COPY src ./src
 
-# Build the application (skip tests for faster build)
-RUN mvn clean package -DskipTests -B
+# Build the application with optimizations
+RUN mvn clean package -DskipTests -B \
+    && rm -rf target/*-sources.jar target/*-javadoc.jar target/classes target/test-classes
 
 # Stage 2: Runtime stage
 FROM eclipse-temurin:17-jre-alpine
@@ -30,13 +31,24 @@ COPY --from=build /app/target/*.jar app.jar
 # Expose port
 EXPOSE 8080
 
-# Set JVM options for container environment
-ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+# Set JVM options optimized for fast startup and low memory
+ENV JAVA_OPTS="\
+-Xmx400m \
+-Xms200m \
+-XX:+UseContainerSupport \
+-XX:MaxRAMPercentage=75.0 \
+-XX:+UseSerialGC \
+-XX:TieredStopAtLevel=1 \
+-Xss256k \
+-XX:MaxMetaspaceSize=128m \
+-Djava.security.egd=file:/dev/./urandom \
+-Dspring.jmx.enabled=false \
+-Dspring.main.lazy-initialization=true"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+# Health check with faster intervals
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1
 
 # Run the application
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Djava.security.egd=file:/dev/./urandom -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
 
