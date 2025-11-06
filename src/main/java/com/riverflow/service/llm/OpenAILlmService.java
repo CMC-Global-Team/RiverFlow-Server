@@ -2,6 +2,7 @@ package com.riverflow.service.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.AiMindmapRequest;
+import com.riverflow.dto.mindmap.ContextNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,7 +40,15 @@ public class OpenAILlmService implements LlmService {
     
     @Override
     public boolean isAvailable() {
-        return apiKey != null && !apiKey.isEmpty();
+        boolean available = apiKey != null && !apiKey.isEmpty();
+        log.info("LLM Service availability check: available={}, apiKey length={}", 
+            available, apiKey != null ? apiKey.length() : 0);
+        if (available) {
+            log.info("Using OpenAI model: {}", model);
+        } else {
+            log.warn("OpenAI API key not configured or empty");
+        }
+        return available;
     }
     
     @Override
@@ -50,9 +59,14 @@ public class OpenAILlmService implements LlmService {
         }
         
         try {
+            log.info("Calling OpenAI API with model: {}", model);
             String prompt = buildPrompt(request);
+            log.debug("OpenAI prompt: {}", prompt);
             String response = callOpenAI(prompt);
-            return parseOpenAIResponse(response);
+            log.info("OpenAI response received, length: {}", response != null ? response.length() : 0);
+            String parsedResponse = parseOpenAIResponse(response);
+            log.info("Parsed OpenAI response: {}", parsedResponse);
+            return parsedResponse;
         } catch (Exception e) {
             log.error("Error calling OpenAI API: {}", e.getMessage(), e);
             return "{}";
@@ -74,8 +88,8 @@ public class OpenAILlmService implements LlmService {
         
         if (request.getContextNodes() != null && !request.getContextNodes().isEmpty()) {
             prompt.append("Context nodes:\n");
-            for (Map<String, String> ctx : request.getContextNodes()) {
-                prompt.append("- ").append(ctx.get("summary")).append("\n");
+            for (ContextNode ctx : request.getContextNodes()) {
+                prompt.append("- ").append(ctx.getSummary()).append("\n");
             }
         }
         
@@ -134,24 +148,48 @@ public class OpenAILlmService implements LlmService {
         
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
         
-        ResponseEntity<Map> response = restTemplate.exchange(
-            apiUrl,
-            HttpMethod.POST,
-            entity,
-            Map.class
-        );
-        
-        Map<String, Object> responseBody = response.getBody();
-        if (responseBody != null && responseBody.containsKey("choices")) {
-            List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
-            if (!choices.isEmpty()) {
-                Map<String, Object> choice = choices.get(0);
-                Map<String, Object> message = (Map<String, Object>) choice.get("message");
-                return (String) message.get("content");
+        try {
+            log.info("Sending request to OpenAI API: {}", apiUrl);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                apiUrl,
+                HttpMethod.POST,
+                entity,
+                Map.class
+            );
+            
+            Map<String, Object> responseBody = response.getBody();
+            log.info("OpenAI API response status: {}", response.getStatusCode());
+            
+            if (responseBody != null) {
+                // Check for errors first
+                if (responseBody.containsKey("error")) {
+                    Map<String, Object> error = (Map<String, Object>) responseBody.get("error");
+                    String errorMessage = error != null ? (String) error.get("message") : "Unknown error";
+                    log.error("OpenAI API error: {}", errorMessage);
+                    throw new RuntimeException("OpenAI API error: " + errorMessage);
+                }
+                
+                if (responseBody.containsKey("choices")) {
+                    List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+                    if (!choices.isEmpty()) {
+                        Map<String, Object> choice = choices.get(0);
+                        Map<String, Object> message = (Map<String, Object>) choice.get("message");
+                        String content = (String) message.get("content");
+                        log.info("OpenAI response content length: {}", content != null ? content.length() : 0);
+                        return content;
+                    }
+                }
             }
+            
+            log.error("Invalid OpenAI API response structure: {}", responseBody);
+            throw new RuntimeException("Invalid OpenAI API response");
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            log.error("OpenAI API HTTP error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("OpenAI API HTTP error: " + e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("OpenAI API call failed: {}", e.getMessage(), e);
+            throw e;
         }
-        
-        throw new RuntimeException("Invalid OpenAI API response");
     }
     
     private String parseOpenAIResponse(String response) {
