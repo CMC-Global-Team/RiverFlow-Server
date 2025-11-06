@@ -34,9 +34,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     @Override
     public AiMindmapResponse processAiRequest(AiMindmapRequest request) {
         log.info("Processing AI mindmap request: {}", request.getUserInstruction());
+        log.info("LLM Service instance: {}", llmService != null ? llmService.getClass().getName() : "NULL");
         
         // Try LLM mode first if available
-        if (llmService.isAvailable()) {
+        log.info("Checking LLM service availability...");
+        boolean llmAvailable = llmService != null && llmService.isAvailable();
+        log.info("LLM service available: {}", llmAvailable);
+        
+        if (llmAvailable) {
             log.info("LLM service is available, using AI generation");
             try {
                 String jsonResponse = llmService.generateMindmapContent(request);
