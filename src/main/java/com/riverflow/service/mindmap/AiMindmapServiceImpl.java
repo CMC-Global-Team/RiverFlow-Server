@@ -1,5 +1,6 @@
 package com.riverflow.service.mindmap;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.AiMindmapRequest;
 import com.riverflow.dto.mindmap.AiMindmapResponse;
@@ -34,6 +35,18 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     public AiMindmapResponse processAiRequest(AiMindmapRequest request) {
         log.info("Processing AI mindmap request: {}", request.getUserInstruction());
         
+        // Try LLM mode first if available
+        if (llmService.isAvailable()) {
+            try {
+                String jsonResponse = llmService.generateMindmapContent(request);
+                return parseLlmResponse(jsonResponse);
+            } catch (Exception e) {
+                log.warn("LLM service failed, falling back to rule-based logic: {}", e.getMessage());
+                // Fall through to rule-based logic
+            }
+        }
+        
+        // Fallback to rule-based logic
         String instruction = request.getUserInstruction() != null 
             ? request.getUserInstruction().toLowerCase() 
             : "";
@@ -50,6 +63,31 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         } else {
             // Default: expand node
             return expandNode(request);
+        }
+    }
+    
+    /**
+     * Parse LLM JSON response into AiMindmapResponse
+     */
+    private AiMindmapResponse parseLlmResponse(String jsonResponse) {
+        try {
+            Map<String, Object> responseMap = objectMapper.readValue(
+                jsonResponse, 
+                new TypeReference<Map<String, Object>>() {}
+            );
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> nodes = (List<Map<String, Object>>) responseMap.get("nodes");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> edges = (List<Map<String, Object>>) responseMap.get("edges");
+            
+            return AiMindmapResponse.builder()
+                .nodes(nodes != null ? nodes : new ArrayList<>())
+                .edges(edges != null ? edges : new ArrayList<>())
+                .build();
+        } catch (Exception e) {
+            log.error("Failed to parse LLM response: {}", e.getMessage(), e);
+            throw new RuntimeException("Invalid LLM response format", e);
         }
     }
     
