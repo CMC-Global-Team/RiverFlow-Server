@@ -1,0 +1,71 @@
+services:
+  - type: web
+    name: riverflow-server
+    runtime: docker
+    region: singapore
+    plan: free
+    branch: docker-deploy
+    
+    # Docker configuration
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    
+    # Environment variables
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      
+      - key: SERVER_PORT
+        value: 8080
+      
+      # Database - Railway MySQL
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://caboose.proxy.rlwy.net:18622/railway?useSSL=true&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      
+      - key: SPRING_DATASOURCE_USERNAME
+        value: root
+      
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false  # Set via Render dashboard for security
+      
+      # MongoDB
+      - key: SPRING_DATA_MONGODB_URI
+        sync: false  # Set via Render dashboard for security
+      
+      - key: SPRING_DATA_MONGODB_DATABASE
+        value: riverflow
+      
+      # JWT Secret
+      - key: JWT_SECRET
+        sync: false  # Set via Render dashboard for security
+      
+      # Email Configuration
+      - key: SPRING_MAIL_HOST
+        value: smtp.gmail.com
+      
+      - key: SPRING_MAIL_PORT
+        value: 587
+      
+      - key: SPRING_MAIL_USERNAME
+        sync: false  # Set via Render dashboard
+      
+      - key: SPRING_MAIL_PASSWORD
+        sync: false  # Set via Render dashboard
+      
+      - key: SPRING_MAIL_FROM
+        sync: false  # Set via Render dashboard
+      
+      # Frontend URL (update after deploying client)
+      - key: APP_FRONTEND_URL
+        value: https://riverflow-client.vercel.app
+      
+      # Backend URL (will be your Render URL)
+      - key: APP_BACKEND_URL
+        value: https://riverflow-server.onrender.com/api
+    
+    # Health check
+    healthCheckPath: /api/actuator/health
+    
+    # Auto-deploy on push
+    autoDeploy: true
+
