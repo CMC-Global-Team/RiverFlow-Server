@@ -2,11 +2,14 @@ package com.riverflow.controller.mindmap;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.MessageResponse;
+import com.riverflow.dto.mindmap.AiMindmapRequest;
+import com.riverflow.dto.mindmap.AiMindmapResponse;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
 import com.riverflow.model.User;
+import com.riverflow.service.mindmap.AiMindmapService;
 import com.riverflow.service.mindmap.MindmapService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import java.util.List;
 public class MindmapController {
     
     private final MindmapService mindmapService;
+    private final AiMindmapService aiMindmapService;
     private final CustomUserDetailsService userDetailsService;
     
     /**
@@ -233,6 +237,39 @@ public class MindmapController {
         log.info("Searching mindmaps for user: {} with keyword: {}", userId, keyword);
         
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * AI Mindmap Assistant
+     * POST /api/mindmaps/ai/assist
+     * 
+     * Processes AI requests for mindmap operations:
+     * - Expand nodes: adds 2-4 child nodes
+     * - Summarize: creates summary structure
+     * - Add new ideas: adds new nodes based on instruction
+     * - Restructure: reorganizes mindmap structure
+     * 
+     * Request body:
+     * {
+     *   "node_title": "...",
+     *   "node_summary": "...",
+     *   "context_nodes": [{"id":"...","summary":"..."}],
+     *   "user_instruction": "..."
+     * }
+     * 
+     * Response: JSON with nodes and edges in React Flow format
+     */
+    @PostMapping("/ai/assist")
+    public ResponseEntity<AiMindmapResponse> aiAssist(
+            @Valid @RequestBody AiMindmapRequest request,
+            Authentication authentication) {
+        
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("AI assist request from user: {} - instruction: {}", 
+            userId, request.getUserInstruction());
+        
+        AiMindmapResponse response = aiMindmapService.processAiRequest(request);
         return ResponseEntity.ok(response);
     }
     
