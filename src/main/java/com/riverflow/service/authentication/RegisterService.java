@@ -34,6 +34,9 @@ public class RegisterService {
     @Value("${app.backend.url:http://localhost:8080/api}")
     private String backendUrl;
 
+    @Value("${app.frontend.url:http://localhost:3000}")
+    private String frontendUrl;
+
     @Value("${app.verification.expire-minutes:15}")
     private int verificationExpireMinutes;
 
@@ -71,7 +74,7 @@ public class RegisterService {
         emailVerificationRepository.save(verificationToken);
 
         // Send verification email
-        String verificationLink = backendUrl + "/auth/verify?token=" + token;
+        String verificationLink = frontendUrl + "/verify-email?token=" + token;
         String emailBody = "Chào " + savedUser.getFullName() + ",\n\n"
                 + "Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào đường link bên dưới để kích hoạt tài khoản của bạn:\n"
                 + verificationLink + "\n\n"
