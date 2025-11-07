@@ -5,12 +5,14 @@ import com.riverflow.dto.MessageResponse;
 import com.riverflow.dto.mindmap.AiMindmapRequest;
 import com.riverflow.dto.mindmap.AiMindmapResponse;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
+import com.riverflow.dto.mindmap.GeneratedMindmapNode;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
 import com.riverflow.model.User;
 import com.riverflow.service.mindmap.AiMindmapService;
 import com.riverflow.service.mindmap.MindmapService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ import java.util.List;
 @RequestMapping("/mindmaps")
 @RequiredArgsConstructor
 @Slf4j
+@SecurityRequirement(name = "bearerAuth")
 public class MindmapController {
     
     private final MindmapService mindmapService;
@@ -241,7 +244,7 @@ public class MindmapController {
     }
     
     /**
-     * AI Mindmap Assistant
+     * AI Mindmap Assistant (Legacy - uses rule-based logic)
      * POST /api/mindmaps/ai/assist
      * 
      * Processes AI requests for mindmap operations:
@@ -278,6 +281,99 @@ public class MindmapController {
             response.getEdges() != null ? response.getEdges().size() : 0);
         
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Generate Mindmap Nodes using Spring AI
+     * POST /api/mindmaps/ai/assist (alternative endpoint)
+     * 
+     * This endpoint uses Spring AI ChatClient to generate mindmap nodes.
+     * It calls the generateMindmapNodes() service method which uses Spring AI.
+     * 
+     * Request body:
+     * {
+     *   "node_title": "Học lập trình Java",
+     *   "node_summary": "Lộ trình học Java từ cơ bản đến nâng cao",
+     *   "context_nodes": [
+     *     { "id": "node-1", "summary": "Java Core: OOP, Collections, Streams" },
+     *     { "id": "node-2", "summary": "Spring Framework: Spring Boot, Spring MVC" }
+     *   ],
+     *   "user_instruction": "mở rộng"
+     * }
+     * 
+     * Response: List of GeneratedMindmapNode objects
+     * [
+     *   {
+     *     "node_title": "Java Core",
+     *     "node_summary": "Các khái niệm cơ bản về Java",
+     *     "parent_id": "node-1"
+     *   },
+     *   ...
+     * ]
+     */
+    @PostMapping(value = "/ai/assist", params = "useSpringAI=true")
+    public ResponseEntity<List<GeneratedMindmapNode>> aiAssistWithSpringAI(
+            @Valid @RequestBody AiMindmapRequest request,
+            Authentication authentication) {
+        
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("=== AI ASSIST WITH SPRING AI API CALLED ===");
+        log.info("User ID: {}", userId);
+        log.info("Instruction: {}", request.getUserInstruction());
+        log.info("Node Title: {}", request.getNodeTitle());
+        log.info("Context Nodes Count: {}", request.getContextNodes() != null ? request.getContextNodes().size() : 0);
+        
+        List<GeneratedMindmapNode> nodes = aiMindmapService.generateMindmapNodes(request);
+        log.info("=== GENERATED {} NODES ===", nodes.size());
+        
+        return ResponseEntity.ok(nodes);
+    }
+    
+    /**
+     * Generate Mindmap Nodes using Spring AI
+     * POST /api/mindmaps/ai/generate-nodes
+     * 
+     * Uses Spring AI ChatClient to generate mindmap nodes based on the request.
+     * This endpoint specifically uses the generateMindmapNodes() method which
+     * returns a list of GeneratedMindmapNode objects.
+     * 
+     * Request body:
+     * {
+     *   "node_title": "Học lập trình Java",
+     *   "node_summary": "Lộ trình học Java từ cơ bản đến nâng cao",
+     *   "context_nodes": [
+     *     { "id": "node-1", "summary": "Java Core: OOP, Collections, Streams" },
+     *     { "id": "node-2", "summary": "Spring Framework: Spring Boot, Spring MVC" }
+     *   ],
+     *   "user_instruction": "mở rộng"
+     * }
+     * 
+     * Response: List of GeneratedMindmapNode objects
+     * [
+     *   {
+     *     "node_title": "Java Core",
+     *     "node_summary": "Các khái niệm cơ bản về Java",
+     *     "parent_id": "node-1"
+     *   },
+     *   ...
+     * ]
+     */
+    @PostMapping("/ai/generate-nodes")
+    public ResponseEntity<List<GeneratedMindmapNode>> generateMindmapNodes(
+            @Valid @RequestBody AiMindmapRequest request,
+            Authentication authentication) {
+        
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("=== GENERATE MINDMAP NODES API CALLED ===");
+        log.info("User ID: {}", userId);
+        log.info("Instruction: {}", request.getUserInstruction());
+        log.info("Node Title: {}", request.getNodeTitle());
+        log.info("Context Nodes Count: {}", request.getContextNodes() != null ? request.getContextNodes().size() : 0);
+        
+        List<GeneratedMindmapNode> nodes = aiMindmapService.generateMindmapNodes(request);
+        log.info("=== GENERATED {} NODES ===", nodes.size());
+        
+        return ResponseEntity.ok(nodes);
     }
     
     /**
