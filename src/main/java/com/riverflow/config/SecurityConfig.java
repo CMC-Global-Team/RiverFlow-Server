@@ -80,7 +80,12 @@ public class SecurityConfig {
                                 "/auth/**",             // API xác thực (context-path đã có /api)
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
-                                "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
+                                "/swagger-ui.html/**",  // Swagger UI paths
+                                "/v3/api-docs/**",      // File JSON định nghĩa OpenAPI
+                                "/v*/api-docs/**",      // Versioned API docs
+                                "/swagger-resources/**", // Swagger resources
+                                "/webjars/**",          // WebJars resources
+                                "/favicon.ico"          // Favicon
                         ).permitAll()
 
                         // Bất kỳ request nào khác đều yêu cầu phải xác thực

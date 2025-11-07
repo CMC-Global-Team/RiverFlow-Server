@@ -9,8 +9,6 @@ import com.riverflow.service.llm.LlmService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -507,9 +505,12 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String prompt = buildMindmapPrompt(request);
             log.debug("Generated prompt: {}", prompt);
             
-            // Call Spring AI ChatClient
-            Prompt aiPrompt = new Prompt(new UserMessage(prompt));
-            String response = chatClient.call(aiPrompt).getResult().getOutput().getContent();
+            // Call Spring AI ChatClient using new fluent API
+            String response = chatClient.prompt()
+                .user(prompt)
+                .call()
+                .content();
+            
             log.info("Spring AI response received, length: {}", response != null ? response.length() : 0);
             
             // Parse JSON response
