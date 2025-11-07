@@ -123,6 +123,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Spring AI Core -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-core</artifactId>
+            <version>1.0.0-M1</version>
+        </dependency>
+
         <!-- Spring AI OpenAI -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
