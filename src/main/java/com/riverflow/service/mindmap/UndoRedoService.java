@@ -39,7 +39,12 @@ public class UndoRedoService {
         historyRepository.save(lastAction);
 
         log.info("Undo thành công hành động: {}", lastAction.getAction());
-        return MindmapMapper.toResponse(mindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(mindmap);
+        response.setCanUndo(checkCanUndo(mindmapId, userId));
+        response.setCanRedo(checkCanRedo(mindmapId, userId));
+
+        return response;
     }
 
     @Transactional
@@ -57,7 +62,12 @@ public class UndoRedoService {
         historyRepository.save(lastUndoneAction);
 
         log.info("Redo thành công hành động: {}", lastUndoneAction.getAction());
-        return MindmapMapper.toResponse(mindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(mindmap);
+        response.setCanUndo(checkCanUndo(mindmapId, userId)); // (Cờ này giờ sẽ là true)
+        response.setCanRedo(checkCanRedo(mindmapId, userId));
+
+        return response;
     }
 
     /**
@@ -149,5 +159,17 @@ public class UndoRedoService {
 
         mindmap.setUpdatedAt(LocalDateTime.now());
         return mindmap;
+    }
+
+    public boolean checkCanUndo(String mindmapId, Long userId) {
+        return historyRepository
+                .findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, "active")
+                .isPresent();
+    }
+
+    public boolean checkCanRedo(String mindmapId, Long userId) {
+        return historyRepository
+                .findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, "undone")
+                .isPresent();
     }
 }
