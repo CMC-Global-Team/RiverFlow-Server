@@ -46,10 +46,17 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
     @Override
     public void sendVerificationEmail(String to, String token) {
         try {
+            // Normalize frontend URL (remove trailing slash if present)
+            String normalizedFrontendUrl = frontendUrl != null 
+                ? frontendUrl.trim().replaceAll("/+$", "") 
+                : frontendUrl;
+            
+            log.debug("Sending verification email - frontendUrl: {}", normalizedFrontendUrl);
+            
             SmtpVerificationEmailRequest request = SmtpVerificationEmailRequest.builder()
                     .to(to)
                     .token(token)
-                    .frontendUrl(frontendUrl)
+                    .frontendUrl(normalizedFrontendUrl)
                     .build();
 
             HttpEntity<SmtpVerificationEmailRequest> entity = new HttpEntity<>(request, createHeaders());
@@ -73,10 +80,17 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
     @Override
     public void sendResetPasswordEmail(String to, String token) {
         try {
+            // Normalize frontend URL (remove trailing slash if present)
+            String normalizedFrontendUrl = frontendUrl != null 
+                ? frontendUrl.trim().replaceAll("/+$", "") 
+                : frontendUrl;
+            
+            log.debug("Sending reset password email - frontendUrl: {}", normalizedFrontendUrl);
+            
             SmtpResetPasswordEmailRequest request = SmtpResetPasswordEmailRequest.builder()
                     .to(to)
                     .token(token)
-                    .frontendUrl(frontendUrl)
+                    .frontendUrl(normalizedFrontendUrl)
                     .build();
 
             HttpEntity<SmtpResetPasswordEmailRequest> entity = new HttpEntity<>(request, createHeaders());
