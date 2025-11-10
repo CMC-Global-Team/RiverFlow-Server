@@ -19,9 +19,20 @@ public interface MindmapHistoryRepository extends MongoRepository<MindmapHistory
     
     List<MindmapHistory> findByMindmapIdAndCreatedAtAfterOrderByCreatedAtDesc(String mindmapId, LocalDateTime after);
 
-    Optional<MindmapHistory> findTopByMindmapIdAndMysqlUserIdOrderByCreatedAtDesc(
+    Optional<MindmapHistory> findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(
             String mindmapId,
-            Long mysqlUserId
+            Long mysqlUserId,
+            String status
+    );
+
+    /**
+     * (Mới cho việc clear redo stack)
+     * Xóa tất cả lịch sử "undone" của user trên mindmap
+     */
+    void deleteAllByMindmapIdAndMysqlUserIdAndStatus(
+            String mindmapId,
+            Long mysqlUserId,
+            String status
     );
 }
 
