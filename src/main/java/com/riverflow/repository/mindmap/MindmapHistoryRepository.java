@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MindmapHistoryRepository extends MongoRepository<MindmapHistory, String> {
@@ -17,5 +18,10 @@ public interface MindmapHistoryRepository extends MongoRepository<MindmapHistory
     List<MindmapHistory> findByMindmapIdAndActionOrderByCreatedAtDesc(String mindmapId, String action);
     
     List<MindmapHistory> findByMindmapIdAndCreatedAtAfterOrderByCreatedAtDesc(String mindmapId, LocalDateTime after);
+
+    Optional<MindmapHistory> findTopByMindmapIdAndMysqlUserIdOrderByCreatedAtDesc(
+            String mindmapId,
+            Long mysqlUserId
+    );
 }
 
