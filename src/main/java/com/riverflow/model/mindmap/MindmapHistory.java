@@ -38,5 +38,9 @@ public class MindmapHistory {
     
     @Indexed
     private LocalDateTime createdAt;
+
+    @Indexed
+    @Builder.Default
+    private String status = "active";
 }
 
