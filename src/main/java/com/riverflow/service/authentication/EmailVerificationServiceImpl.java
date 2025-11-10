@@ -39,17 +39,39 @@ public class EmailVerificationServiceImpl {
      */
     @Transactional
     public void verifyEmail(String token) {
-        log.debug("Starting email verification for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
+        // Trim token to handle any whitespace issues
+        final String trimmedToken = (token != null) ? token.trim() : null;
         
-        if (token == null || token.trim().isEmpty()) {
+        log.info("Starting email verification for token: {} (length: {})", 
+            trimmedToken != null ? trimmedToken.substring(0, Math.min(8, trimmedToken.length())) + "..." : "null",
+            trimmedToken != null ? trimmedToken.length() : 0);
+        
+        if (trimmedToken == null || trimmedToken.isEmpty()) {
             log.warn("Email verification attempted with null or empty token");
             throw new InvalidTokenException("Token xác thực không hợp lệ.");
         }
 
-        // Find token
-        EmailVerification verificationToken = emailVerificationRepository.findByToken(token)
+        // Find token - try exact match first
+        EmailVerification verificationToken = emailVerificationRepository.findByToken(trimmedToken)
                 .orElseThrow(() -> {
-                    log.warn("Email verification token not found: {}", token.substring(0, Math.min(8, token.length())) + "...");
+                    log.error("Email verification token not found in database. Token: {} (length: {})", 
+                        trimmedToken.substring(0, Math.min(8, trimmedToken.length())) + "...", 
+                        trimmedToken.length());
+                    log.error("Attempting to find token with different variations...");
+                    
+                    // Try to find similar tokens for debugging (case-insensitive, trimmed)
+                    try {
+                        final String searchToken = trimmedToken; // Make final for lambda
+                        emailVerificationRepository.findAll().forEach(v -> {
+                            if (v.getToken() != null && v.getToken().trim().equalsIgnoreCase(searchToken)) {
+                                log.error("Found similar token (case-insensitive match): stored='{}' (length: {}), requested='{}' (length: {})", 
+                                    v.getToken(), v.getToken().length(), searchToken, searchToken.length());
+                            }
+                        });
+                    } catch (Exception e) {
+                        log.error("Error while searching for similar tokens: {}", e.getMessage());
+                    }
+                    
                     return new InvalidTokenException("Token xác thực không hợp lệ.");
                 });
 

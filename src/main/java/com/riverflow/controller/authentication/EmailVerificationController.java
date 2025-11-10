@@ -26,15 +26,24 @@ public class EmailVerificationController {
      */
     @GetMapping("/verify-email")
     public ResponseEntity<MessageResponse> verifyEmail(@RequestParam("token") String token) {
-        log.info("Email verification request received for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
+        // Trim token from request parameter
+        if (token != null) {
+            token = token.trim();
+        }
+        
+        log.info("Email verification request received for token: {} (length: {})", 
+            token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null",
+            token != null ? token.length() : 0);
         try {
             emailVerificationService.verifyEmail(token);
             log.info("Email verification successful for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
             return ResponseEntity.ok(new MessageResponse("Xác thực email thành công! Bạn có thể đăng nhập."));
         } catch (Exception e) {
-            log.error("Email verification failed for token: {} - Error: {}", 
-                token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null", 
-                e.getMessage());
+            log.error("Email verification failed for token: {} (length: {}) - Error: {} - Exception type: {}", 
+                token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null",
+                token != null ? token.length() : 0,
+                e.getMessage(),
+                e.getClass().getSimpleName());
             throw e;
         }
     }
