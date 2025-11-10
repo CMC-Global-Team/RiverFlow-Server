@@ -7,7 +7,7 @@ import com.riverflow.model.EmailVerification;
 import com.riverflow.model.User;
 import com.riverflow.repository.EmailVerificationRepository;
 import com.riverflow.repository.UserRepository;
-import com.riverflow.service.EmailService;
+import com.riverflow.service.SmtpEmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +29,7 @@ public class RegisterService {
     private final UserRepository userRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final PasswordEncoder passwordEncoder;
-    private final EmailService emailService;
+    private final SmtpEmailService smtpEmailService;
 
     @Value("${app.backend.url:http://localhost:8080/api}")
     private String backendUrl;
@@ -73,16 +73,9 @@ public class RegisterService {
         );
         emailVerificationRepository.save(verificationToken);
 
-        // Send verification email
-        String verificationLink = frontendUrl + "/verify-email?token=" + token;
-        String emailBody = "Chào " + savedUser.getFullName() + ",\n\n"
-                + "Cảm ơn bạn đã đăng ký. Vui lòng nhấn vào đường link bên dưới để kích hoạt tài khoản của bạn:\n"
-                + verificationLink + "\n\n"
-                + "Liên kết sẽ hết hạn sau " + verificationExpireMinutes + " phút.\n\n"
-                + "Trân trọng,\nĐội ngũ RiverFlow.";
-
-        emailService.sendSimpleMessage(savedUser.getEmail(), "Xác thực tài khoản RiverFlow", emailBody);
-        log.info("Verification email sent to {}", savedUser.getEmail());
+        // Send verification email via SMTP Server
+        smtpEmailService.sendVerificationEmail(savedUser.getEmail(), token);
+        log.info("Verification email sent to {} via SMTP server", savedUser.getEmail());
 
         // Build response
         return RegisterResponse.builder()
