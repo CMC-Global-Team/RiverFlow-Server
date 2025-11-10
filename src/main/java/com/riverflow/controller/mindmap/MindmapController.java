@@ -8,6 +8,7 @@ import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
 import com.riverflow.model.User;
 import com.riverflow.service.mindmap.MindmapService;
+import com.riverflow.service.mindmap.UndoRedoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class MindmapController {
     
     private final MindmapService mindmapService;
     private final CustomUserDetailsService userDetailsService;
+    private final UndoRedoService undoRedoService;
     
     /**
      * Create a new mindmap
@@ -233,6 +235,30 @@ public class MindmapController {
         log.info("Searching mindmaps for user: {} with keyword: {}", userId, keyword);
         
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/undo")
+    public ResponseEntity<MindmapResponse> undo(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Undoing mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = undoRedoService.undo(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/redo")
+    public ResponseEntity<MindmapResponse> redo(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Redoing mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = undoRedoService.redo(id, userId);
         return ResponseEntity.ok(response);
     }
     
