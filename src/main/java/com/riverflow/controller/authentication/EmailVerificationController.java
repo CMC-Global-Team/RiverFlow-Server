@@ -5,6 +5,7 @@ import com.riverflow.dto.authentication.ResendVerificationRequest;
 import com.riverflow.service.authentication.EmailVerificationServiceImpl;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class EmailVerificationController {
 
     private final EmailVerificationServiceImpl emailVerificationService;
@@ -24,8 +26,17 @@ public class EmailVerificationController {
      */
     @GetMapping("/verify-email")
     public ResponseEntity<MessageResponse> verifyEmail(@RequestParam("token") String token) {
-        emailVerificationService.verifyEmail(token);
-        return ResponseEntity.ok(new MessageResponse("Xác thực email thành công! Bạn có thể đăng nhập."));
+        log.info("Email verification request received for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
+        try {
+            emailVerificationService.verifyEmail(token);
+            log.info("Email verification successful for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
+            return ResponseEntity.ok(new MessageResponse("Xác thực email thành công! Bạn có thể đăng nhập."));
+        } catch (Exception e) {
+            log.error("Email verification failed for token: {} - Error: {}", 
+                token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null", 
+                e.getMessage());
+            throw e;
+        }
     }
 
     /**
