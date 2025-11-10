@@ -72,5 +72,8 @@ public class MindmapResponse {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+
+    private boolean canUndo;
+    private boolean canRedo;
 }
 
