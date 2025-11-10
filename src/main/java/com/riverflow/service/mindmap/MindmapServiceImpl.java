@@ -16,6 +16,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.riverflow.service.mindmap.MindmapHistoryService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class MindmapServiceImpl implements MindmapService {
     
     private final MindmapRepository mindmapRepository;
     private final MongoTemplate mongoTemplate;
+    private final MindmapHistoryService historyService;
     
     @Override
     @Transactional
@@ -62,6 +64,14 @@ public class MindmapServiceImpl implements MindmapService {
         
         Mindmap savedMindmap = mindmapRepository.save(mindmap);
         log.info("Mindmap created successfully with id: {}", savedMindmap.getId());
+
+        historyService.recordChange(
+                savedMindmap.getId(),
+                userId,
+                "create_mindmap",
+                null,
+                MindmapMapper.toResponse(savedMindmap)
+        );
         
         return MindmapMapper.toResponse(savedMindmap);
     }
@@ -93,6 +103,8 @@ public class MindmapServiceImpl implements MindmapService {
         if (!mindmap.getMysqlUserId().equals(userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
+
+        MindmapResponse oldMindmapState = MindmapMapper.toResponse(mindmap);
         
         // Update fields if provided
         if (request.getTitle() != null) {
@@ -142,6 +154,14 @@ public class MindmapServiceImpl implements MindmapService {
         
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
         log.info("Mindmap updated successfully: {}", mindmapId);
+
+        historyService.recordChange(
+                mindmapId,
+                userId,
+                "update_mindmap",
+                oldMindmapState, // Trạng thái 'before'
+                MindmapMapper.toResponse(updatedMindmap) // Trạng thái 'after'
+        );
         
         return MindmapMapper.toResponse(updatedMindmap);
     }
@@ -158,11 +178,15 @@ public class MindmapServiceImpl implements MindmapService {
         if (!mindmap.getMysqlUserId().equals(userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
+
+        String oldStatus = mindmap.getStatus();
         
         mindmap.setStatus("deleted");
         mindmap.setUpdatedAt(LocalDateTime.now());
         mindmapRepository.save(mindmap);
-        
+
+        historyService.recordChange(mindmapId, userId, "delete_mindmap", oldStatus, "deleted");
+
         log.info("Mindmap soft deleted successfully: {}", mindmapId);
     }
     
@@ -234,26 +258,30 @@ public class MindmapServiceImpl implements MindmapService {
                 .map(MindmapMapper::toSummaryResponse)
                 .collect(Collectors.toList());
     }
-    
+
     @Override
     @Transactional
     public MindmapResponse toggleFavorite(String mindmapId, Long userId) {
         log.info("Toggling favorite status for mindmap: {} user: {}", mindmapId, userId);
-        
+
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
-        
+
         // Check if user is the owner
         if (!mindmap.getMysqlUserId().equals(userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
-        
-        mindmap.setIsFavorite(!mindmap.getIsFavorite());
+
+        Boolean oldState = mindmap.getIsFavorite();
+        Boolean newState = !oldState;
+
+        mindmap.setIsFavorite(newState);
         mindmap.setUpdatedAt(LocalDateTime.now());
-        
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+
+        historyService.recordChange(mindmapId, userId, "toggle_favorite", oldState, newState);
         log.info("Favorite status toggled for mindmap: {}", mindmapId);
-        
+
         return MindmapMapper.toResponse(updatedMindmap);
     }
     
@@ -269,11 +297,14 @@ public class MindmapServiceImpl implements MindmapService {
         if (!mindmap.getMysqlUserId().equals(userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
-        
+
+        String oldState = mindmap.getStatus();
+
         mindmap.setStatus("archived");
         mindmap.setUpdatedAt(LocalDateTime.now());
-        
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+
+        historyService.recordChange(mindmapId, userId, "archive_mindmap", oldState, "archived");
         log.info("Mindmap archived: {}", mindmapId);
         
         return MindmapMapper.toResponse(updatedMindmap);
@@ -291,11 +322,14 @@ public class MindmapServiceImpl implements MindmapService {
         if (!mindmap.getMysqlUserId().equals(userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
-        
+
+        String oldState = mindmap.getStatus();
+
         mindmap.setStatus("active");
         mindmap.setUpdatedAt(LocalDateTime.now());
-        
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+
+        historyService.recordChange(mindmapId, userId, "unarchive_mindmap", oldState, "active");
         log.info("Mindmap unarchived: {}", mindmapId);
         
         return MindmapMapper.toResponse(updatedMindmap);
