@@ -17,6 +17,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.riverflow.service.mindmap.MindmapHistoryService;
+import com.riverflow.service.mindmap.UndoRedoService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ public class MindmapServiceImpl implements MindmapService {
     private final MindmapRepository mindmapRepository;
     private final MongoTemplate mongoTemplate;
     private final MindmapHistoryService historyService;
+    private final UndoRedoService undoRedoService;
     
     @Override
     @Transactional
@@ -72,8 +74,12 @@ public class MindmapServiceImpl implements MindmapService {
                 null,
                 MindmapMapper.toResponse(savedMindmap)
         );
-        
-        return MindmapMapper.toResponse(savedMindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(savedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(savedMindmap.getId(), userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(savedMindmap.getId(), userId));
+
+        return response;
     }
     
     @Override
@@ -82,13 +88,17 @@ public class MindmapServiceImpl implements MindmapService {
         
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
-        
+
         // Check if user has access
         if (!hasAccess(mindmap, userId)) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
-        
-        return MindmapMapper.toResponse(mindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(mindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
     }
     
     @Override
@@ -162,8 +172,12 @@ public class MindmapServiceImpl implements MindmapService {
                 oldMindmapState, // Trạng thái 'before'
                 MindmapMapper.toResponse(updatedMindmap) // Trạng thái 'after'
         );
-        
-        return MindmapMapper.toResponse(updatedMindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
     }
     
     @Override
@@ -282,7 +296,11 @@ public class MindmapServiceImpl implements MindmapService {
         historyService.recordChange(mindmapId, userId, "toggle_favorite", oldState, newState);
         log.info("Favorite status toggled for mindmap: {}", mindmapId);
 
-        return MindmapMapper.toResponse(updatedMindmap);
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
     }
     
     @Override
@@ -306,8 +324,12 @@ public class MindmapServiceImpl implements MindmapService {
 
         historyService.recordChange(mindmapId, userId, "archive_mindmap", oldState, "archived");
         log.info("Mindmap archived: {}", mindmapId);
-        
-        return MindmapMapper.toResponse(updatedMindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
     }
     
     @Override
@@ -331,8 +353,12 @@ public class MindmapServiceImpl implements MindmapService {
 
         historyService.recordChange(mindmapId, userId, "unarchive_mindmap", oldState, "active");
         log.info("Mindmap unarchived: {}", mindmapId);
-        
-        return MindmapMapper.toResponse(updatedMindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
     }
     
     @Override
