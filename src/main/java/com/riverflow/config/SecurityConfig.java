@@ -69,6 +69,9 @@ public class SecurityConfig {
                 // Tắt CSRF (Cross-Site Request Forgery) vì chúng ta dùng API stateless
                 .csrf(csrf -> csrf.disable())
 
+                .formLogin(form -> form.disable())
+                .httpBasic(httpBasic -> httpBasic.disable())
+
                 // Cấu hình phân quyền cho các request
                 .authorizeHttpRequests(authz -> authz
                         // Cho phép tất cả OPTIONS requests (CORS preflight)
@@ -82,6 +85,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
+
+                        .requestMatchers("/auth/mindmaps/**").permitAll()
 
                         // Bất kỳ request nào khác đều yêu cầu phải xác thực
                         .anyRequest().authenticated()
