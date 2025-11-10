@@ -39,17 +39,32 @@ public class EmailVerificationServiceImpl {
      */
     @Transactional
     public void verifyEmail(String token) {
+        log.debug("Starting email verification for token: {}", token != null ? token.substring(0, Math.min(8, token.length())) + "..." : "null");
+        
+        if (token == null || token.trim().isEmpty()) {
+            log.warn("Email verification attempted with null or empty token");
+            throw new InvalidTokenException("Token xác thực không hợp lệ.");
+        }
+
         // Find token
         EmailVerification verificationToken = emailVerificationRepository.findByToken(token)
-                .orElseThrow(() -> new InvalidTokenException("Token xác thực không hợp lệ."));
+                .orElseThrow(() -> {
+                    log.warn("Email verification token not found: {}", token.substring(0, Math.min(8, token.length())) + "...");
+                    return new InvalidTokenException("Token xác thực không hợp lệ.");
+                });
+
+        log.debug("Found verification token for user: {}", verificationToken.getUser().getEmail());
 
         // Check if token already used
         if (verificationToken.getVerifiedAt() != null) {
+            log.warn("Email verification attempted with already used token for user: {}", verificationToken.getUser().getEmail());
             throw new InvalidTokenException("Token này đã được sử dụng.");
         }
 
         // Check if token expired
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("Email verification attempted with expired token for user: {}, expired at: {}", 
+                verificationToken.getUser().getEmail(), verificationToken.getExpiresAt());
             throw new InvalidTokenException("Token đã hết hạn. Vui lòng yêu cầu link mới.");
         }
 
@@ -58,10 +73,12 @@ public class EmailVerificationServiceImpl {
         user.setEmailVerified(true);
         user.setEmailVerifiedAt(LocalDateTime.now());
         userRepository.save(user);
+        log.debug("User email verified flag set to true for: {}", user.getEmail());
 
         // Mark token as used
         verificationToken.setVerifiedAt(LocalDateTime.now());
         emailVerificationRepository.save(verificationToken);
+        log.debug("Verification token marked as used");
 
         log.info("Email verified successfully for user: {}", user.getEmail());
     }
