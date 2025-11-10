@@ -86,7 +86,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
 
-                        .requestMatchers("/auth/mindmaps/**").permitAll()
+                        .requestMatchers("/mindmaps/**").authenticated()
 
                         // Bất kỳ request nào khác đều yêu cầu phải xác thực
                         .anyRequest().authenticated()
