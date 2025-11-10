@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.riverflow.service.mindmap.MindmapHistoryService;
 import com.riverflow.service.mindmap.UndoRedoService;
+import com.riverflow.model.mindmap.subdocuments.Collaborator;
+import com.riverflow.model.mindmap.subdocuments.MindmapMetadata;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -383,6 +385,80 @@ public class MindmapServiceImpl implements MindmapService {
         return mindmaps.stream()
                 .map(MindmapMapper::toSummaryResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public MindmapResponse duplicateMindmap(String originalMapId, Long userId) {
+        log.info("Nhân bản mindmap: {} cho user: {}", originalMapId, userId);
+
+        // 1. Tìm mindmap gốc
+        Mindmap originalMindmap = mindmapRepository.findById(originalMapId)
+                .orElseThrow(() -> new MindmapNotFoundException(originalMapId, userId));
+
+        // 2. Kiểm tra quyền truy cập (Dùng lại hàm private 'hasAccess' của bạn)
+        if (!hasAccess(originalMindmap, userId)) {
+            throw new MindmapAccessDeniedException(originalMapId, userId);
+        }
+
+        // 3. Tạo owner (collaborator) mới cho map
+        // (Giả sử bạn có class Collaborator và builder)
+        Collaborator newOwner = Collaborator.builder()
+                .mysqlUserId(userId)
+                .role("owner") // (Hoặc "ROLE_OWNER" tùy theo Enum của bạn)
+                .status("accepted")
+                .invitedBy(userId)
+                .acceptedAt(LocalDateTime.now())
+                .build();
+
+        // 4. (Tùy chọn) Cập nhật metadata forking
+        // (Giả sử bạn có class MindmapMetadata)
+        MindmapMetadata newMetadata = MindmapMetadata.builder()
+                .nodeCount(originalMindmap.getNodes().size()) // Copy số node
+                .edgeCount(originalMindmap.getEdges().size()) // Copy số edge
+                .forkedFrom(originalMapId) // <-- Ghi lại nguồn
+                .viewCount(0) // Reset view count
+                .build();
+
+        Mindmap newMindmap = Mindmap.builder()
+                .id(null)
+                .mysqlUserId(userId)
+                .title("Copy of " + originalMindmap.getTitle())
+                .status("active")
+                .isFavorite(false)
+                .shareToken(null)
+                .collaborators(List.of(newOwner))
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .description(originalMindmap.getDescription())
+                .thumbnail(originalMindmap.getThumbnail())
+                .nodes(new ArrayList<>(originalMindmap.getNodes()))
+                .edges(new ArrayList<>(originalMindmap.getEdges()))
+                .viewport(originalMindmap.getViewport())
+                .settings(originalMindmap.getSettings())
+                .tags(new ArrayList<>(originalMindmap.getTags()))
+                .category(originalMindmap.getCategory())
+                .aiGenerated(originalMindmap.getAiGenerated())
+                .aiWorkflowId(originalMindmap.getAiWorkflowId())
+                .aiMetadata(originalMindmap.getAiMetadata())
+                .build();
+
+        Mindmap savedMindmap = mindmapRepository.save(newMindmap);
+        log.info("Nhân bản thành công. Mindmap mới ID: {}", savedMindmap.getId());
+
+        historyService.recordChange(
+                savedMindmap.getId(),
+                userId,
+                "create_duplicate",
+                originalMapId,
+                MindmapMapper.toResponse(savedMindmap)
+        );
+
+        MindmapResponse response = MindmapMapper.toResponse(savedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(savedMindmap.getId(), userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(savedMindmap.getId(), userId));
+
+        return response;
     }
     
     /**
