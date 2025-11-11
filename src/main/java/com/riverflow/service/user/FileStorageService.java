@@ -22,8 +22,8 @@ public class FileStorageService {
     @Value("${file.upload-dir:uploads/avatars}")
     private String uploadDir;
 
-    @Value("${file.base-url:http://localhost:8080/api/files}")
-    private String baseUrl;
+    @Value("${app.backend.url:http://localhost:8080/api}")
+    private String backendUrl;
 
     /**
      * Store uploaded file and return the URL
@@ -49,8 +49,8 @@ public class FileStorageService {
 
         log.info("File saved: {}", filePath);
 
-        // Return URL
-        return baseUrl + "/avatars/" + filename;
+        // Return URL - use backend URL from config
+        return backendUrl + "/files/avatars/" + filename;
     }
 
     /**
