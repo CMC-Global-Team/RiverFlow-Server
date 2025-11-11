@@ -21,7 +21,7 @@ public class UpdateUserRequest {
     @Size(min = 2, max = 100, message = "Họ và tên phải có từ 2 đến 100 ký tự")
     private String fullName;
 
-    @NotBlank(message = "Email không được để trống")
+    // Email is optional in request but will not be updated
     @Email(message = "Email không hợp lệ")
     private String email;
 

@@ -49,19 +49,10 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Check if email is being changed and if it's already taken
-        if (!user.getEmail().equals(request.getEmail())) {
-            if (userRepository.existsByEmail(request.getEmail())) {
-                throw new RuntimeException("Email đã được sử dụng");
-            }
-            // If email is changed, reset email verification
-            user.setEmailVerified(false);
-            user.setEmailVerifiedAt(null);
-        }
-
-        // Update user fields
+        // Email cannot be changed - ignore email from request
+        // Update user fields (excluding email)
         user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
+        // Email is not updated - it remains unchanged
         if (request.getAvatar() != null) {
             user.setAvatar(request.getAvatar());
         }
