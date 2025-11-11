@@ -75,6 +75,7 @@ public class SignInService {
                     .email(user.getEmail())
                     .fullName(user.getFullName())
                     .role("USER") // All users have USER role
+                    .avatar(user.getAvatar())
                     .build();
 
         } catch (EmailNotVerifiedException e) {
