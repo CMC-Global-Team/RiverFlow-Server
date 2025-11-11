@@ -1,4 +1,4 @@
-package com.riverflow.service.authentication;
+package com.riverflow.service.user;
 
 import com.riverflow.dto.authentication.UpdateUserRequest;
 import com.riverflow.dto.authentication.UserResponse;

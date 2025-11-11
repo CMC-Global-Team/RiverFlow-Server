@@ -1,10 +1,10 @@
-package com.riverflow.controller.authentication;
+package com.riverflow.controller.user;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.authentication.UpdateUserRequest;
 import com.riverflow.dto.authentication.UserResponse;
 import com.riverflow.model.User;
-import com.riverflow.service.authentication.UserService;
+import com.riverflow.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
