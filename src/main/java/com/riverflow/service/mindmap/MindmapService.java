@@ -76,5 +76,14 @@ public interface MindmapService {
      * Search mindmaps by title or description
      */
     List<MindmapSummaryResponse> searchMindmaps(Long userId, String keyword);
+
+    /**
+     * Nhân bản (duplicate) một mindmap đã có.
+     *
+     * @param originalMapId ID của mindmap gốc
+     * @param userId ID (MySQL) của người dùng (sẽ là owner mới)
+     * @return MindmapResponse của mindmap MỚI đã được nhân bản
+     */
+    MindmapResponse duplicateMindmap(String originalMapId, Long userId);
 }
 

@@ -127,6 +127,22 @@ public class MindmapController {
         mindmapService.permanentlyDeleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap permanently deleted"));
     }
+
+    /**
+     * Nhân bản (duplicate) một mindmap
+     * POST /api/mindmaps/{id}/duplicate
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<MindmapResponse> duplicateMindmap(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Duplicating mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = mindmapService.duplicateMindmap(id, userId);
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Get mindmaps by category
