@@ -25,7 +25,8 @@ public class FileStorageConfig implements WebMvcConfigurer {
             resourceLocation = resourceLocation + "/";
         }
 
-        registry.addResourceHandler("/api/files/avatars/**")
+        // Note: Do NOT include the context-path (/api) here; Spring applies it automatically.
+        registry.addResourceHandler("/files/avatars/**")
                 .addResourceLocations(resourceLocation);
     }
 }
