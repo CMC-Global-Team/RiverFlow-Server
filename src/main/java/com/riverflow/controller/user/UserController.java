@@ -87,16 +87,8 @@ public class UserController {
             log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
-            // Return /api/user/avatar/{userId} - full path
->>>>>>> 56889d22ef6c7ac2fa6838b9cd680b05d84191f4
-            response.put("url", "/api/user/avatar/" + userId);
-=======
             // Return /user/avatar/{userId} (context-path /api will be added automatically)
             response.put("url", "/user/avatar/" + userId);
->>>>>>> Stashed changes
             response.put("message", "Avatar uploaded successfully");
             
             return ResponseEntity.ok(response);
