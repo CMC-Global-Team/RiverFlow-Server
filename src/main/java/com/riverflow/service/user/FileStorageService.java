@@ -24,7 +24,7 @@ public class FileStorageService {
     @Value("${file.upload-dir:uploads/avatars}")
     private String uploadDir;
 
-    @Value("${app.backend.url:http://localhost:8080/api}")
+    @Value("${app.backend.url:http://localhost:8080}")
     private String backendUrl;
 
     private static final String FALLBACK_TMP_DIR = "riverflow";
@@ -55,8 +55,8 @@ public class FileStorageService {
 
         log.info("File saved: {}", filePath);
 
-        // Return URL - use backend URL from config
-        return backendUrl + "/files/avatars/" + filename;
+        // Return URL - matches the FileController mapping
+        return backendUrl + "/api/files/avatars/" + filename;
     }
 
     /**
@@ -114,4 +114,3 @@ public class FileStorageService {
         return resolvedUploadPath;
     }
 }
-
