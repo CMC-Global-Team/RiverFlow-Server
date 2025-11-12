@@ -45,9 +45,10 @@ public class RefreshTokenService {
         log.info("Access token refreshed for user: {}", username);
 
         // Generate avatar URL if avatar data exists in database
+        // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
         String avatarUrl = null;
         if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
-            avatarUrl = "/api/user/avatar/" + user.getId();
+            avatarUrl = "/user/avatar/" + user.getId();
         } else if (user.getAvatar() != null) {
             // Fallback to legacy URL-based avatar
             avatarUrl = user.getAvatar();

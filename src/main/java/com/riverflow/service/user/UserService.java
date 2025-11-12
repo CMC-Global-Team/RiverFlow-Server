@@ -27,9 +27,10 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Generate avatar URL if avatar data exists
+        // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
         String avatarUrl = null;
         if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
-            avatarUrl = "/api/user/avatar/" + userId;
+            avatarUrl = "/user/avatar/" + userId;
         } else if (user.getAvatar() != null) {
             // Fallback to legacy URL-based avatar
             avatarUrl = user.getAvatar();
@@ -74,9 +75,10 @@ public class UserService {
         log.info("User {} profile updated", user.getEmail());
 
         // Generate avatar URL if avatar data exists
+        // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
         String avatarUrl = null;
         if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
-            avatarUrl = "/api/user/avatar/" + userId;
+            avatarUrl = "/user/avatar/" + userId;
         } else if (user.getAvatar() != null) {
             // Fallback to legacy URL-based avatar
             avatarUrl = user.getAvatar();

@@ -76,7 +76,8 @@ public class UserController {
             log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
-            response.put("url", "/api/user/avatar/" + userId);
+            // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
+            response.put("url", "/user/avatar/" + userId);
             response.put("message", "Avatar uploaded successfully");
             
             return ResponseEntity.ok(response);
