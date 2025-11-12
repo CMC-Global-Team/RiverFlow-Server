@@ -3,7 +3,6 @@ package com.riverflow.service.user;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -16,8 +15,12 @@ import java.util.UUID;
 
 /**
  * Service for handling file storage operations
+ * 
+ * @deprecated Avatar storage has been moved to database (BLOB).
+ * This service is kept for backward compatibility but is no longer used.
+ * The AvatarService handles all avatar operations now.
  */
-@Service
+// @Service  // DISABLED: Avatar storage moved to database (AvatarService)
 @Slf4j
 public class FileStorageService {
 
