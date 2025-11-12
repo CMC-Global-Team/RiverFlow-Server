@@ -48,10 +48,24 @@ public class User {
     private String fullName;
     
     /**
-     * URL to user's avatar image
+     * URL to user's avatar image (deprecated - use avatar_data instead)
      */
     @Column(length = 500)
     private String avatar;
+    
+    /**
+     * Avatar image binary data (BLOB)
+     * Stored directly in database for reliability
+     */
+    @Lob
+    @Column(name = "avatar_data")
+    private byte[] avatarData;
+    
+    /**
+     * MIME type of avatar image (e.g., "image/png", "image/jpeg")
+     */
+    @Column(name = "avatar_mime_type", length = 50)
+    private String avatarMimeType;
     
     /**
      * Account status
