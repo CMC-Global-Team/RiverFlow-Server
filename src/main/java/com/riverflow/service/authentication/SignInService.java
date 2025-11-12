@@ -65,6 +65,15 @@ public class SignInService {
 
             log.info("User {} signed in successfully", user.getEmail());
 
+            // Generate avatar URL if avatar data exists in database
+            String avatarUrl = null;
+            if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+                avatarUrl = "/api/user/avatar/" + user.getId();
+            } else if (user.getAvatar() != null) {
+                // Fallback to legacy URL-based avatar
+                avatarUrl = user.getAvatar();
+            }
+
             // Build response
             return SignInResponse.builder()
                     .accessToken(accessToken)
@@ -75,7 +84,7 @@ public class SignInService {
                     .email(user.getEmail())
                     .fullName(user.getFullName())
                     .role("USER") // All users have USER role
-                    .avatar(user.getAvatar())
+                    .avatar(avatarUrl)
                     .build();
 
         } catch (EmailNotVerifiedException e) {

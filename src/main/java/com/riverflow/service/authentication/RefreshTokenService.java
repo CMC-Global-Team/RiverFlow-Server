@@ -44,6 +44,15 @@ public class RefreshTokenService {
 
         log.info("Access token refreshed for user: {}", username);
 
+        // Generate avatar URL if avatar data exists in database
+        String avatarUrl = null;
+        if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+            avatarUrl = "/api/user/avatar/" + user.getId();
+        } else if (user.getAvatar() != null) {
+            // Fallback to legacy URL-based avatar
+            avatarUrl = user.getAvatar();
+        }
+
         // Build response
         return SignInResponse.builder()
                 .accessToken(newAccessToken)
@@ -54,6 +63,7 @@ public class RefreshTokenService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role("USER") // All users have USER role
+                .avatar(avatarUrl)
                 .build();
     }
 }
