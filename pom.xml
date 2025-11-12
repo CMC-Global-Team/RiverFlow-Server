@@ -129,6 +129,16 @@
             <version>0.12.3</version>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Flyway Database Migration -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
