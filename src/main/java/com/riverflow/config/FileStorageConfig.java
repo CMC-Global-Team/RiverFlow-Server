@@ -1,45 +1,24 @@
 package com.riverflow.config;
 
-import com.riverflow.service.user.FileStorageService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import java.nio.file.Path;
 
 /**
  * Configuration for file storage and serving
+ * 
+ * NOTE: Not using Spring's ResourceHandler for /api/files/avatars/**
+ * because it throws 500 errors when files are missing.
+ * Instead, FileController handles file serving with graceful 404 responses.
  */
 @Configuration
-@RequiredArgsConstructor
 @Slf4j
 public class FileStorageConfig implements WebMvcConfigurer {
 
-    private final FileStorageService fileStorageService;
-
     /**
-     * Configure resource handlers for serving uploaded files
-     * Maps /api/files/avatars/** to the actual upload directory on disk
+     * FileController handles all file serving for /api/files/avatars/**
+     * This provides better error handling than Spring's built-in ResourceHandler
      */
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        try {
-            Path uploadPath = fileStorageService.getResolvedUploadPath();
-            String uploadDir = uploadPath.toUri().toString();
-            
-            log.info("Configuring resource handler for: {} -> {}", "/api/files/avatars/", uploadDir);
-            
-            registry.addResourceHandler("/api/files/avatars/**")
-                    .addResourceLocations(uploadDir)
-                    .setCachePeriod(3600) // Cache for 1 hour
-                    .resourceChain(true)
-                    .addResolver(new org.springframework.web.servlet.resource.PathResourceResolver());
-        } catch (Exception e) {
-            log.warn("Failed to configure resource handler for avatars: {}", e.getMessage());
-            // Gracefully continue - FileController will handle serving
-        }
-    }
+    // Resource handler intentionally disabled to allow FileController to handle gracefully
 }
 
