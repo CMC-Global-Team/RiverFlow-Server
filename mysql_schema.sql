@@ -7,9 +7,9 @@
 -- ==============================================================================
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS railway CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS mindmap_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-USE railway;
+USE mindmap_system;
 
 -- ==============================================================================
 -- USERS TABLE
@@ -269,12 +269,14 @@ CREATE TABLE system_settings (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     setting_key VARCHAR(100) NOT NULL UNIQUE,
     setting_value TEXT NOT NULL,
-    setting_type ENUM('string', 'number', 'boolean', 'json') NOT NULL DEFAULT 'string',
+    setting_type ENUM('STRING', 'NUMBER', 'BOOLEAN', 'JSON') NOT NULL DEFAULT 'STRING',
     description TEXT NULL,
     is_public BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Can be accessed by frontend',
+    updated_by BIGINT UNSIGNED NULL COMMENT 'User who last updated this setting',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_setting_key (setting_key),
     INDEX idx_is_public (is_public)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -388,14 +390,14 @@ INSERT INTO ai_workflows (category_id, name, slug, description, prompt_template,
 
 -- Insert system settings
 INSERT INTO system_settings (setting_key, setting_value, setting_type, description, is_public) VALUES
-('site_name', 'RiverFlow Mindmap', 'string', 'Website name', TRUE),
-('max_upload_size_mb', '10', 'number', 'Maximum file upload size in MB', FALSE),
-('email_verification_required', 'true', 'boolean', 'Require email verification for new users', FALSE),
-('maintenance_mode', 'false', 'boolean', 'Enable maintenance mode', TRUE),
-('max_mindmaps_per_user', '100', 'number', 'Maximum mindmaps per user (0 = unlimited)', FALSE),
-('max_collaborators_per_mindmap', '10', 'number', 'Maximum collaborators per mindmap', FALSE),
-('enable_ai_features', 'true', 'boolean', 'Enable AI workflow features', TRUE),
-('ai_daily_limit_per_user', '20', 'number', 'Daily AI workflow usage limit per user', FALSE);
+('site_name', 'RiverFlow Mindmap', 'STRING', 'Website name', TRUE),
+('max_upload_size_mb', '10', 'NUMBER', 'Maximum file upload size in MB', FALSE),
+('email_verification_required', 'true', 'BOOLEAN', 'Require email verification for new users', FALSE),
+('maintenance_mode', 'false', 'BOOLEAN', 'Enable maintenance mode', TRUE),
+('max_mindmaps_per_user', '100', 'NUMBER', 'Maximum mindmaps per user (0 = unlimited)', FALSE),
+('max_collaborators_per_mindmap', '10', 'NUMBER', 'Maximum collaborators per mindmap', FALSE),
+('enable_ai_features', 'true', 'BOOLEAN', 'Enable AI workflow features', TRUE),
+('ai_daily_limit_per_user', '20', 'NUMBER', 'Daily AI workflow usage limit per user', FALSE);
 
 -- ==============================================================================
 -- VIEWS FOR COMMON QUERIES
