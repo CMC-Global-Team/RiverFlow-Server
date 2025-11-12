@@ -22,7 +22,9 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NULL COMMENT 'NULL for OAuth users',
     full_name VARCHAR(255) NOT NULL,
-    avatar VARCHAR(500) NULL COMMENT 'URL to user avatar',
+    avatar VARCHAR(500) NULL COMMENT 'URL to user avatar (deprecated - use avatar_data instead)',
+    avatar_data LONGBLOB NULL COMMENT 'Avatar image binary data (BLOB)',
+    avatar_mime_type VARCHAR(50) NULL COMMENT 'MIME type of avatar image (e.g., image/png, image/jpeg)',
     status ENUM('active', 'suspended', 'deleted') NOT NULL DEFAULT 'active',
     
     -- OAuth fields
@@ -46,7 +48,8 @@ CREATE TABLE users (
     INDEX idx_email (email),
     INDEX idx_oauth (oauth_provider, oauth_id),
     INDEX idx_status (status),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_avatar_mime_type (avatar_mime_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ==============================================================================
