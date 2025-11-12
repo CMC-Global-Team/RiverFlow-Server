@@ -4,7 +4,7 @@ import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.authentication.UpdateUserRequest;
 import com.riverflow.dto.authentication.UserResponse;
 import com.riverflow.model.User;
-import com.riverflow.service.user.FileStorageService;
+import com.riverflow.service.user.AvatarService;
 import com.riverflow.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class UserController {
 
     private final UserService userService;
     private final CustomUserDetailsService userDetailsService;
-    private final FileStorageService fileStorageService;
+    private final AvatarService avatarService;
 
     /**
      * API Endpoint: Lấy thông tin người dùng
@@ -61,6 +61,7 @@ public class UserController {
     /**
      * API Endpoint: Upload avatar image
      * POST /api/user/avatar/upload
+     * Avatar is stored directly in database as BLOB
      */
     @PostMapping("/avatar/upload")
     public ResponseEntity<Map<String, String>> uploadAvatar(
@@ -69,36 +70,46 @@ public class UserController {
         try {
             Long userId = getUserIdFromAuth(authentication);
             
-            // Validate file
-            if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body(createErrorResponse("File is empty"));
-            }
+            // Upload avatar to database
+            avatarService.uploadAvatar(file, userId);
             
-            // Validate file type
-            String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                return ResponseEntity.badRequest().body(createErrorResponse("File must be an image"));
-            }
-            
-            // Validate file size (max 5MB)
-            if (file.getSize() > 5 * 1024 * 1024) {
-                return ResponseEntity.badRequest().body(createErrorResponse("File size must be less than 5MB"));
-            }
-            
-            // Upload file and get URL
-            String fileUrl = fileStorageService.storeFile(file, userId);
-            
-            log.info("Avatar uploaded for user: {}, URL: {}", userId, fileUrl);
+            log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
-            response.put("url", fileUrl);
+            response.put("url", "/api/user/avatar/" + userId);
             response.put("message", "Avatar uploaded successfully");
             
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid avatar upload: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
             log.error("Error uploading avatar", e);
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createErrorResponse("Failed to upload avatar: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * API Endpoint: Get avatar image for user
+     * GET /api/user/avatar/{userId}
+     */
+    @GetMapping("/avatar/{userId}")
+    public ResponseEntity<?> getAvatar(@PathVariable Long userId) {
+        try {
+            var avatarOpt = avatarService.getAvatar(userId);
+            
+            if (avatarOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            var avatar = avatarOpt.get();
+            return ResponseEntity.ok()
+                    .contentType(org.springframework.http.MediaType.parseMediaType(avatar.getMimeType()))
+                    .body(avatar.getData());
+        } catch (Exception e) {
+            log.error("Error retrieving avatar for user: {}", userId, e);
+            return ResponseEntity.notFound().build();
         }
     }
 

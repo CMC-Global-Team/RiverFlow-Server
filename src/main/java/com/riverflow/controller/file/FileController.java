@@ -1,11 +1,8 @@
 package com.riverflow.controller.file;
 
-import com.riverflow.service.user.FileStorageService;
+import com.riverflow.service.user.AvatarService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,12 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 /**
- * Controller for serving uploaded files
+ * Controller for serving uploaded files from database
  */
 @RestController
 @RequestMapping("/api/files")
@@ -26,52 +19,34 @@ import java.nio.file.Path;
 @Slf4j
 public class FileController {
 
-    private final FileStorageService fileStorageService;
+    private final AvatarService avatarService;
 
     /**
-     * Serve avatar files
-     * GET /api/files/avatars/{filename}
+     * Serve avatar files from database
+     * GET /api/files/avatars/{userId}
+     * 
+     * Note: Avatar endpoint moved to /api/user/avatar/{userId}
+     * This endpoint is kept for backward compatibility
      */
-    @GetMapping("/avatars/{filename:.+}")
-    public ResponseEntity<Resource> serveAvatar(@PathVariable String filename) {
+    @GetMapping("/avatars/{userId}")
+    public ResponseEntity<?> serveAvatar(@PathVariable Long userId) {
         try {
-            // Validate filename to prevent path traversal
-            if (filename.contains("..") || filename.startsWith("/")) {
-                log.warn("Attempted path traversal attack: {}", filename);
-                return ResponseEntity.notFound().build();
-            }
-
-            Path uploadPath = fileStorageService.getResolvedUploadPath();
-            Path filePath = uploadPath.resolve(filename).normalize();
+            var avatarOpt = avatarService.getAvatar(userId);
             
-            // Security check: ensure the file is within the upload directory
-            if (!filePath.startsWith(uploadPath.normalize())) {
-                log.warn("Attempted path traversal attack: {}", filename);
+            if (avatarOpt.isEmpty()) {
+                log.debug("Avatar not found for user: {}", userId);
                 return ResponseEntity.notFound().build();
             }
             
-            File file = filePath.toFile();
-            if (!file.exists() || !file.isFile()) {
-                log.warn("Avatar file not found: {} (resolved path: {})", filename, filePath);
-                return ResponseEntity.notFound().build();
-            }
-            
-            Resource resource = new FileSystemResource(file);
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "application/octet-stream";
-            }
-            
-            log.debug("Serving avatar file: {}", filename);
-            
+            var avatar = avatarOpt.get();
             return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                    .body(resource);
+                    .contentType(MediaType.parseMediaType(avatar.getMimeType()))
+                    .body(avatar.getData());
         } catch (Exception e) {
-            log.error("Error serving avatar file: {}", filename, e);
+            log.error("Error serving avatar for user: {}", userId, e);
             return ResponseEntity.notFound().build();
         }
     }
 }
+
 
