@@ -84,11 +84,16 @@ public class SecurityConfig {
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**",      // File JSON định nghĩa OpenAPI
-                                "/files/avatars/**",    // Tài nguyên ảnh đại diện (cũ)
-                                "/user/avatar/**"       // Tài nguyên ảnh đại diện từ DB (mới)
+                                "/files/avatars/**"     // Tài nguyên ảnh đại diện (cũ)
                         ).permitAll()
+                        
+                        // GET avatar - public access
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
 
                         .requestMatchers("/mindmaps/**").authenticated()
+                        
+                        // POST upload avatar - requires authentication
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/user/avatar/upload").authenticated()
 
                         // Bất kỳ request nào khác đều yêu cầu phải xác thực
                         .anyRequest().authenticated()

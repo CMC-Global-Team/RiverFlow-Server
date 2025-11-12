@@ -87,7 +87,11 @@ public class UserController {
             log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
+<<<<<<< HEAD
 <<<<<<< Updated upstream
+=======
+            // Return /api/user/avatar/{userId} - full path
+>>>>>>> 56889d22ef6c7ac2fa6838b9cd680b05d84191f4
             response.put("url", "/api/user/avatar/" + userId);
 =======
             // Return /user/avatar/{userId} (context-path /api will be added automatically)
@@ -109,6 +113,7 @@ public class UserController {
     /**
      * API Endpoint: Get avatar image for user
      * GET /api/user/avatar/{userId}
+     * Public endpoint - no authentication required
      */
     @GetMapping("/avatar/{userId}")
     public ResponseEntity<?> getAvatar(@PathVariable Long userId) {
