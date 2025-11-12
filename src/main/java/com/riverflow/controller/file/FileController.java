@@ -35,6 +35,12 @@ public class FileController {
     @GetMapping("/avatars/{filename:.+}")
     public ResponseEntity<Resource> serveAvatar(@PathVariable String filename) {
         try {
+            // Validate filename to prevent path traversal
+            if (filename.contains("..") || filename.startsWith("/")) {
+                log.warn("Attempted path traversal attack: {}", filename);
+                return ResponseEntity.notFound().build();
+            }
+
             Path uploadPath = fileStorageService.getResolvedUploadPath();
             Path filePath = uploadPath.resolve(filename).normalize();
             
@@ -46,7 +52,7 @@ public class FileController {
             
             File file = filePath.toFile();
             if (!file.exists() || !file.isFile()) {
-                log.warn("Avatar file not found: {}", filePath);
+                log.warn("Avatar file not found: {} (resolved path: {})", filename, filePath);
                 return ResponseEntity.notFound().build();
             }
             
@@ -55,6 +61,8 @@ public class FileController {
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
+            
+            log.debug("Serving avatar file: {}", filename);
             
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))

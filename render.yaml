@@ -10,18 +10,28 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     
-    # Environment variables (Optional - có default values từ application-prod.properties)
-    # Uncomment và set nếu muốn override giá trị mặc định
+    # Environment variables
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       
-      # Uncomment để override production URLs
-      # - key: APP_FRONTEND_URL
-      #   value: https://riverflow-client.vercel.app
+      # Backend URL for file serving
+      - key: APP_BACKEND_URL
+        value: https://riverflow-server.onrender.com/api
       
-      # - key: APP_BACKEND_URL
-      #   value: https://riverflow-server.onrender.com/api
+      # Frontend URL for CORS
+      - key: APP_FRONTEND_URL
+        value: https://river-flow-client.vercel.app
+      
+      # Upload directory - must match the disk mount path
+      - key: APP_UPLOAD_DIR
+        value: /app/uploads/avatars
+    
+    # Persistent disk for file uploads
+    disk:
+      name: riverflow-uploads
+      mountPath: /app/uploads
+      sizeGB: 1
     
     # Health check
     healthCheckPath: /api/actuator/health
