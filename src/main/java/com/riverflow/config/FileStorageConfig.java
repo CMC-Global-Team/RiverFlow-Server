@@ -20,7 +20,7 @@ public class FileStorageConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         Path uploadPath = fileStorageService.getResolvedUploadPath();
-        String resourceLocation = uploadPath.toUri().toString();
+        String resourceLocation = "file:" + uploadPath.toAbsolutePath().toString();
         if (!resourceLocation.endsWith("/")) {
             resourceLocation = resourceLocation + "/";
         }
