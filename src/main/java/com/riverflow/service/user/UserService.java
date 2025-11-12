@@ -26,11 +26,20 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // Generate avatar URL if avatar data exists
+        String avatarUrl = null;
+        if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+            avatarUrl = "/api/user/avatar/" + userId;
+        } else if (user.getAvatar() != null) {
+            // Fallback to legacy URL-based avatar
+            avatarUrl = user.getAvatar();
+        }
+
         return UserResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .avatar(user.getAvatar())
+                .avatar(avatarUrl)
                 .preferredLanguage(user.getPreferredLanguage())
                 .timezone(user.getTimezone())
                 .theme(user.getTheme() != null ? user.getTheme().name() : "light")
@@ -53,9 +62,6 @@ public class UserService {
         // Update user fields (excluding email)
         user.setFullName(request.getFullName());
         // Email is not updated - it remains unchanged
-        if (request.getAvatar() != null) {
-            user.setAvatar(request.getAvatar());
-        }
         if (request.getPreferredLanguage() != null) {
             user.setPreferredLanguage(request.getPreferredLanguage());
         }
@@ -67,11 +73,20 @@ public class UserService {
 
         log.info("User {} profile updated", user.getEmail());
 
+        // Generate avatar URL if avatar data exists
+        String avatarUrl = null;
+        if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+            avatarUrl = "/api/user/avatar/" + userId;
+        } else if (user.getAvatar() != null) {
+            // Fallback to legacy URL-based avatar
+            avatarUrl = user.getAvatar();
+        }
+
         return UserResponse.builder()
                 .userId(user.getId())
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .avatar(user.getAvatar())
+                .avatar(avatarUrl)
                 .preferredLanguage(user.getPreferredLanguage())
                 .timezone(user.getTimezone())
                 .theme(user.getTheme() != null ? user.getTheme().name() : "light")
