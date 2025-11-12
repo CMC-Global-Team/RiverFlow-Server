@@ -21,7 +21,7 @@ import java.util.Map;
  * Controller for user profile operations
  */
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/user")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
@@ -32,7 +32,7 @@ public class UserController {
 
     /**
      * API Endpoint: Lấy thông tin người dùng
-     * GET /api/user/profile (context-path /api + mapping /user/profile)
+     * GET /api/user/profile
      */
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getUserProfile(Authentication authentication) {
@@ -45,7 +45,7 @@ public class UserController {
 
     /**
      * API Endpoint: Cập nhật thông tin người dùng
-     * PUT /api/user/profile (context-path /api + mapping /user/profile)
+     * PUT /api/user/profile
      */
     @PutMapping("/profile")
     public ResponseEntity<UserResponse> updateUserProfile(
@@ -60,7 +60,7 @@ public class UserController {
 
     /**
      * API Endpoint: Upload avatar image
-     * POST /api/user/avatar/upload (context-path /api + mapping /user/avatar/upload)
+     * POST /api/user/avatar/upload
      * Avatar is stored directly in database as BLOB
      */
     @PostMapping("/avatar/upload")
@@ -76,9 +76,8 @@ public class UserController {
             log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
-            // Return /user/avatar/{userId} (without /api prefix)
-            // Client baseURL already includes /api, so final URL will be: baseURL + /user/avatar/{userId}
-            response.put("url", "/user/avatar/" + userId);
+            // Return /api/user/avatar/{userId} - full path
+            response.put("url", "/api/user/avatar/" + userId);
             response.put("message", "Avatar uploaded successfully");
             
             return ResponseEntity.ok(response);
@@ -94,7 +93,7 @@ public class UserController {
 
     /**
      * API Endpoint: Get avatar image for user
-     * GET /api/user/avatar/{userId} (context-path /api + mapping /user/avatar/{userId})
+     * GET /api/user/avatar/{userId}
      * Public endpoint - no authentication required
      */
     @GetMapping("/avatar/{userId}")
