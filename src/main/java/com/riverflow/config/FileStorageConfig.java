@@ -1,25 +1,32 @@
 package com.riverflow.config;
 
+import com.riverflow.service.user.FileStorageService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 
 /**
  * Configuration for file storage and serving
  */
 @Configuration
+@RequiredArgsConstructor
 public class FileStorageConfig implements WebMvcConfigurer {
+
+    private final FileStorageService fileStorageService;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String uploadDir = "uploads/avatars";
-        Path uploadPath = Paths.get(uploadDir);
-        
+        Path uploadPath = fileStorageService.getResolvedUploadPath();
+        String resourceLocation = uploadPath.toUri().toString();
+        if (!resourceLocation.endsWith("/")) {
+            resourceLocation = resourceLocation + "/";
+        }
+
         registry.addResourceHandler("/api/files/avatars/**")
-                .addResourceLocations("file:" + uploadPath.toAbsolutePath().toString() + "/");
+                .addResourceLocations(resourceLocation);
     }
 }
 

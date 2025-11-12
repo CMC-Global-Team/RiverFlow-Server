@@ -83,7 +83,8 @@ public class SecurityConfig {
                                 "/auth/**",             // API xác thực (context-path đã có /api)
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
-                                "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
+                                "/v3/api-docs/**",      // File JSON định nghĩa OpenAPI
+                                "/files/avatars/**"     // Tài nguyên ảnh đại diện
                         ).permitAll()
 
                         .requestMatchers("/mindmaps/**").authenticated()

@@ -109,5 +109,9 @@ public class FileStorageService {
             );
         }
     }
+
+    public Path getResolvedUploadPath() {
+        return resolvedUploadPath;
+    }
 }
 
