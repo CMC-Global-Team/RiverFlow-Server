@@ -21,7 +21,7 @@ import java.util.Map;
  * Controller for user profile operations
  */
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/user")
 @RequiredArgsConstructor
 @Slf4j
 public class UserController {
@@ -36,11 +36,22 @@ public class UserController {
      */
     @GetMapping("/profile")
     public ResponseEntity<UserResponse> getUserProfile(Authentication authentication) {
-        Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting profile for user: {}", userId);
-        
-        UserResponse response = userService.getUserById(userId);
-        return ResponseEntity.ok(response);
+        try {
+            Long userId = getUserIdFromAuth(authentication);
+            log.info("Getting profile for user: {}", userId);
+            
+            UserResponse response = userService.getUserById(userId);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request for user profile: {}", e.getMessage());
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException e) {
+            log.error("Error getting user profile", e);
+            throw e; // Let GlobalExceptionHandler handle it
+        } catch (Exception e) {
+            log.error("Unexpected error getting user profile", e);
+            throw e; // Let GlobalExceptionHandler handle it
+        }
     }
 
     /**
@@ -76,7 +87,12 @@ public class UserController {
             log.info("Avatar uploaded for user: {}", userId);
             
             Map<String, String> response = new HashMap<>();
+<<<<<<< Updated upstream
             response.put("url", "/api/user/avatar/" + userId);
+=======
+            // Return /user/avatar/{userId} (context-path /api will be added automatically)
+            response.put("url", "/user/avatar/" + userId);
+>>>>>>> Stashed changes
             response.put("message", "Avatar uploaded successfully");
             
             return ResponseEntity.ok(response);
