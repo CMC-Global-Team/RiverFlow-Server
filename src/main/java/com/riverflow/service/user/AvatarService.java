@@ -70,12 +70,29 @@ public class AvatarService {
      * @return Optional containing avatar data
      */
     public Optional<AvatarData> getAvatar(Long userId) {
-        return userRepository.findById(userId)
-                .filter(user -> user.getAvatarData() != null && user.getAvatarData().length > 0)
-                .map(user -> new AvatarData(
-                    user.getAvatarData(),
-                    user.getAvatarMimeType()
-                ));
+        var userOpt = userRepository.findById(userId);
+        
+        if (userOpt.isEmpty()) {
+            log.warn("User not found: {}", userId);
+            return Optional.empty();
+        }
+        
+        var user = userOpt.get();
+        log.debug("Avatar data for user {}: data size = {}, mimeType = {}", 
+                userId, 
+                user.getAvatarData() != null ? user.getAvatarData().length : 0,
+                user.getAvatarMimeType());
+        
+        if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+            log.info("Returning avatar for user: {}, size: {} bytes", userId, user.getAvatarData().length);
+            return Optional.of(new AvatarData(
+                user.getAvatarData(),
+                user.getAvatarMimeType()
+            ));
+        }
+        
+        log.warn("No avatar data found for user: {}", userId);
+        return Optional.empty();
     }
 
     /**

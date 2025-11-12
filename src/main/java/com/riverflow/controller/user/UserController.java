@@ -97,13 +97,18 @@ public class UserController {
     @GetMapping("/avatar/{userId}")
     public ResponseEntity<?> getAvatar(@PathVariable Long userId) {
         try {
+            log.info("Fetching avatar for user: {}", userId);
             var avatarOpt = avatarService.getAvatar(userId);
             
             if (avatarOpt.isEmpty()) {
+                log.warn("Avatar not found for user: {}", userId);
                 return ResponseEntity.notFound().build();
             }
             
             var avatar = avatarOpt.get();
+            log.info("Returning avatar for user: {} with mimeType: {}, size: {}", 
+                    userId, avatar.getMimeType(), avatar.getData().length);
+            
             return ResponseEntity.ok()
                     .contentType(org.springframework.http.MediaType.parseMediaType(avatar.getMimeType()))
                     .body(avatar.getData());
