@@ -54,11 +54,12 @@ public class User {
     private String avatar;
     
     /**
-     * Avatar image binary data (BLOB)
+     * Avatar image binary data (LONGBLOB)
      * Stored directly in database for reliability
+     * Max size: 4GB (but practically limited to max file upload size of 5MB)
      */
     @Lob
-    @Column(name = "avatar_data")
+    @Column(name = "avatar_data", columnDefinition = "LONGBLOB")
     private byte[] avatarData;
     
     /**
