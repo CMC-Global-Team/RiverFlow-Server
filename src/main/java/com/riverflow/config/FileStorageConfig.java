@@ -17,17 +17,11 @@ public class FileStorageConfig implements WebMvcConfigurer {
 
     private final FileStorageService fileStorageService;
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        Path uploadPath = fileStorageService.getResolvedUploadPath();
-        String resourceLocation = "file:" + uploadPath.toAbsolutePath().toString();
-        if (!resourceLocation.endsWith("/")) {
-            resourceLocation = resourceLocation + "/";
-        }
-
-        // Note: Do NOT include the context-path (/api) here; Spring applies it automatically.
-        registry.addResourceHandler("/files/avatars/**")
-                .addResourceLocations(resourceLocation);
-    }
+    // Static resource handler removed - FileController now handles file serving
+    // This prevents conflicts between static resource handler and controller endpoints
+    // @Override
+    // public void addResourceHandlers(ResourceHandlerRegistry registry) {
+    //     // Removed - using FileController instead
+    // }
 }
 
