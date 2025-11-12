@@ -74,13 +74,23 @@ public class FileStorageService {
     private Path initialiseUploadPath() {
         // Check if production upload directory exists (Render Disk)
         Path productionPath = Paths.get(PRODUCTION_UPLOAD_DIR);
-        if (Files.exists(productionPath) && Files.isDirectory(productionPath)) {
-            try {
+        try {
+            // Try to create production directory if it doesn't exist
+            if (!Files.exists(productionPath)) {
+                log.info("Creating production upload directory: {}", productionPath);
+                Files.createDirectories(productionPath);
+            }
+            
+            if (Files.isDirectory(productionPath)) {
                 log.info("Using production upload directory: {}", productionPath);
                 return productionPath;
-            } catch (Exception e) {
-                log.warn("Failed to use production directory: {}", e.getMessage());
             }
+        } catch (AccessDeniedException ex) {
+            log.warn("Access denied to production directory '{}': {}. Will use fallback.", 
+                    productionPath, ex.getMessage());
+        } catch (IOException ex) {
+            log.warn("Cannot initialize production directory '{}': {}. Will use fallback.", 
+                    productionPath, ex.getMessage());
         }
 
         // Use configured path
@@ -95,6 +105,7 @@ public class FileStorageService {
 
         try {
             Files.createDirectories(configuredPath);
+            log.info("Using configured upload directory: {}", configuredPath);
             return configuredPath;
         } catch (AccessDeniedException ex) {
             Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"))
