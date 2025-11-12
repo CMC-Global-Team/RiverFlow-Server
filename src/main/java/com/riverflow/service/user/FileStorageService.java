@@ -21,13 +21,14 @@ import java.util.UUID;
 @Slf4j
 public class FileStorageService {
 
-    @Value("${file.upload-dir:uploads/avatars}")
+    @Value("${app.upload.dir:uploads/avatars}")
     private String uploadDir;
 
     @Value("${app.backend.url:http://localhost:8080}")
     private String backendUrl;
 
     private static final String FALLBACK_TMP_DIR = "riverflow";
+    private static final String PRODUCTION_UPLOAD_DIR = "/app/uploads/avatars";
 
     private Path resolvedUploadPath;
 
@@ -71,6 +72,18 @@ public class FileStorageService {
     }
 
     private Path initialiseUploadPath() {
+        // Check if production upload directory exists (Render Disk)
+        Path productionPath = Paths.get(PRODUCTION_UPLOAD_DIR);
+        if (Files.exists(productionPath) && Files.isDirectory(productionPath)) {
+            try {
+                log.info("Using production upload directory: {}", productionPath);
+                return productionPath;
+            } catch (Exception e) {
+                log.warn("Failed to use production directory: {}", e.getMessage());
+            }
+        }
+
+        // Use configured path
         Path configuredPath = Paths.get(uploadDir);
         if (!configuredPath.isAbsolute()) {
             Path tmpBase = Paths.get(System.getProperty("java.io.tmpdir"))
