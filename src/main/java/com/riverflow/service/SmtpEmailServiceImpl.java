@@ -1,9 +1,6 @@
 package com.riverflow.service;
 
-import com.riverflow.dto.smtp.SmtpEmailRequest;
-import com.riverflow.dto.smtp.SmtpEmailResponse;
-import com.riverflow.dto.smtp.SmtpResetPasswordEmailRequest;
-import com.riverflow.dto.smtp.SmtpVerificationEmailRequest;
+import com.riverflow.dto.smtp.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -108,6 +105,39 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
         } catch (Exception e) {
             log.error("Error sending reset password email to {} via SMTP server: {}", to, e.getMessage());
             throw new RuntimeException("Failed to send reset password email: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void sendInvitationEmail(String to, String token, String inviterName, String mindmapTitle) {
+        try {
+            String normalizedFrontendUrl = frontendUrl != null
+                    ? frontendUrl.trim().replaceAll("/+$", "")
+                    : frontendUrl;
+
+            log.debug("Sending invitation email via SMTP Proxy...");
+
+            SmtpInvitationEmailRequest request = SmtpInvitationEmailRequest.builder()
+                    .to(to)
+                    .token(token)
+                    .inviterName(inviterName)
+                    .mindmapTitle(mindmapTitle)
+                    .frontendUrl(normalizedFrontendUrl)
+                    .build();
+
+            HttpEntity<SmtpInvitationEmailRequest> entity = new HttpEntity<>(request, createHeaders());
+            String url = smtpServerUrl + "/api/email/invitation";
+
+            SmtpEmailResponse response = restTemplate.postForObject(url, entity, SmtpEmailResponse.class);
+
+            if (response != null && response.getSuccess()) {
+                log.info("Invitation email sent successfully to {} via SMTP server", to);
+            } else {
+                log.error("Failed to send invitation email to {}: {}", to,
+                        response != null ? response.getMessage() : "No response");
+            }
+        } catch (Exception e) {
+            log.error("Error sending invitation email to {} via SMTP server: {}", to, e.getMessage());
         }
     }
 
