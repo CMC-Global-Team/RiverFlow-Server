@@ -9,13 +9,18 @@ import java.util.Optional;
 
 @Repository
 public interface CollaborationInvitationRepository extends MongoRepository<CollaborationInvitation, String> {
-    
-    List<CollaborationInvitation> findByMindmapIdAndStatus(String mindmapId, String status);
-    
-    List<CollaborationInvitation> findByInvitedEmailAndStatus(String invitedEmail, String status);
-    
-    List<CollaborationInvitation> findByInvitedUserIdAndStatus(Long invitedUserId, String status);
-    
-    Optional<CollaborationInvitation> findByToken(String token);
-}
 
+    List<CollaborationInvitation> findByMindmapIdAndStatus(String mindmapId, String status);
+
+    List<CollaborationInvitation> findByInvitedEmailAndStatus(String invitedEmail, String status);
+
+    List<CollaborationInvitation> findByInvitedUserIdAndStatus(Long invitedUserId, String status);
+
+    Optional<CollaborationInvitation> findByToken(String token);
+
+    Optional<CollaborationInvitation> findByMindmapIdAndInvitedEmailAndStatus(
+            String mindmapId,
+            String invitedEmail,
+            String status
+    );
+}
