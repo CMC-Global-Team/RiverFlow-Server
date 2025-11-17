@@ -28,5 +28,14 @@ public interface SmtpEmailService {
      * @param text Nội dung text (optional)
      */
     void sendEmail(String to, String subject, String html, String text);
+
+    /**
+     * Gửi email mời cộng tác
+     * @param to Email người nhận
+     * @param token Token lời mời
+     * @param inviterName Tên người mời
+     * @param mindmapTitle Tên mindmap được chia sẻ
+     */
+    void sendInvitationEmail(String to, String token, String inviterName, String mindmapTitle);
 }
 

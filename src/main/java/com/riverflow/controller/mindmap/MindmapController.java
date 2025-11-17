@@ -2,11 +2,14 @@ package com.riverflow.controller.mindmap;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.MessageResponse;
+import com.riverflow.dto.collaboration.InviteCollaboratorRequest;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
 import com.riverflow.model.User;
+import com.riverflow.model.mindmap.CollaborationInvitation;
+import com.riverflow.service.mindmap.CollaborationService;
 import com.riverflow.service.mindmap.MindmapService;
 import com.riverflow.service.mindmap.UndoRedoService;
 import jakarta.validation.Valid;
@@ -31,7 +34,8 @@ public class MindmapController {
     private final MindmapService mindmapService;
     private final CustomUserDetailsService userDetailsService;
     private final UndoRedoService undoRedoService;
-    
+    private final CollaborationService collaborationService;
+
     /**
      * Create a new mindmap
      * POST /api/mindmaps
@@ -276,6 +280,20 @@ public class MindmapController {
 
         MindmapResponse response = undoRedoService.redo(id, userId);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/collaborators/invite")
+    public ResponseEntity<CollaborationInvitation> inviteCollaborator(
+            @PathVariable String id,
+            @Valid @RequestBody InviteCollaboratorRequest request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Request invite collaborator to map: {} by user: {}", id, userId);
+
+        CollaborationInvitation invitation = collaborationService.inviteCollaborator(id, request, userId);
+
+        return ResponseEntity.ok(invitation);
     }
     
     /**
