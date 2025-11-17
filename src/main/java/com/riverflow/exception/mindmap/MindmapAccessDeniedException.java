@@ -5,7 +5,7 @@ package com.riverflow.exception.mindmap;
  */
 public class MindmapAccessDeniedException extends RuntimeException {
     
-    public MindmapAccessDeniedException(String message) {
+    public MindmapAccessDeniedException(String message, String mindmapId, Long userId) {
         super(message);
     }
     
