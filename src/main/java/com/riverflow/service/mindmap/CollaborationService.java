@@ -182,18 +182,13 @@ public class CollaborationService {
                 .findFirst()
                 .orElse(null);
 
-        // Case 1: Collaborator exists in mindmap
+        // Case 1: Collaborator exists in mindmap - remove regardless of status
         if (collaborator != null) {
-            // Only allow removing collaborators with "pending" status
-            if (!"pending".equals(collaborator.getStatus())) {
-                throw new IllegalArgumentException("Chỉ có thể xóa những người được mời còn chờ xác nhận. Để xóa một thành viên đã chấp nhận, vui lòng liên hệ với quản trị viên.");
-            }
-
             mindmap.getCollaborators().removeIf(c -> 
                     c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
             );
             mindmapRepository.save(mindmap);
-            log.info("Pending collaborator {} removed from mindmap {}", email, mindmapId);
+            log.info("Collaborator {} removed from mindmap {} (status: {})", email, mindmapId, collaborator.getStatus());
         } else {
             // Case 2: Collaborator doesn't exist in mindmap but might have pending invitation
             // This happens when user was invited but hasn't registered yet
