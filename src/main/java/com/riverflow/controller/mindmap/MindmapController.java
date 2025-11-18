@@ -317,6 +317,22 @@ public class MindmapController {
     }
 
     /**
+     * Get pending invitations for a mindmap
+     * GET /api/mindmaps/{id}/pending-invitations
+     */
+    @GetMapping("/{id}/pending-invitations")
+    public ResponseEntity<?> getPendingInvitations(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Getting pending invitations for mindmap: {} by user: {}", id, userId);
+
+        var response = collaborationService.getPendingInvitations(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Update collaborator role
      * PUT /api/mindmaps/{id}/collaborators/{email}/role
      */

@@ -269,4 +269,21 @@ public class CollaborationService {
         log.info("Getting invitation with token: {}", token);
         return invitationRepository.findByToken(token).orElse(null);
     }
+
+    /**
+     * Lấy danh sách lời mời đang chờ xác nhận cho một mindmap
+     */
+    public List<CollaborationInvitation> getPendingInvitations(String mindmapId, Long userId) {
+        log.info("Getting pending invitations for mindmap: {} by user: {}", mindmapId, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        // Chỉ chủ sở hữu mới có quyền xem lời mời
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền xem lời mời.", mindmapId, userId);
+        }
+
+        return invitationRepository.findByMindmapIdAndStatus(mindmapId, "pending");
+    }
 }
