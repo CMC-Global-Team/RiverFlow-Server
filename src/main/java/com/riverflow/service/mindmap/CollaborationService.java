@@ -248,7 +248,7 @@ public class CollaborationService {
 
         // Find or create collaborator
         Collaborator collaborator = mindmap.getCollaborators().stream()
-                .filter(c -> c.getMysqlUserId().equals(userId))
+                .filter(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId))
                 .findFirst()
                 .orElse(null);
 
@@ -312,7 +312,7 @@ public class CollaborationService {
                     .orElse(null);
             if (mindmap != null) {
                 mindmap.getCollaborators().removeIf(c -> 
-                        c.getMysqlUserId().equals(userId) && "pending".equals(c.getStatus())
+                        c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId) && "pending".equals(c.getStatus())
                 );
                 mindmapRepository.save(mindmap);
             }

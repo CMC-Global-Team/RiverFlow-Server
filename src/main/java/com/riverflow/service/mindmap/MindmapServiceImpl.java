@@ -93,6 +93,12 @@ public class MindmapServiceImpl implements MindmapService {
 
         // Check if user has access
         if (!hasAccess(mindmap, userId)) {
+            log.error("Access Denied - User: {}, Mindmap: {}, Owner: {}, IsPublic: {}, Collaborators: {}", 
+                userId, mindmapId, mindmap.getMysqlUserId(), mindmap.getIsPublic(),
+                mindmap.getCollaborators().stream()
+                    .map(c -> "userId=" + c.getMysqlUserId() + ",status=" + c.getStatus())
+                    .toList()
+            );
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
 
