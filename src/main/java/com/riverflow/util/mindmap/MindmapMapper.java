@@ -29,6 +29,7 @@ public class MindmapMapper {
                 .viewport(toViewportDto(mindmap.getViewport()))
                 .settings(toSettingsDto(mindmap.getSettings()))
                 .isPublic(mindmap.getIsPublic())
+                .publicAccessLevel(mindmap.getPublicAccessLevel())
                 .shareToken(mindmap.getShareToken())
                 .collaborators(mindmap.getCollaborators())
                 .tags(mindmap.getTags())
