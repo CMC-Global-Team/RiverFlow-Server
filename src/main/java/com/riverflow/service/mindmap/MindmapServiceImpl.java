@@ -607,5 +607,25 @@ public class MindmapServiceImpl implements MindmapService {
 
         return false;
     }
+
+    @Override
+    public MindmapResponse getMindmapByShareToken(String shareToken) {
+        log.info("Getting mindmap with shareToken: {}", shareToken);
+
+        Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
+                .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
+
+        // Verify mindmap is public
+        if (!Boolean.TRUE.equals(mindmap.getIsPublic())) {
+            log.error("Attempted to access non-public mindmap with shareToken: {}", shareToken);
+            throw new MindmapNotFoundException("This mindmap is not public", null);
+        }
+
+        MindmapResponse response = MindmapMapper.toResponse(mindmap);
+        response.setCanUndo(false);
+        response.setCanRedo(false);
+
+        return response;
+    }
 }
 

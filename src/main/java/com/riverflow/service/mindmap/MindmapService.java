@@ -94,5 +94,11 @@ public interface MindmapService {
      * @param userId ID (MySQL) của người dùng
      */
     MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId);
+
+    /**
+     * Get public mindmap by share token (NO AUTH REQUIRED)
+     * @param shareToken Share token của mindmap công khai
+     */
+    MindmapResponse getMindmapByShareToken(String shareToken);
 }
 

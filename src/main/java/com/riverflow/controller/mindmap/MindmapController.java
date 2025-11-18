@@ -494,6 +494,20 @@ public class MindmapController {
         collaborationService.leaveCollaboration(id, userId);
         return ResponseEntity.ok(new MessageResponse("Bạn đã rời khỏi project thành công."));
     }
+
+    /**
+     * Get public mindmap by share token (NO AUTH REQUIRED)
+     * GET /api/mindmaps/public/{shareToken}
+     */
+    @GetMapping("/public/{shareToken}")
+    public ResponseEntity<MindmapResponse> getPublicMindmap(
+            @PathVariable String shareToken) {
+        
+        log.info("Getting public mindmap with shareToken: {}", shareToken);
+        
+        MindmapResponse response = mindmapService.getMindmapByShareToken(shareToken);
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Helper method to get user ID from authentication
