@@ -478,6 +478,22 @@ public class MindmapController {
             return ResponseEntity.status(400).body(new MessageResponse("Invalid or expired invitation."));
         }
     }
+
+    /**
+     * Leave collaboration - collaborator removes themselves from mindmap
+     * POST /api/mindmaps/{id}/leave-collaboration
+     */
+    @PostMapping("/{id}/leave-collaboration")
+    public ResponseEntity<MessageResponse> leaveCollaboration(
+            @PathVariable String id,
+            Authentication authentication) {
+        
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} leaving collaboration on mindmap {}", userId, id);
+        
+        collaborationService.leaveCollaboration(id, userId);
+        return ResponseEntity.ok(new MessageResponse("Bạn đã rời khỏi project thành công."));
+    }
     
     /**
      * Helper method to get user ID from authentication
