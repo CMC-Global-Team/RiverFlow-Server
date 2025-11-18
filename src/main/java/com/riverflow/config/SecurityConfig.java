@@ -83,10 +83,11 @@ public class SecurityConfig {
                                 "/auth/**",             // API xác thực (context-path đã có /api)
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
-                                "/v3/api-docs/**",      // File JSON định nghĩa OpenAPI
-                                "/files/avatars/**",    // Tài nguyên ảnh đại diện (cũ)
-                                "/mindmaps/public/**"   // Public mindmap access (NO AUTH)
+                                "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
+                        
+                        // Public mindmap access (NO AUTH) - MUST come before /mindmaps/**
+                        .requestMatchers("/mindmaps/public/**").permitAll()
                         
                         // GET avatar - public access
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
