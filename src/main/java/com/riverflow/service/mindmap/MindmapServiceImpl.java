@@ -527,11 +527,13 @@ public class MindmapServiceImpl implements MindmapService {
     private boolean hasAccess(Mindmap mindmap, Long userId) {
         // Owner has access
         if (mindmap.getMysqlUserId().equals(userId)) {
+            log.debug("User {} has access to mindmap {} as owner", userId, mindmap.getId());
             return true;
         }
 
         // Public mindmaps are accessible
         if (Boolean.TRUE.equals(mindmap.getIsPublic())) {
+            log.debug("Mindmap {} is public, user {} has access", mindmap.getId(), userId);
             return true;
         }
 
@@ -547,10 +549,14 @@ public class MindmapServiceImpl implements MindmapService {
                 log.debug("User {} has access to mindmap {} as accepted collaborator", userId, mindmap.getId());
                 return true;
             }
-            // Log pending collaborators for debugging
-            mindmap.getCollaborators().stream()
-                    .filter(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId))
-                    .forEach(c -> log.debug("User {} found in mindmap {} but status is: {}", userId, mindmap.getId(), c.getStatus()));
+            
+            // Log all collaborators for debugging
+            log.debug("Checking collaborators for user {} in mindmap {}", userId, mindmap.getId());
+            mindmap.getCollaborators().forEach(c -> {
+                log.debug("Collaborator: email={}, mysqlUserId={}, status={}", c.getEmail(), c.getMysqlUserId(), c.getStatus());
+            });
+        } else {
+            log.debug("Mindmap {} has no collaborators", mindmap.getId());
         }
 
         return false;
