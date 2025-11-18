@@ -393,15 +393,34 @@ public class MindmapController {
      * POST /api/mindmaps/accept-invitation/{token}
      */
     @PostMapping("/accept-invitation/{token}")
-    public ResponseEntity<MessageResponse> acceptInvitation(
+    public ResponseEntity<?> acceptInvitation(
             @PathVariable String token,
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
         log.info("User {} accepting invitation with token: {}", userId, token);
 
-        collaborationService.acceptInvitation(token, userId);
-        return ResponseEntity.ok(new MessageResponse("Invitation accepted successfully. Mindmap added to your collection."));
+        try {
+            collaborationService.acceptInvitation(token, userId);
+            
+            // Get invitation details to return mindmapId
+            CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
+            Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
+                    .orElseThrow(() -> new MindmapNotFoundException(invitation.getMindmapId(), userId));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Lời mời được chấp nhận thành công. Mindmap đã được thêm vào bộ sưu tập của bạn.");
+            response.put("mindmapId", mindmap.getId());
+            response.put("mindmapTitle", mindmap.getTitle());
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
     }
 
     /**

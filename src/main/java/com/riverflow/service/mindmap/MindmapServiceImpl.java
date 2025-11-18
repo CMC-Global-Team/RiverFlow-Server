@@ -529,10 +529,13 @@ public class MindmapServiceImpl implements MindmapService {
             return true;
         }
 
-        // Check if user is a collaborator
+        // Check if user is an accepted collaborator
         if (mindmap.getCollaborators() != null) {
             return mindmap.getCollaborators().stream()
-                    .anyMatch(collaborator -> collaborator.getMysqlUserId().equals(userId));
+                    .anyMatch(collaborator -> 
+                        collaborator.getMysqlUserId().equals(userId) && 
+                        "accepted".equals(collaborator.getStatus())
+                    );
         }
 
         return false;
