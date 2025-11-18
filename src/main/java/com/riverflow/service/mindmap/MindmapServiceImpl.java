@@ -622,6 +622,14 @@ public class MindmapServiceImpl implements MindmapService {
         }
 
         MindmapResponse response = MindmapMapper.toResponse(mindmap);
+        
+        // Add owner info
+        User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+        if (owner != null) {
+            response.setOwnerName(owner.getFullName());
+            response.setOwnerAvatar(owner.getAvatar());
+        }
+        
         response.setCanUndo(false);
         response.setCanRedo(false);
 
