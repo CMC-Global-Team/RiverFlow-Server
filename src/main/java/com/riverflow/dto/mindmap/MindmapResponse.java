@@ -75,5 +75,9 @@ public class MindmapResponse {
 
     private boolean canUndo;
     private boolean canRedo;
+    
+    // Owner info (for public mindmaps)
+    private String ownerName;
+    private String ownerAvatar;
 }
 
