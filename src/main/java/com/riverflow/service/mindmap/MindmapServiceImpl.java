@@ -118,7 +118,20 @@ public class MindmapServiceImpl implements MindmapService {
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
         // Check if user is the owner
-        if (!mindmap.getMysqlUserId().equals(userId)) {
+        boolean isOwner = mindmap.getMysqlUserId().equals(userId);
+        
+        // Check if user is an EDITOR collaborator
+        boolean isEditorCollaborator = mindmap.getCollaborators() != null && 
+            mindmap.getCollaborators().stream()
+                .anyMatch(c -> 
+                    c.getMysqlUserId() != null &&
+                    c.getMysqlUserId().equals(userId) && 
+                    "accepted".equals(c.getStatus()) &&
+                    "EDITOR".equals(c.getRole())
+                );
+        
+        if (!isOwner && !isEditorCollaborator) {
+            log.warn("User {} does not have permission to update mindmap {}", userId, mindmapId);
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
 
