@@ -44,6 +44,8 @@ public class MindmapResponse {
     // Sharing & Collaboration
     private Boolean isPublic;
     
+    private String publicAccessLevel; // view, edit, private
+    
     private String shareToken;
     
     private List<Collaborator> collaborators;
