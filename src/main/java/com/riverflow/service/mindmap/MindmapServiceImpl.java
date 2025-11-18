@@ -556,6 +556,12 @@ public class MindmapServiceImpl implements MindmapService {
         mindmap.setIsPublic(isPublic);
         mindmap.setPublicAccessLevel(accessLevel != null ? accessLevel : "private");
         mindmap.setUpdatedAt(LocalDateTime.now());
+        
+        // Generate shareToken if making public and it doesn't have one
+        if (Boolean.TRUE.equals(isPublic) && mindmap.getShareToken() == null) {
+            mindmap.setShareToken(java.util.UUID.randomUUID().toString());
+            log.info("Generated shareToken for mindmap: {} token: {}", mindmapId, mindmap.getShareToken());
+        }
 
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
         log.info("Public access updated for mindmap: {} isPublic: {} accessLevel: {}", mindmapId, isPublic, accessLevel);
