@@ -119,11 +119,17 @@ public class GlobalExceptionHandler {
      * Xử lý MindmapAccessDeniedException (Forbidden)
      */
     @ExceptionHandler(MindmapAccessDeniedException.class)
-    public ResponseEntity<MessageResponse> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
+    public ResponseEntity<Map<String, Object>> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
         log.error("MindmapAccessDeniedException: {}", ex.getMessage());
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", ex.getMessage());
+        // Include shareToken if available (for public mindmaps)
+        if (ex.getShareToken() != null) {
+            response.put("shareToken", ex.getShareToken());
+        }
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(new MessageResponse(ex.getMessage()));
+                .body(response);
     }
 
     /**

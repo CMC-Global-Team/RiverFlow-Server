@@ -80,8 +80,18 @@ public class MindmapController {
             @PathVariable String id,
             Authentication authentication) {
         
-        Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting mindmap: {} for user: {}", id, userId);
+        // Handle unauthenticated users - allow access if mindmap is public
+        Long userId = null;
+        if (authentication != null) {
+            try {
+                userId = getUserIdFromAuth(authentication);
+            } catch (Exception e) {
+                log.warn("Failed to get userId from authentication, treating as unauthenticated: {}", e.getMessage());
+                userId = null;
+            }
+        }
+        
+        log.info("Getting mindmap: {} for user: {}", id, userId != null ? userId : "unauthenticated");
         
         MindmapResponse response = mindmapService.getMindmapById(id, userId);
         return ResponseEntity.ok(response);

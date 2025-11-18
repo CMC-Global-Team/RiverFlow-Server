@@ -102,7 +102,12 @@ public class MindmapServiceImpl implements MindmapService {
                     .map(c -> "userId=" + c.getMysqlUserId() + ",status=" + c.getStatus())
                     .toList()
             );
-            throw new MindmapAccessDeniedException(mindmapId, userId);
+            // If mindmap is public, include shareToken in exception so client can load via public API
+            String shareToken = null;
+            if (Boolean.TRUE.equals(mindmap.getIsPublic()) && mindmap.getShareToken() != null) {
+                shareToken = mindmap.getShareToken();
+            }
+            throw new MindmapAccessDeniedException(mindmapId, userId, shareToken);
         }
 
         MindmapResponse response = MindmapMapper.toResponse(mindmap);
@@ -577,15 +582,21 @@ public class MindmapServiceImpl implements MindmapService {
      * Check if user has access to mindmap
      */
     private boolean hasAccess(Mindmap mindmap, Long userId) {
-        // Owner has access
-        if (mindmap.getMysqlUserId().equals(userId)) {
-            log.debug("User {} has access to mindmap {} as owner", userId, mindmap.getId());
+        // Public mindmaps are accessible to everyone (including unauthenticated users)
+        if (Boolean.TRUE.equals(mindmap.getIsPublic())) {
+            log.debug("Mindmap {} is public, user {} has access", mindmap.getId(), userId != null ? userId : "unauthenticated");
             return true;
         }
 
-        // Public mindmaps are accessible
-        if (Boolean.TRUE.equals(mindmap.getIsPublic())) {
-            log.debug("Mindmap {} is public, user {} has access", mindmap.getId(), userId);
+        // If user is not authenticated, only public mindmaps are accessible
+        if (userId == null) {
+            log.debug("User is unauthenticated and mindmap {} is not public, no access", mindmap.getId());
+            return false;
+        }
+
+        // Owner has access
+        if (mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId)) {
+            log.debug("User {} has access to mindmap {} as owner", userId, mindmap.getId());
             return true;
         }
 
