@@ -176,11 +176,27 @@ public class CollaborationService {
             throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền xóa collaborator.", mindmapId, userId);
         }
 
+        // Find the collaborator
+        Collaborator collaborator = mindmap.getCollaborators().stream()
+                .filter(c -> c.getEmail() != null && c.getEmail().equalsIgnoreCase(email))
+                .findFirst()
+                .orElse(null);
+
+        if (collaborator == null) {
+            throw new IllegalArgumentException("Collaborator không tìm thấy.");
+        }
+
+        // Only allow removing collaborators with "pending" status
+        if (!"pending".equals(collaborator.getStatus())) {
+            throw new IllegalArgumentException("Chỉ có thể xóa những người được mời còn chờ xác nhận. Để xóa một thành viên đã chấp nhận, vui lòng liên hệ với quản trị viên.");
+        }
+
         mindmap.getCollaborators().removeIf(c -> 
                 c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
         );
 
         mindmapRepository.save(mindmap);
+        log.info("Pending collaborator {} removed from mindmap {}", email, mindmapId);
     }
 
     /**
