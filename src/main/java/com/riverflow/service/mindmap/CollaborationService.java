@@ -176,27 +176,49 @@ public class CollaborationService {
             throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền xóa collaborator.", mindmapId, userId);
         }
 
-        // Find the collaborator
+        // Find the collaborator in mindmap
         Collaborator collaborator = mindmap.getCollaborators().stream()
                 .filter(c -> c.getEmail() != null && c.getEmail().equalsIgnoreCase(email))
                 .findFirst()
                 .orElse(null);
 
-        if (collaborator == null) {
-            throw new IllegalArgumentException("Collaborator không tìm thấy.");
+        // Case 1: Collaborator exists in mindmap
+        if (collaborator != null) {
+            // Only allow removing collaborators with "pending" status
+            if (!"pending".equals(collaborator.getStatus())) {
+                throw new IllegalArgumentException("Chỉ có thể xóa những người được mời còn chờ xác nhận. Để xóa một thành viên đã chấp nhận, vui lòng liên hệ với quản trị viên.");
+            }
+
+            mindmap.getCollaborators().removeIf(c -> 
+                    c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
+            );
+            mindmapRepository.save(mindmap);
+            log.info("Pending collaborator {} removed from mindmap {}", email, mindmapId);
+        } else {
+            // Case 2: Collaborator doesn't exist in mindmap but might have pending invitation
+            // This happens when user was invited but hasn't registered yet
+            log.debug("Collaborator {} not found in mindmap {}, checking pending invitations", email, mindmapId);
         }
 
-        // Only allow removing collaborators with "pending" status
-        if (!"pending".equals(collaborator.getStatus())) {
-            throw new IllegalArgumentException("Chỉ có thể xóa những người được mời còn chờ xác nhận. Để xóa một thành viên đã chấp nhận, vui lòng liên hệ với quản trị viên.");
-        }
-
-        mindmap.getCollaborators().removeIf(c -> 
-                c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
+        // Remove pending invitation(s) for this email regardless
+        var pendingInvitations = invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(
+                mindmapId, 
+                email.toLowerCase(), 
+                "pending"
         );
+        
+        if (pendingInvitations.isPresent()) {
+            CollaborationInvitation invitation = pendingInvitations.get();
+            invitation.setStatus("cancelled");
+            invitation.setUpdatedAt(LocalDateTime.now());
+            invitationRepository.save(invitation);
+            log.info("Pending invitation for {} in mindmap {} cancelled", email, mindmapId);
+        }
 
-        mindmapRepository.save(mindmap);
-        log.info("Pending collaborator {} removed from mindmap {}", email, mindmapId);
+        // If neither collaborator nor invitation exists, throw error
+        if (collaborator == null && pendingInvitations.isEmpty()) {
+            throw new IllegalArgumentException("Người dùng này không phải là collaborator hoặc không có lời mời đang chờ xác nhận.");
+        }
     }
 
     /**
@@ -321,6 +343,8 @@ public class CollaborationService {
             throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền xem lời mời.", mindmapId, userId);
         }
 
+        // Return all pending invitations (including those for unregistered users)
+        // This will show all pending invites regardless of whether user has registered or been added as collaborator
         return invitationRepository.findByMindmapIdAndStatus(mindmapId, "pending");
     }
 }
