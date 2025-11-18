@@ -213,11 +213,20 @@ public class CollaborationService {
         Collaborator collaborator = mindmap.getCollaborators().stream()
                 .filter(c -> c.getMysqlUserId().equals(userId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Collaborator không tìm thấy trong mindmap."));
+                .orElseThrow(() -> {
+                    log.error("Collaborator with userId {} not found in mindmap {}. Collaborators: {}", 
+                        userId, mindmap.getId(), mindmap.getCollaborators().stream()
+                        .map(c -> "userId=" + c.getMysqlUserId() + ", status=" + c.getStatus())
+                        .collect(Collectors.toList()));
+                    return new IllegalArgumentException("Collaborator không tìm thấy trong mindmap.");
+                });
 
+        log.info("Found collaborator for user {} in mindmap {}, current status: {}", userId, mindmap.getId(), collaborator.getStatus());
         collaborator.setStatus("accepted");
         collaborator.setAcceptedAt(LocalDateTime.now());
-        mindmapRepository.save(mindmap);
+        
+        Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+        log.info("Mindmap saved after accepting invitation. Updated collaborator status in mindmap {}", updatedMindmap.getId());
 
         // Cập nhật status của lời mời
         invitation.setStatus("accepted");
