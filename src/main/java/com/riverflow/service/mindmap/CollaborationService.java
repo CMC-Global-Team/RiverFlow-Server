@@ -342,4 +342,27 @@ public class CollaborationService {
         // This will show all pending invites regardless of whether user has registered or been added as collaborator
         return invitationRepository.findByMindmapIdAndStatus(mindmapId, "pending");
     }
+
+    /**
+     * Collaborator leaves the mindmap
+     */
+    @Transactional
+    public void leaveCollaboration(String mindmapId, Long userId) {
+        log.info("User {} leaving collaboration on mindmap {}", userId, mindmapId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        // Find and remove the collaborator
+        boolean removed = mindmap.getCollaborators().removeIf(c -> 
+                c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId)
+        );
+
+        if (!removed) {
+            throw new IllegalArgumentException("Người dùng này không phải là collaborator của mindmap này.");
+        }
+
+        mindmapRepository.save(mindmap);
+        log.info("User {} successfully left mindmap {}", userId, mindmapId);
+    }
 }

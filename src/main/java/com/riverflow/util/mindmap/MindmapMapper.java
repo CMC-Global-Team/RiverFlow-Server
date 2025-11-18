@@ -71,6 +71,39 @@ public class MindmapMapper {
                 .aiWorkflowId(mindmap.getAiWorkflowId())
                 .createdAt(mindmap.getCreatedAt())
                 .updatedAt(mindmap.getUpdatedAt())
+                .ownerName(null)
+                .ownerAvatar(null)
+                .build();
+    }
+
+    /**
+     * Convert Mindmap entity to MindmapSummaryResponse DTO with owner info
+     */
+    public static MindmapSummaryResponse toSummaryResponse(Mindmap mindmap, String ownerName, String ownerAvatar) {
+        if (mindmap == null) {
+            return null;
+        }
+        
+        return MindmapSummaryResponse.builder()
+                .id(mindmap.getId())
+                .mysqlUserId(mindmap.getMysqlUserId())
+                .title(mindmap.getTitle())
+                .description(mindmap.getDescription())
+                .thumbnail(mindmap.getThumbnail())
+                .nodeCount(mindmap.getNodes() != null ? mindmap.getNodes().size() : 0)
+                .edgeCount(mindmap.getEdges() != null ? mindmap.getEdges().size() : 0)
+                .tags(mindmap.getTags())
+                .category(mindmap.getCategory())
+                .isFavorite(mindmap.getIsFavorite())
+                .isTemplate(mindmap.getIsTemplate())
+                .isPublic(mindmap.getIsPublic())
+                .status(mindmap.getStatus())
+                .aiGenerated(mindmap.getAiGenerated())
+                .aiWorkflowId(mindmap.getAiWorkflowId())
+                .createdAt(mindmap.getCreatedAt())
+                .updatedAt(mindmap.getUpdatedAt())
+                .ownerName(ownerName)
+                .ownerAvatar(ownerAvatar)
                 .build();
     }
     

@@ -52,5 +52,10 @@ public class MindmapSummaryResponse {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+    
+    // Owner info
+    private String ownerName;
+    
+    private String ownerAvatar;
 }
 

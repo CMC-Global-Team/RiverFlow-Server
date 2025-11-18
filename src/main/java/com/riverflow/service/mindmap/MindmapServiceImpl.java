@@ -6,7 +6,9 @@ import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
 import com.riverflow.exception.mindmap.MindmapAccessDeniedException;
 import com.riverflow.exception.mindmap.MindmapNotFoundException;
+import com.riverflow.model.User;
 import com.riverflow.model.mindmap.Mindmap;
+import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.util.mindmap.MindmapMapper;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +37,7 @@ import java.util.stream.Collectors;
 public class MindmapServiceImpl implements MindmapService {
 
     private final MindmapRepository mindmapRepository;
+    private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
     private final MindmapHistoryService historyService;
     private final UndoRedoService undoRedoService;
@@ -273,7 +276,13 @@ public class MindmapServiceImpl implements MindmapService {
         allMindmaps.sort((m1, m2) -> m2.getUpdatedAt().compareTo(m1.getUpdatedAt()));
 
         return allMindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
