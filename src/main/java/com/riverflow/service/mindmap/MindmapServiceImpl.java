@@ -294,7 +294,13 @@ public class MindmapServiceImpl implements MindmapService {
                 .findByMysqlUserIdAndCategoryAndStatus(userId, category, "active");
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -310,7 +316,13 @@ public class MindmapServiceImpl implements MindmapService {
         List<Mindmap> mindmaps = mongoTemplate.find(query, Mindmap.class);
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -322,7 +334,13 @@ public class MindmapServiceImpl implements MindmapService {
                 .findByMysqlUserIdAndStatus(userId, "archived");
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -434,7 +452,13 @@ public class MindmapServiceImpl implements MindmapService {
         List<Mindmap> mindmaps = mongoTemplate.find(query, Mindmap.class);
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -559,16 +583,16 @@ public class MindmapServiceImpl implements MindmapService {
             return true;
         }
 
-        // Check if user is an accepted collaborator
+        // Check if user is a collaborator (accepted or pending status)
         if (mindmap.getCollaborators() != null && !mindmap.getCollaborators().isEmpty()) {
             boolean hasAccess = mindmap.getCollaborators().stream()
                     .anyMatch(collaborator -> 
                         collaborator.getMysqlUserId() != null &&
                         collaborator.getMysqlUserId().equals(userId) && 
-                        "accepted".equals(collaborator.getStatus())
+                        ("accepted".equals(collaborator.getStatus()) || "pending".equals(collaborator.getStatus()))
                     );
             if (hasAccess) {
-                log.debug("User {} has access to mindmap {} as accepted collaborator", userId, mindmap.getId());
+                log.debug("User {} has access to mindmap {} as collaborator", userId, mindmap.getId());
                 return true;
             }
             
