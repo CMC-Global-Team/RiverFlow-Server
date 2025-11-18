@@ -530,12 +530,21 @@ public class MindmapServiceImpl implements MindmapService {
         }
 
         // Check if user is an accepted collaborator
-        if (mindmap.getCollaborators() != null) {
-            return mindmap.getCollaborators().stream()
+        if (mindmap.getCollaborators() != null && !mindmap.getCollaborators().isEmpty()) {
+            boolean hasAccess = mindmap.getCollaborators().stream()
                     .anyMatch(collaborator -> 
+                        collaborator.getMysqlUserId() != null &&
                         collaborator.getMysqlUserId().equals(userId) && 
                         "accepted".equals(collaborator.getStatus())
                     );
+            if (hasAccess) {
+                log.debug("User {} has access to mindmap {} as accepted collaborator", userId, mindmap.getId());
+                return true;
+            }
+            // Log pending collaborators for debugging
+            mindmap.getCollaborators().stream()
+                    .filter(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId))
+                    .forEach(c -> log.debug("User {} found in mindmap {} but status is: {}", userId, mindmap.getId(), c.getStatus()));
         }
 
         return false;
