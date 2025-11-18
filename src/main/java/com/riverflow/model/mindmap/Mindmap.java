@@ -57,14 +57,14 @@ public class Mindmap {
     @Builder.Default
     @Indexed
     private Boolean isPublic = false;
-    
+
     @Indexed
     private String shareToken;
     
-    @Builder.Default
-    private List<Collaborator> collaborators = new ArrayList<>();
+    private String publicAccessLevel; // view, edit, private
     
-    // Organization
+    @Builder.Default
+    private List<Collaborator> collaborators = new ArrayList<>();    // Organization
     private List<String> tags;
     
     private String category; // work, personal, education, project, brainstorming, ai-generated, other

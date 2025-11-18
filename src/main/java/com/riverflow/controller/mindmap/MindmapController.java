@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller for Mindmap CRUD operations
@@ -294,6 +295,78 @@ public class MindmapController {
         CollaborationInvitation invitation = collaborationService.inviteCollaborator(id, request, userId);
 
         return ResponseEntity.ok(invitation);
+    }
+
+    /**
+     * Get all collaborators for a mindmap
+     * GET /api/mindmaps/{id}/collaborators
+     */
+    @GetMapping("/{id}/collaborators")
+    public ResponseEntity<?> getCollaborators(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Getting collaborators for mindmap: {} by user: {}", id, userId);
+
+        var response = collaborationService.getCollaborators(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update collaborator role
+     * PUT /api/mindmaps/{id}/collaborators/{email}/role
+     */
+    @PutMapping("/{id}/collaborators/{email}/role")
+    public ResponseEntity<?> updateCollaboratorRole(
+            @PathVariable String id,
+            @PathVariable String email,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Updating collaborator role for mindmap: {} by user: {}", id, userId);
+
+        String role = request.get("role");
+        var response = collaborationService.updateCollaboratorRole(id, email, role, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Remove collaborator from mindmap
+     * DELETE /api/mindmaps/{id}/collaborators/{email}
+     */
+    @DeleteMapping("/{id}/collaborators/{email}")
+    public ResponseEntity<MessageResponse> removeCollaborator(
+            @PathVariable String id,
+            @PathVariable String email,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Removing collaborator from mindmap: {} by user: {}", id, userId);
+
+        collaborationService.removeCollaborator(id, email, userId);
+        return ResponseEntity.ok(new MessageResponse("Collaborator removed successfully"));
+    }
+
+    /**
+     * Update public access level of mindmap
+     * PUT /api/mindmaps/{id}/public-access
+     */
+    @PutMapping("/{id}/public-access")
+    public ResponseEntity<MindmapResponse> updatePublicAccess(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        Boolean isPublic = (Boolean) request.get("isPublic");
+        String accessLevel = (String) request.get("accessLevel");
+        
+        log.info("Updating public access for mindmap: {} by user: {}", id, userId);
+
+        MindmapResponse response = mindmapService.updatePublicAccess(id, isPublic, accessLevel, userId);
+        return ResponseEntity.ok(response);
     }
     
     /**

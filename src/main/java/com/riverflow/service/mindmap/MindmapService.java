@@ -85,5 +85,14 @@ public interface MindmapService {
      * @return MindmapResponse của mindmap MỚI đã được nhân bản
      */
     MindmapResponse duplicateMindmap(String originalMapId, Long userId);
+
+    /**
+     * Update public access level for a mindmap
+     * @param mindmapId ID của mindmap
+     * @param isPublic Có công khai hay không
+     * @param accessLevel Quyền truy cập: view, edit, private
+     * @param userId ID (MySQL) của người dùng
+     */
+    MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId);
 }
 

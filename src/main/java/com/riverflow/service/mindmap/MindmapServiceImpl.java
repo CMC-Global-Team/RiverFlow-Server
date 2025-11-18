@@ -464,6 +464,35 @@ public class MindmapServiceImpl implements MindmapService {
     }
 
     /**
+     * Update public access level
+     */
+    @Override
+    @Transactional
+    public MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId) {
+        log.info("Updating public access for mindmap: {} by user: {}", mindmapId, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền cập nhật.", mindmapId, userId);
+        }
+
+        mindmap.setIsPublic(isPublic);
+        mindmap.setPublicAccessLevel(accessLevel != null ? accessLevel : "private");
+        mindmap.setUpdatedAt(LocalDateTime.now());
+
+        Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+        log.info("Public access updated for mindmap: {} isPublic: {} accessLevel: {}", mindmapId, isPublic, accessLevel);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
+    }
+
+    /**
      * Check if user has access to mindmap
      */
     private boolean hasAccess(Mindmap mindmap, Long userId) {

@@ -6,6 +6,7 @@ import com.riverflow.exception.mindmap.MindmapNotFoundException;
 import com.riverflow.model.User;
 import com.riverflow.model.mindmap.CollaborationInvitation;
 import com.riverflow.model.mindmap.Mindmap;
+import com.riverflow.model.mindmap.subdocuments.Collaborator;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.mindmap.CollaborationInvitationRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
@@ -16,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -87,5 +90,72 @@ public class CollaborationService {
         log.info("Lời mời đã được tạo. Token: {}", token);
 
         return savedInvitation;
+    }
+
+    /**
+     * Lấy danh sách collaborators của một mindmap
+     */
+    public List<Collaborator> getCollaborators(String mindmapId, Long userId) {
+        log.info("Getting collaborators for mindmap: {} by user: {}", mindmapId, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        // Kiểm tra quyền (chủ sở hữu hoặc collaborator)
+        boolean hasAccess = mindmap.getMysqlUserId().equals(userId) ||
+                mindmap.getCollaborators().stream()
+                        .anyMatch(c -> c.getMysqlUserId().equals(userId));
+
+        if (!hasAccess) {
+            throw new MindmapAccessDeniedException("Không có quyền truy cập.", mindmapId, userId);
+        }
+
+        return mindmap.getCollaborators();
+    }
+
+    /**
+     * Cập nhật quyền của collaborator
+     */
+    @Transactional
+    public Collaborator updateCollaboratorRole(String mindmapId, String email, String role, Long userId) {
+        log.info("Updating collaborator role for mindmap: {} email: {} by user: {}", mindmapId, email, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền cập nhật quyền.", mindmapId, userId);
+        }
+
+        Collaborator collaborator = mindmap.getCollaborators().stream()
+                .filter(c -> c.getEmail() != null && c.getEmail().equalsIgnoreCase(email))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Collaborator không tìm thấy"));
+
+        collaborator.setRole(role);
+        mindmapRepository.save(mindmap);
+
+        return collaborator;
+    }
+
+    /**
+     * Xóa collaborator khỏi mindmap
+     */
+    @Transactional
+    public void removeCollaborator(String mindmapId, String email, Long userId) {
+        log.info("Removing collaborator from mindmap: {} email: {} by user: {}", mindmapId, email, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền xóa collaborator.", mindmapId, userId);
+        }
+
+        mindmap.getCollaborators().removeIf(c -> 
+                c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
+        );
+
+        mindmapRepository.save(mindmap);
     }
 }
