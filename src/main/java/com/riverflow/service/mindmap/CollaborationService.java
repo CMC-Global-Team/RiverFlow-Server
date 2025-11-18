@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -209,19 +208,32 @@ public class CollaborationService {
         Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(invitation.getMindmapId(), userId));
 
-        // Cập nhật status của collaborator từ "pending" sang "accepted"
+        // Find or create collaborator
         Collaborator collaborator = mindmap.getCollaborators().stream()
                 .filter(c -> c.getMysqlUserId().equals(userId))
                 .findFirst()
-                .orElseThrow(() -> {
-                    log.error("Collaborator with userId {} not found in mindmap {}. Collaborators: {}", 
-                        userId, mindmap.getId(), mindmap.getCollaborators().stream()
-                        .map(c -> "userId=" + c.getMysqlUserId() + ", status=" + c.getStatus())
-                        .collect(Collectors.toList()));
-                    return new IllegalArgumentException("Collaborator không tìm thấy trong mindmap.");
-                });
+                .orElse(null);
 
-        log.info("Found collaborator for user {} in mindmap {}, current status: {}", userId, mindmap.getId(), collaborator.getStatus());
+        if (collaborator == null) {
+            // Collaborator doesn't exist (user signed up after being invited)
+            log.info("Creating new collaborator entry for user {} in mindmap {}", userId, mindmap.getId());
+            User acceptingUser = userRepository.findById(userId).orElse(null);
+            String userEmail = (acceptingUser != null) ? acceptingUser.getEmail() : invitation.getInvitedEmail();
+            
+            collaborator = Collaborator.builder()
+                    .mysqlUserId(userId)
+                    .email(userEmail)
+                    .role(invitation.getRole().toString())
+                    .invitedBy(invitation.getInvitedByUserId())
+                    .invitedAt(invitation.getCreatedAt())
+                    .status("pending")
+                    .build();
+            
+            mindmap.getCollaborators().add(collaborator);
+            log.info("Collaborator {} added to mindmap {} with pending status", userEmail, mindmap.getId());
+        }
+
+        log.info("Updating collaborator status for user {} in mindmap {} to accepted", userId, mindmap.getId());
         collaborator.setStatus("accepted");
         collaborator.setAcceptedAt(LocalDateTime.now());
         
