@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @Builder
 public class Collaborator {
     private Long mysqlUserId;
+    private String email; // Email của collaborator
     private String role; // owner, editor, viewer
     private Long invitedBy;
     private LocalDateTime invitedAt;

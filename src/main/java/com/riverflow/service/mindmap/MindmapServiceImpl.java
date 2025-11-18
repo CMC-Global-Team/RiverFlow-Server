@@ -227,10 +227,33 @@ public class MindmapServiceImpl implements MindmapService {
     public List<MindmapSummaryResponse> getAllMindmapsByUser(Long userId) {
         log.info("Getting all active mindmaps for user: {}", userId);
 
-        List<Mindmap> mindmaps = mindmapRepository
+        // Get mindmaps owned by user
+        List<Mindmap> ownedMindmaps = mindmapRepository
                 .findByMysqlUserIdAndStatusOrderByUpdatedAtDesc(userId, "active");
 
-        return mindmaps.stream()
+        // Get mindmaps where user is an accepted collaborator
+        Query collaboratorQuery = new Query();
+        collaboratorQuery.addCriteria(
+                Criteria.where("collaborators").elemMatch(
+                        Criteria.where("mysqlUserId").is(userId)
+                                .and("status").is("accepted")
+                )
+                .and("status").is("active")
+        );
+        List<Mindmap> collaboratedMindmaps = mongoTemplate.find(collaboratorQuery, Mindmap.class);
+
+        // Combine results and remove duplicates
+        List<Mindmap> allMindmaps = new ArrayList<>(ownedMindmaps);
+        collaboratedMindmaps.forEach(m -> {
+            if (allMindmaps.stream().noneMatch(om -> om.getId().equals(m.getId()))) {
+                allMindmaps.add(m);
+            }
+        });
+
+        // Sort by updatedAt descending
+        allMindmaps.sort((m1, m2) -> m2.getUpdatedAt().compareTo(m1.getUpdatedAt()));
+
+        return allMindmaps.stream()
                 .map(MindmapMapper::toSummaryResponse)
                 .collect(Collectors.toList());
     }
@@ -459,6 +482,35 @@ public class MindmapServiceImpl implements MindmapService {
         MindmapResponse response = MindmapMapper.toResponse(savedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(savedMindmap.getId(), userId));
         response.setCanRedo(undoRedoService.checkCanRedo(savedMindmap.getId(), userId));
+
+        return response;
+    }
+
+    /**
+     * Update public access level
+     */
+    @Override
+    @Transactional
+    public MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId) {
+        log.info("Updating public access for mindmap: {} by user: {}", mindmapId, userId);
+
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền cập nhật.", mindmapId, userId);
+        }
+
+        mindmap.setIsPublic(isPublic);
+        mindmap.setPublicAccessLevel(accessLevel != null ? accessLevel : "private");
+        mindmap.setUpdatedAt(LocalDateTime.now());
+
+        Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+        log.info("Public access updated for mindmap: {} isPublic: {} accessLevel: {}", mindmapId, isPublic, accessLevel);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
 
         return response;
     }
