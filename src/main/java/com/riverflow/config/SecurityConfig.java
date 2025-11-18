@@ -84,7 +84,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",     // Trang UI Swagger
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**",      // File JSON định nghĩa OpenAPI
-                                "/files/avatars/**"     // Tài nguyên ảnh đại diện (cũ)
+                                "/files/avatars/**",    // Tài nguyên ảnh đại diện (cũ)
+                                "/mindmaps/public/**"   // Public mindmap access (NO AUTH)
                         ).permitAll()
                         
                         // GET avatar - public access
