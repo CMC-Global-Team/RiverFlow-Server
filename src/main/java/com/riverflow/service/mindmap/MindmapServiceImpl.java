@@ -227,10 +227,33 @@ public class MindmapServiceImpl implements MindmapService {
     public List<MindmapSummaryResponse> getAllMindmapsByUser(Long userId) {
         log.info("Getting all active mindmaps for user: {}", userId);
 
-        List<Mindmap> mindmaps = mindmapRepository
+        // Get mindmaps owned by user
+        List<Mindmap> ownedMindmaps = mindmapRepository
                 .findByMysqlUserIdAndStatusOrderByUpdatedAtDesc(userId, "active");
 
-        return mindmaps.stream()
+        // Get mindmaps where user is an accepted collaborator
+        Query collaboratorQuery = new Query();
+        collaboratorQuery.addCriteria(
+                Criteria.where("collaborators").elemMatch(
+                        Criteria.where("mysqlUserId").is(userId)
+                                .and("status").is("accepted")
+                )
+                .and("status").is("active")
+        );
+        List<Mindmap> collaboratedMindmaps = mongoTemplate.find(collaboratorQuery, Mindmap.class);
+
+        // Combine results and remove duplicates
+        List<Mindmap> allMindmaps = new ArrayList<>(ownedMindmaps);
+        collaboratedMindmaps.forEach(m -> {
+            if (allMindmaps.stream().noneMatch(om -> om.getId().equals(m.getId()))) {
+                allMindmaps.add(m);
+            }
+        });
+
+        // Sort by updatedAt descending
+        allMindmaps.sort((m1, m2) -> m2.getUpdatedAt().compareTo(m1.getUpdatedAt()));
+
+        return allMindmaps.stream()
                 .map(MindmapMapper::toSummaryResponse)
                 .collect(Collectors.toList());
     }

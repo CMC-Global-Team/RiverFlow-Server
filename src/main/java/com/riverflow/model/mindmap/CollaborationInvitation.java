@@ -49,6 +49,12 @@ public class CollaborationInvitation {
 
     private LocalDateTime acceptedAt;
 
+    private Long acceptedByUserId;
+
+    private LocalDateTime rejectedAt;
+
+    private Long rejectedByUserId;
+
     private Map<String, Object> metadata; // sentViaEmail, emailSentAt, reminderCount
 
     @CreatedDate

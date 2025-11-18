@@ -7,8 +7,11 @@ import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
+import com.riverflow.exception.mindmap.MindmapNotFoundException;
 import com.riverflow.model.User;
 import com.riverflow.model.mindmap.CollaborationInvitation;
+import com.riverflow.model.mindmap.Mindmap;
+import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.mindmap.CollaborationService;
 import com.riverflow.service.mindmap.MindmapService;
 import com.riverflow.service.mindmap.UndoRedoService;
@@ -20,8 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Controller for Mindmap CRUD operations
@@ -36,6 +38,7 @@ public class MindmapController {
     private final CustomUserDetailsService userDetailsService;
     private final UndoRedoService undoRedoService;
     private final CollaborationService collaborationService;
+    private final MindmapRepository mindmapRepository;
 
     /**
      * Create a new mindmap
@@ -367,6 +370,78 @@ public class MindmapController {
 
         MindmapResponse response = mindmapService.updatePublicAccess(id, isPublic, accessLevel, userId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Accept collaboration invitation
+     * POST /api/mindmaps/accept-invitation/{token}
+     */
+    @PostMapping("/accept-invitation/{token}")
+    public ResponseEntity<MessageResponse> acceptInvitation(
+            @PathVariable String token,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} accepting invitation with token: {}", userId, token);
+
+        collaborationService.acceptInvitation(token, userId);
+        return ResponseEntity.ok(new MessageResponse("Invitation accepted successfully. Mindmap added to your collection."));
+    }
+
+    /**
+     * Reject collaboration invitation
+     * POST /api/mindmaps/reject-invitation/{token}
+     */
+    @PostMapping("/reject-invitation/{token}")
+    public ResponseEntity<MessageResponse> rejectInvitation(
+            @PathVariable String token,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} rejecting invitation with token: {}", userId, token);
+
+        collaborationService.rejectInvitation(token, userId);
+        return ResponseEntity.ok(new MessageResponse("Invitation rejected successfully."));
+    }
+
+    /**
+     * Verify collaboration invitation
+     * GET /api/mindmaps/verify-invitation/{token}
+     */
+    @GetMapping("/verify-invitation/{token}")
+    public ResponseEntity<?> verifyInvitation(@PathVariable String token) {
+        log.info("Verifying invitation with token: {}", token);
+
+        try {
+            CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
+            
+            if (invitation == null || "expired".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has expired."));
+            }
+
+            if ("accepted".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has already been accepted."));
+            }
+
+            if ("rejected".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has been rejected."));
+            }
+
+            Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
+                    .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found"));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("mindmapId", mindmap.getId());
+            response.put("mindmapTitle", mindmap.getTitle());
+            response.put("invitedBy", invitation.getInvitedByUserId());
+            response.put("expiresAt", invitation.getExpiresAt());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to verify invitation: {}", e.getMessage());
+            return ResponseEntity.status(400).body(new MessageResponse("Invalid or expired invitation."));
+        }
     }
     
     /**
