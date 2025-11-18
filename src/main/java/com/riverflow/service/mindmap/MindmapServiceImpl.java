@@ -294,7 +294,13 @@ public class MindmapServiceImpl implements MindmapService {
                 .findByMysqlUserIdAndCategoryAndStatus(userId, category, "active");
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -310,7 +316,13 @@ public class MindmapServiceImpl implements MindmapService {
         List<Mindmap> mindmaps = mongoTemplate.find(query, Mindmap.class);
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -322,7 +334,13 @@ public class MindmapServiceImpl implements MindmapService {
                 .findByMysqlUserIdAndStatus(userId, "archived");
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -434,7 +452,13 @@ public class MindmapServiceImpl implements MindmapService {
         List<Mindmap> mindmaps = mongoTemplate.find(query, Mindmap.class);
 
         return mindmaps.stream()
-                .map(MindmapMapper::toSummaryResponse)
+                .map(mindmap -> {
+                    // Get owner info
+                    User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+                    String ownerName = owner != null ? owner.getFullName() : "Unknown";
+                    String ownerAvatar = owner != null ? owner.getAvatar() : null;
+                    return MindmapMapper.toSummaryResponse(mindmap, ownerName, ownerAvatar);
+                })
                 .collect(Collectors.toList());
     }
 
