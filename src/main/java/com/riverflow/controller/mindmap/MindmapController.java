@@ -509,6 +509,15 @@ public class MindmapController {
      * Get public mindmap by share token (NO AUTH REQUIRED)
      * GET /api/mindmaps/public/{shareToken}
      */
+    @PutMapping("/public/{shareToken}")
+    public ResponseEntity<MindmapResponse> updatePublicMindmap(
+            @PathVariable String shareToken,
+            @Valid @RequestBody UpdateMindmapRequest request) {
+        log.info("Updating public mindmap with shareToken: {}", shareToken);
+        MindmapResponse response = mindmapService.updateMindmapByShareToken(shareToken, request);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/public/{shareToken}")
     public ResponseEntity<MindmapResponse> getPublicMindmap(
             @PathVariable String shareToken) {

@@ -99,6 +99,8 @@ public interface MindmapService {
      * Get public mindmap by share token (NO AUTH REQUIRED)
      * @param shareToken Share token của mindmap công khai
      */
+    MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request);
+
     MindmapResponse getMindmapByShareToken(String shareToken);
 }
 

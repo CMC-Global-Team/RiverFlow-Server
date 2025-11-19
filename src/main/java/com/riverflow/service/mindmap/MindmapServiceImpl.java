@@ -626,6 +626,40 @@ public class MindmapServiceImpl implements MindmapService {
     }
 
     @Override
+    @Transactional
+    public MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request) {
+        log.info("Updating mindmap with shareToken: {}", shareToken);
+
+        Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
+                .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
+
+        if (!Boolean.TRUE.equals(mindmap.getIsPublic()) || !"edit".equals(mindmap.getPublicAccessLevel())) {
+            log.error("Attempted to update non-editable public mindmap with shareToken: {}", shareToken);
+            throw new MindmapAccessDeniedException("This mindmap is not editable publicly", mindmap.getId(), null);
+        }
+
+        MindmapResponse oldState = MindmapMapper.toResponse(mindmap);
+
+        if (request.getTitle() != null) mindmap.setTitle(request.getTitle());
+        if (request.getNodes() != null) mindmap.setNodes(request.getNodes());
+        if (request.getEdges() != null) mindmap.setEdges(request.getEdges());
+        if (request.getViewport() != null) mindmap.setViewport(MindmapMapper.toViewportEntity(request.getViewport()));
+        mindmap.setUpdatedAt(LocalDateTime.now());
+
+        Mindmap updated = mindmapRepository.save(mindmap);
+
+        historyService.recordChange(
+                updated.getId(),
+                mindmap.getMysqlUserId(),
+                "public_update",
+                oldState,
+                MindmapMapper.toResponse(updated)
+        );
+
+        return MindmapMapper.toResponse(updated);
+    }
+
+    @Override
     public MindmapResponse getMindmapByShareToken(String shareToken) {
         log.info("Getting mindmap with shareToken: {}", shareToken);
 
