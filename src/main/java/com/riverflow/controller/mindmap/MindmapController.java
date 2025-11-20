@@ -532,6 +532,7 @@ public class MindmapController {
      * Helper method to get user ID from authentication
      */
     private Long getUserIdFromAuth(Authentication authentication) {
+        if (authentication == null) return null;
         String email = authentication.getName();
         User user = userDetailsService.loadUserEntityByEmail(email);
         return user.getId();
