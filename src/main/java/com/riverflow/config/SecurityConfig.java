@@ -86,8 +86,14 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
                         
-                        // Public mindmap access (NO AUTH) - MUST come before /mindmaps/**
+                        // Public mindmap & invitation access (NO AUTH) - MUST come before /mindmaps/**
                         .requestMatchers("/mindmaps/public/**").permitAll()
+                        .requestMatchers(
+                                "/mindmaps/verify-invitation/**",
+                                "/mindmaps/accept-invitation/**",
+                                "/mindmaps/reject-invitation/**",
+                                "/invitations/**"
+                        ).permitAll()
                         
                         // GET avatar - public access
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
