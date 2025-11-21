@@ -42,3 +42,5 @@ mvnw.cmd
 *.log
 
 application-local.properties
+sepay.properties
+secrets/
