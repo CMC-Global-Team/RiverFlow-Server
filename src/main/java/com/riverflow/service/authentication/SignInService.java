@@ -84,7 +84,8 @@ public class SignInService {
                     .userId(user.getId())
                     .email(user.getEmail())
                     .fullName(user.getFullName())
-                    .role("USER") // All users have USER role
+                    .role(user.getRole() != null ? user.getRole().name().toUpperCase() : "USER")
+                    .credit(user.getCredit() != null ? user.getCredit() : 0L)
                     .avatar(avatarUrl)
                     .build();
 
