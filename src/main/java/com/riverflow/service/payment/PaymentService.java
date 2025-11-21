@@ -56,7 +56,13 @@ public class PaymentService {
     public void handleSepayWebhook(SepayWebhookPayload payload, String apiKeyHeader) {
         String codeCandidate = payload.getCode();
         if ((codeCandidate == null || codeCandidate.isEmpty()) && payload.getContent() != null) {
-            codeCandidate = extractCodeFromContent(payload.getContent());
+            java.util.List<String> candidates = extractCodesFromContent(payload.getContent());
+            for (String c : candidates) {
+                if (topupRequestRepository.findByCode(c).isPresent()) {
+                    codeCandidate = c;
+                    break;
+                }
+            }
         }
         PaymentTransaction.TransferType type = payload.getTransferType() != null && payload.getTransferType().equalsIgnoreCase("in")
                 ? PaymentTransaction.TransferType.in
@@ -134,13 +140,14 @@ public class PaymentService {
         return code;
     }
 
-    private String extractCodeFromContent(String content) {
+    private java.util.List<String> extractCodesFromContent(String content) {
         String cleaned = content == null ? "" : content.toUpperCase();
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Z0-9]{10,16}").matcher(cleaned);
-        if (m.find()) {
-            return m.group(0);
+        java.util.List<String> list = new java.util.ArrayList<>();
+        while (m.find()) {
+            list.add(m.group(0));
         }
-        return null;
+        return list;
     }
 
     private LocalDateTime parseDate(String s) {
