@@ -26,15 +26,26 @@ public class SepayWebhookController {
                                                    @RequestHeader(value = "X-Sepay-Api-Key", required = false) String xSepayApiKey,
                                                    @RequestHeader(value = "Api-Access", required = false) String apiAccess,
                                                    @RequestHeader(value = "X-Api-Access", required = false) String xApiAccess,
+                                                   @RequestHeader(value = "Authorization", required = false) String authorization,
                                                    @RequestParam(value = "api_key", required = false) String apiKeyParam,
                                                    @RequestParam(value = "api_access", required = false) String apiAccessParam,
                                                    @RequestBody SepayWebhookPayload payload) {
+        String bearer = null;
+        if (authorization != null) {
+            String a = authorization.trim();
+            if (a.toLowerCase().startsWith("bearer ")) {
+                bearer = a.substring(7).trim();
+            } else {
+                bearer = a;
+            }
+        }
         String key = xApiKey != null ? xApiKey :
                 (apiKey != null ? apiKey :
                         (xSepayApiKey != null ? xSepayApiKey :
                                 (apiKeyParam != null ? apiKeyParam :
                                         (apiAccess != null ? apiAccess :
-                                                (xApiAccess != null ? xApiAccess : apiAccessParam)))));
+                                                (xApiAccess != null ? xApiAccess :
+                                                        (apiAccessParam != null ? apiAccessParam : bearer))))));
         log.info("Webhook sepay received id={}, hasKey={}", payload.getId(), key != null);
         paymentService.handleSepayWebhook(payload, key);
         return ResponseEntity.ok().build();
