@@ -38,6 +38,9 @@ public class PaymentService {
     @Value("${app.sepay.bank}")
     private String bank;
 
+    @Value("${app.sepay.require-auth:true}")
+    private boolean sepayRequireAuth;
+
     public CreditTopupRequest createTopupRequest(Long userId, Long amount) {
         User user = userRepository.findById(userId).orElseThrow();
         String code = generateUniqueCode();
@@ -97,11 +100,18 @@ public class PaymentService {
         if (expectedKey != null) {
             expectedKey = expectedKey.trim();
         }
-        if (apiKeyHeader == null || expectedKey == null || !expectedKey.equals(apiKeyHeader)) {
+        boolean keyOk = expectedKey != null && apiKeyHeader != null && expectedKey.equals(apiKeyHeader);
+        if (sepayRequireAuth && !keyOk) {
             Integer expLen = expectedKey == null ? null : expectedKey.length();
             Integer hdrLen = apiKeyHeader == null ? null : apiKeyHeader.length();
             log.warn("Webhook invalid api key id={} acc={} ref={} expLen={} hdrLen={}", payload.getId(), payload.getAccountNumber(), payload.getReferenceCode(), expLen, hdrLen);
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
+            transactionRepository.save(tx);
+            return;
+        }
+        if (payload.getAccountNumber() == null || !payload.getAccountNumber().equals(accountNumber)) {
+            log.info("Webhook ignored account mismatch id={} acc={} ref={}", payload.getId(), payload.getAccountNumber(), payload.getReferenceCode());
+            tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
         }
