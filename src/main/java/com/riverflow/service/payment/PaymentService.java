@@ -54,9 +54,6 @@ public class PaymentService {
 
     @Transactional
     public void handleSepayWebhook(SepayWebhookPayload payload, String apiKeyHeader) {
-        if (apiKeyHeader == null || sepayApiKey == null || !sepayApiKey.equals(apiKeyHeader)) {
-            return;
-        }
         String codeCandidate = payload.getCode();
         if ((codeCandidate == null || codeCandidate.isEmpty()) && payload.getContent() != null) {
             codeCandidate = extractCodeFromContent(payload.getContent());
@@ -79,6 +76,11 @@ public class PaymentService {
                 .description(payload.getDescription())
                 .status(PaymentTransaction.TransactionStatus.pending)
                 .build();
+        if (apiKeyHeader == null || sepayApiKey == null || !sepayApiKey.equals(apiKeyHeader)) {
+            tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
+            transactionRepository.save(tx);
+            return;
+        }
         if (type != PaymentTransaction.TransferType.in) {
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
