@@ -85,6 +85,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
+                        .requestMatchers("/web-hook/**").permitAll()
                         
                         // Public mindmap & invitation access (NO AUTH) - MUST come before /mindmaps/**
                         .requestMatchers("/mindmaps/public/**").permitAll()
@@ -99,6 +100,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
 
                         .requestMatchers("/mindmaps/**").authenticated()
+                        .requestMatchers("/payments/**").authenticated()
                         
                         // POST upload avatar - requires authentication
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/user/avatar/upload").authenticated()
