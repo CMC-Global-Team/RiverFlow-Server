@@ -30,13 +30,14 @@ public class UserPrincipal implements UserDetails {
      * Phương thức tĩnh (static) để tạo UserPrincipal từ User entity
      */
     public static UserPrincipal create(User user) {
+        String roleName = user.getRole() == com.riverflow.model.User.Role.admin ? "ROLE_ADMIN" : "ROLE_USER";
         return new UserPrincipal(
                 user.getId(),
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getStatus() == User.UserStatus.active,
                 user.getStatus() == User.UserStatus.suspended,
-                Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"))
+                Collections.singleton(new SimpleGrantedAuthority(roleName))
         );
     }
 
