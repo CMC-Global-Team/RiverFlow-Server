@@ -24,6 +24,7 @@ CREATE TABLE users (
     avatar_data LONGBLOB NULL COMMENT 'Avatar image binary data (BLOB)',
     avatar_mime_type VARCHAR(50) NULL COMMENT 'MIME type of avatar image (e.g., image/png, image/jpeg)',
     status ENUM('active', 'suspended', 'deleted') NOT NULL DEFAULT 'active',
+    role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     
     -- OAuth fields
     oauth_provider ENUM('email', 'google', 'github', 'facebook') NOT NULL DEFAULT 'email',
@@ -37,6 +38,7 @@ CREATE TABLE users (
     preferred_language VARCHAR(10) DEFAULT 'en' COMMENT 'Language code (en, vi, etc.)',
     timezone VARCHAR(50) DEFAULT 'UTC',
     theme ENUM('light', 'dark', 'auto') DEFAULT 'light',
+    credit BIGINT UNSIGNED NOT NULL DEFAULT 0,
     
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -46,6 +48,7 @@ CREATE TABLE users (
     INDEX idx_email (email),
     INDEX idx_oauth (oauth_provider, oauth_id),
     INDEX idx_status (status),
+    INDEX idx_role (role),
     INDEX idx_created_at (created_at),
     INDEX idx_avatar_mime_type (avatar_mime_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -411,6 +414,8 @@ SELECT
     u.full_name,
     u.avatar,
     u.status,
+    u.role,
+    u.credit,
     u.oauth_provider,
     u.email_verified,
     u.preferred_language,
