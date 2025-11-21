@@ -8,6 +8,7 @@ import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.payment.CreditTopupRequestRepository;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentService {
 
     private final CreditTopupRequestRepository topupRequestRepository;
@@ -26,6 +28,9 @@ public class PaymentService {
 
     @Value("${app.sepay.api-key:}")
     private String sepayApiKey;
+
+    @Value("${app.sepay.api-access:}")
+    private String sepayApiAccess;
 
     @Value("${app.sepay.account-number}")
     private String accountNumber;
@@ -82,24 +87,29 @@ public class PaymentService {
                 .description(payload.getDescription())
                 .status(PaymentTransaction.TransactionStatus.pending)
                 .build();
-        if (apiKeyHeader == null || sepayApiKey == null || !sepayApiKey.equals(apiKeyHeader)) {
+        String expectedKey = (sepayApiAccess != null && !sepayApiAccess.isEmpty()) ? sepayApiAccess : sepayApiKey;
+        if (apiKeyHeader == null || expectedKey == null || !expectedKey.equals(apiKeyHeader)) {
+            log.warn("Webhook invalid api key id={} acc={} ref={}", payload.getId(), payload.getAccountNumber(), payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
         }
         if (type != PaymentTransaction.TransferType.in) {
+            log.info("Webhook ignored non-in id={} type={} ref={}", payload.getId(), payload.getTransferType(), payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
         }
         String code = codeCandidate;
         if (code == null || code.isEmpty()) {
+            log.warn("Webhook invalid code id={} content={} ref={}", payload.getId(), payload.getContent(), payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
         }
         Optional<CreditTopupRequest> opt = topupRequestRepository.findByCode(code);
         if (opt.isEmpty()) {
+            log.info("Webhook ignored unknown code id={} code={} ref={}", payload.getId(), code, payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
@@ -108,6 +118,7 @@ public class PaymentService {
         if (req.getStatus() == CreditTopupRequest.TopupStatus.paid) {
             tx.setMatchedRequest(req);
             tx.setUser(req.getUser());
+            log.info("Webhook ignored already paid id={} code={} ref={}", payload.getId(), code, payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
@@ -115,6 +126,7 @@ public class PaymentService {
         if (!req.getAmount().equals(payload.getTransferAmount())) {
             tx.setMatchedRequest(req);
             tx.setUser(req.getUser());
+            log.warn("Webhook invalid amount id={} code={} expected={} actual={} ref={}", payload.getId(), code, req.getAmount(), payload.getTransferAmount(), payload.getReferenceCode());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
@@ -130,6 +142,7 @@ public class PaymentService {
         tx.setUser(user);
         tx.setStatus(PaymentTransaction.TransactionStatus.processed);
         transactionRepository.save(tx);
+        log.info("Webhook processed id={} code={} amount={} user={} ref={}", payload.getId(), code, payload.getTransferAmount(), user.getId(), payload.getReferenceCode());
     }
 
     private String generateUniqueCode() {
