@@ -41,6 +41,9 @@ public class PaymentService {
     @Value("${app.sepay.require-auth:true}")
     private boolean sepayRequireAuth;
 
+    @Value("${app.credit.rate-vnd-per-credit:1000}")
+    private long vndPerCredit;
+
     public CreditTopupRequest createTopupRequest(Long userId, Long amount) {
         User user = userRepository.findById(userId).orElseThrow();
         String code = generateUniqueCode();
@@ -154,7 +157,8 @@ public class PaymentService {
         }
         User user = req.getUser();
         long current = user.getCredit() == null ? 0L : user.getCredit();
-        user.setCredit(current + payload.getTransferAmount());
+        long addCredits = vndPerCredit > 0 ? (payload.getTransferAmount() / vndPerCredit) : 0L;
+        user.setCredit(current + addCredits);
         req.setStatus(CreditTopupRequest.TopupStatus.paid);
         req.setPaidAt(LocalDateTime.now());
         userRepository.save(user);
