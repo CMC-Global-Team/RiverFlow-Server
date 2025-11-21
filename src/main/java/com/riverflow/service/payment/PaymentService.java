@@ -54,12 +54,15 @@ public class PaymentService {
 
     @Transactional
     public void handleSepayWebhook(SepayWebhookPayload payload, String apiKeyHeader) {
-        if (apiKeyHeader == null || sepayApiKey == null || !sepayApiKey.equals(apiKeyHeader)) {
-            return;
-        }
         String codeCandidate = payload.getCode();
         if ((codeCandidate == null || codeCandidate.isEmpty()) && payload.getContent() != null) {
-            codeCandidate = extractCodeFromContent(payload.getContent());
+            java.util.List<String> candidates = extractCodesFromContent(payload.getContent());
+            for (String c : candidates) {
+                if (topupRequestRepository.findByCode(c).isPresent()) {
+                    codeCandidate = c;
+                    break;
+                }
+            }
         }
         PaymentTransaction.TransferType type = payload.getTransferType() != null && payload.getTransferType().equalsIgnoreCase("in")
                 ? PaymentTransaction.TransferType.in
@@ -79,6 +82,11 @@ public class PaymentService {
                 .description(payload.getDescription())
                 .status(PaymentTransaction.TransactionStatus.pending)
                 .build();
+        if (apiKeyHeader == null || sepayApiKey == null || !sepayApiKey.equals(apiKeyHeader)) {
+            tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
+            transactionRepository.save(tx);
+            return;
+        }
         if (type != PaymentTransaction.TransferType.in) {
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
@@ -132,13 +140,14 @@ public class PaymentService {
         return code;
     }
 
-    private String extractCodeFromContent(String content) {
+    private java.util.List<String> extractCodesFromContent(String content) {
         String cleaned = content == null ? "" : content.toUpperCase();
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Z0-9]{10,16}").matcher(cleaned);
-        if (m.find()) {
-            return m.group(0);
+        java.util.List<String> list = new java.util.ArrayList<>();
+        while (m.find()) {
+            list.add(m.group(0));
         }
-        return null;
+        return list;
     }
 
     private LocalDateTime parseDate(String s) {
