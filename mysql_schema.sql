@@ -566,6 +566,46 @@ CREATE INDEX idx_users_last_login ON users(last_login_at);
 CREATE INDEX idx_notifications_user_read ON notifications(user_id, is_read);
 CREATE INDEX idx_workflow_history_created ON user_workflow_history(created_at);
 
+CREATE TABLE credit_topup_requests (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NOT NULL,
+    code VARCHAR(64) NOT NULL UNIQUE,
+    amount BIGINT UNSIGNED NOT NULL,
+    status ENUM('pending','paid','expired','cancelled') NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    paid_at TIMESTAMP NULL,
+    INDEX idx_code (code),
+    INDEX idx_user_status (user_id, status),
+    CONSTRAINT fk_topup_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE payment_transactions (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    external_id BIGINT UNSIGNED NULL,
+    gateway VARCHAR(50) NOT NULL,
+    transaction_date TIMESTAMP NULL,
+    account_number VARCHAR(32) NULL,
+    code VARCHAR(64) NULL,
+    content TEXT NULL,
+    transfer_type ENUM('in','out') NOT NULL,
+    transfer_amount BIGINT UNSIGNED NOT NULL,
+    accumulated BIGINT UNSIGNED NULL,
+    sub_account VARCHAR(64) NULL,
+    reference_code VARCHAR(64) NULL,
+    description TEXT NULL,
+    user_id BIGINT UNSIGNED NULL,
+    matched_request_id BIGINT UNSIGNED NULL,
+    status ENUM('pending','matched','processed','ignored','invalid') NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (matched_request_id) REFERENCES credit_topup_requests(id) ON DELETE SET NULL,
+    INDEX idx_gateway_date (gateway, transaction_date),
+    INDEX idx_code (code),
+    INDEX idx_user (user_id),
+    INDEX idx_matched_request (matched_request_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ==============================================================================
 -- END OF SCHEMA
 -- ==============================================================================
