@@ -59,6 +59,12 @@ public class PaymentService {
 
     @Transactional
     public void handleSepayWebhook(SepayWebhookPayload payload, String apiKeyHeader) {
+        if (apiKeyHeader != null) {
+            apiKeyHeader = apiKeyHeader.trim();
+            if ((apiKeyHeader.startsWith("\"") && apiKeyHeader.endsWith("\"")) || (apiKeyHeader.startsWith("'") && apiKeyHeader.endsWith("'"))) {
+                apiKeyHeader = apiKeyHeader.substring(1, apiKeyHeader.length() - 1);
+            }
+        }
         String codeCandidate = payload.getCode();
         if ((codeCandidate == null || codeCandidate.isEmpty()) && payload.getContent() != null) {
             java.util.List<String> candidates = extractCodesFromContent(payload.getContent());
@@ -88,8 +94,13 @@ public class PaymentService {
                 .status(PaymentTransaction.TransactionStatus.pending)
                 .build();
         String expectedKey = (sepayApiAccess != null && !sepayApiAccess.isEmpty()) ? sepayApiAccess : sepayApiKey;
+        if (expectedKey != null) {
+            expectedKey = expectedKey.trim();
+        }
         if (apiKeyHeader == null || expectedKey == null || !expectedKey.equals(apiKeyHeader)) {
-            log.warn("Webhook invalid api key id={} acc={} ref={}", payload.getId(), payload.getAccountNumber(), payload.getReferenceCode());
+            Integer expLen = expectedKey == null ? null : expectedKey.length();
+            Integer hdrLen = apiKeyHeader == null ? null : apiKeyHeader.length();
+            log.warn("Webhook invalid api key id={} acc={} ref={} expLen={} hdrLen={}", payload.getId(), payload.getAccountNumber(), payload.getReferenceCode(), expLen, hdrLen);
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
