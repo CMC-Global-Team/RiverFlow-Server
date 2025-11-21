@@ -74,6 +74,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserStatus status = UserStatus.active;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 10)
+    private Role role = Role.user;
     
     // OAuth fields
     
@@ -124,6 +128,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private Theme theme = Theme.light;
+
+    @Column(name = "credit", nullable = false)
+    private Long credit = 0L;
     
     // Timestamps
     
@@ -160,6 +167,11 @@ public class User {
         light,
         dark,
         auto
+    }
+
+    public enum Role {
+        admin,
+        user
     }
 }
 

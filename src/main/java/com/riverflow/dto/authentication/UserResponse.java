@@ -20,6 +20,8 @@ public class UserResponse {
     private String email;
     private String fullName;
     private String avatar;
+    private String role;
+    private Long credit;
     private String preferredLanguage;
     private String timezone;
     private String theme;
