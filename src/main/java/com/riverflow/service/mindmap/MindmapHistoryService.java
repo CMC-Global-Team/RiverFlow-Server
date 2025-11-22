@@ -56,6 +56,11 @@ public class MindmapHistoryService {
             String status
     ) {
         String st = status != null ? status : "active";
+        String act = action != null ? action : "";
+        boolean allowed = act.startsWith("node_") || act.startsWith("edge_") || "delete".equals(act) || "restore".equals(act);
+        if (!allowed) {
+            return null;
+        }
         if ((changes == null || changes.isEmpty()) && (snapshot == null || snapshot.isEmpty())) {
             return null;
         }
