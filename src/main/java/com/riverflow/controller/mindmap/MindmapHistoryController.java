@@ -31,11 +31,21 @@ public class MindmapHistoryController {
             @RequestParam(required = false) String action,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime after,
             @RequestParam(required = false, defaultValue = "100") Integer limit,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             Authentication authentication
     ) {
         Long userId = getUserId(authentication);
-        log.info("Get history mindmapId={} userId={} action={} after={} limit={}", id, userId, action, after, limit);
         ensureCanView(id, userId);
+        if (page != null || size != null || from != null || to != null) {
+            var pageData = historyService.getHistoryPaged(id, action, from, to, page, size);
+            return ResponseEntity.ok()
+                    .header("X-Total-Count", String.valueOf(pageData.getTotalElements()))
+                    .header("X-Total-Pages", String.valueOf(pageData.getTotalPages()))
+                    .body(pageData.getContent());
+        }
         List<MindmapHistory> items = historyService.getHistory(id, action, after, limit);
         return ResponseEntity.ok(items);
     }
