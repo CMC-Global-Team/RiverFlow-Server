@@ -3,8 +3,10 @@ package com.riverflow.service.mindmap;
 import com.riverflow.model.mindmap.MindmapHistory;
 import com.riverflow.repository.mindmap.MindmapHistoryRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -77,5 +79,25 @@ public class MindmapHistoryService {
         }
         var list = historyRepository.findByMindmapIdOrderByCreatedAtDesc(mindmapId);
         return (limit != null && limit > 0 && list.size() > limit) ? list.subList(0, limit) : list;
+    }
+
+    public Page<MindmapHistory> getHistoryPaged(
+            String mindmapId,
+            String action,
+            LocalDateTime from,
+            LocalDateTime to,
+            Integer page,
+            Integer size
+    ) {
+        int p = page != null && page >= 0 ? page : 0;
+        int s = size != null && size > 0 ? size : 20;
+        Pageable pageable = PageRequest.of(p, s, Sort.by(Sort.Direction.DESC, "createdAt"));
+        if (action != null && !action.isBlank()) {
+            return historyRepository.findByMindmapIdAndAction(mindmapId, action, pageable);
+        }
+        if (from != null && to != null) {
+            return historyRepository.findByMindmapIdAndCreatedAtBetween(mindmapId, from, to, pageable);
+        }
+        return historyRepository.findByMindmapId(mindmapId, pageable);
     }
 }
