@@ -57,9 +57,8 @@ public class MindmapHistoryController {
             Authentication authentication
     ) {
         Long userId = getUserId(authentication);
-        log.info("Log history mindmapId={} userId={} action={}", id, userId, request.getAction());
         ensureCanEdit(id, userId);
-        historyService.logAction(
+        var saved = historyService.logAction(
                 id,
                 userId,
                 request.getAction(),
@@ -68,7 +67,11 @@ public class MindmapHistoryController {
                 request.getMetadata(),
                 request.getStatus()
         );
-        return ResponseEntity.ok(new MessageResponse("Logged"));
+        if (saved != null) {
+            log.info("Log history mindmapId={} userId={} action={}", id, userId, request.getAction());
+            return ResponseEntity.ok(new MessageResponse("Logged"));
+        }
+        return ResponseEntity.ok(new MessageResponse("Skipped"));
     }
 
     private Long getUserId(Authentication authentication) {

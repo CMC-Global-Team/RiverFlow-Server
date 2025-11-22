@@ -55,6 +55,21 @@ public class MindmapHistoryService {
             Map<String, Object> metadata,
             String status
     ) {
+        String st = status != null ? status : "active";
+        if ((changes == null || changes.isEmpty()) && (snapshot == null || snapshot.isEmpty())) {
+            return null;
+        }
+        var last = historyRepository.findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, st);
+        if (last.isPresent()) {
+            var prev = last.get();
+            boolean sameAction = action != null && action.equals(prev.getAction());
+            boolean sameChanges = java.util.Objects.equals(changes, prev.getChanges());
+            boolean sameSnapshot = java.util.Objects.equals(snapshot, prev.getSnapshot());
+            boolean withinWindow = prev.getCreatedAt() != null && prev.getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(2));
+            if (sameAction && sameChanges && sameSnapshot && withinWindow) {
+                return null;
+            }
+        }
         MindmapHistory entry = MindmapHistory.builder()
                 .mindmapId(mindmapId)
                 .mysqlUserId(userId)
@@ -63,7 +78,7 @@ public class MindmapHistoryService {
                 .snapshot(snapshot)
                 .metadata(metadata)
                 .createdAt(LocalDateTime.now())
-                .status(status != null ? status : "active")
+                .status(st)
                 .build();
         return historyRepository.save(entry);
     }
