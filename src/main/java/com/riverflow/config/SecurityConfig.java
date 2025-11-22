@@ -99,6 +99,9 @@ public class SecurityConfig {
                         // GET avatar - public access
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
 
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/mindmaps/*/history").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/mindmaps/*/history").permitAll()
+
                         .requestMatchers("/mindmaps/**").authenticated()
                         .requestMatchers("/payments/**").authenticated()
                         
