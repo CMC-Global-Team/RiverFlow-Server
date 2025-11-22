@@ -119,17 +119,18 @@ public class GoogleAuthService {
 			return userRepository.save(user);
 		}
 
-		User user = User.builder()
-				.email(email)
-				.passwordHash(null)
-				.fullName(fullName != null ? fullName : email)
-				.avatar(picture)
-				.status(User.UserStatus.active)
-				.oauthProvider(User.OAuthProvider.google)
-				.oauthId(sub)
-				.emailVerified(Boolean.TRUE)
-				.emailVerifiedAt(LocalDateTime.now())
-				.build();
+        User user = User.builder()
+                .email(email)
+                .passwordHash(null)
+                .fullName(fullName != null ? fullName : email)
+                .avatar(picture)
+                .status(User.UserStatus.active)
+                .oauthProvider(User.OAuthProvider.google)
+                .oauthId(sub)
+                .emailVerified(Boolean.TRUE)
+                .emailVerifiedAt(LocalDateTime.now())
+                .credit(3L)
+                .build();
 		return userRepository.save(user);
 	}
 }

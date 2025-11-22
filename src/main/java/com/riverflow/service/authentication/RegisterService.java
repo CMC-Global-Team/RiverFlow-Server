@@ -59,6 +59,7 @@ public class RegisterService {
                 .status(User.UserStatus.active)
                 .oauthProvider(User.OAuthProvider.email)
                 .emailVerified(false)
+                .credit(3L)
                 .build();
 
         User savedUser = userRepository.save(user);
