@@ -3,6 +3,8 @@ package com.riverflow.model.mindmap;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -12,6 +14,10 @@ import java.util.Map;
  * Mindmap history for undo/redo and audit trail
  */
 @Document(collection = "mindmap_history")
+@CompoundIndexes({
+        @CompoundIndex(name = "idx_mindmap_action_createdAt", def = "{'mindmapId': 1, 'action': 1, 'createdAt': -1}"),
+        @CompoundIndex(name = "idx_mindmap_status_createdAt", def = "{'mindmapId': 1, 'status': 1, 'createdAt': -1}")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -36,7 +42,7 @@ public class MindmapHistory {
     
     private Map<String, Object> metadata; // ip, userAgent, sessionId
     
-    @Indexed
+    @Indexed(expireAfterSeconds = 7776000)
     private LocalDateTime createdAt;
 
     @Indexed
