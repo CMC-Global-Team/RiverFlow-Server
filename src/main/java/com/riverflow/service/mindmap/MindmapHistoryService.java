@@ -65,6 +65,15 @@ public class MindmapHistoryService {
             return null;
         }
         var last = historyRepository.findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, st);
+        boolean isUpdateAction = "node_update".equals(act) || "edge_update".equals(act);
+        if (isUpdateAction && last.isPresent()) {
+            var prev = last.get();
+            boolean sameAct = act.equals(prev.getAction());
+            boolean tooSoon = prev.getCreatedAt() != null && prev.getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(1));
+            if (sameAct && tooSoon) {
+                return null;
+            }
+        }
         if (last.isPresent()) {
             var prev = last.get();
             boolean sameAction = action != null && action.equals(prev.getAction());
