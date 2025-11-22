@@ -130,7 +130,8 @@ public class User {
     private Theme theme = Theme.light;
 
     @Column(name = "credit", nullable = false)
-    private Long credit = 0L;
+    @Builder.Default
+    private Long credit = 3L;
     
     // Timestamps
     
