@@ -33,7 +33,7 @@ public class WebConfig {
                 frontendUrl,                    // Frontend URL từ config
                 "https://*.vercel.app",         // Vercel deployments
                 "https://*.netlify.app",        // Netlify deployments
-                "https://*.railway.app"         // Railway deployments
+                "https://*.railway.app",         // Railway deployments
         ));
         
         // Cho phép các HTTP methods
