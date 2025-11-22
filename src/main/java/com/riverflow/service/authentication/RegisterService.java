@@ -57,6 +57,7 @@ public class RegisterService {
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .status(User.UserStatus.active)
+                .role(User.Role.user)
                 .oauthProvider(User.OAuthProvider.email)
                 .emailVerified(false)
                 .credit(3L)
