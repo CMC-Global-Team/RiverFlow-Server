@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
+import com.riverflow.dto.mindmap.ai.ExpandNodeRequest;
 import com.riverflow.dto.mindmap.ai.GenerateMindmapRequest;
 import com.riverflow.dto.mindmap.ai.OptimizeRequest;
 import com.riverflow.exception.mindmap.InvalidMindmapDataException;
@@ -15,9 +16,9 @@ import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.mindmap.MindmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -30,20 +31,25 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AiMindmapServiceImpl implements AiMindmapService {
 
-    private final WebClient openAiWebClient; // configured bean
+    @Qualifier("geminiWebClient")
+    private final WebClient geminiWebClient; // configured Gemini client
     private final MindmapRepository mindmapRepository;
     private final MindmapService mindmapService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${openai.model:gpt-4o-mini}")
+    @Value("${gemini.model:gemini-1.5-flash}")
     private String model;
+
+    @Value("${gemini.api-key:}")
+    private String geminiApiKey;
 
     @Override
     public MindmapResponse generateMindmap(GenerateMindmapRequest request, Long userId) {
         String topic = request.getTopic().trim();
         String title = StringUtils.hasText(request.getTitle()) ? request.getTitle().trim() : topic;
         int levels = request.getLevels() != null ? request.getLevels() : 2;
-        String mode = request.getMode() != null ? request.getMode() : "normal";
+        String reqMode = request.getMode();
+        String mode = (reqMode == null || reqMode.isBlank() || "default".equalsIgnoreCase(reqMode)) ? "normal" : reqMode;
         int defaultFirst = "normal".equalsIgnoreCase(mode) ? 4 : 5;
         int reqFirst = request.getFirstLevelCount() != null ? request.getFirstLevelCount() : defaultFirst;
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
@@ -52,9 +58,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
         int firstLevelCount = Math.max(minFirst, Math.min(maxFirst, reqFirst));
 
-        Map<String, Object> payload = buildChatPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
+        Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
 
-        String json = callOpenAi(payload);
+        String json = callGemini(payload);
         JsonNode root = parseJson(json);
 
         // Validate schema: nodes array with parent-child, root must exist
@@ -146,6 +152,82 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     @Override
+    public MindmapResponse expandNode(ExpandNodeRequest request, Long userId) {
+        Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
+                .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
+
+        boolean isOwner = mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId);
+        boolean isEditor = mindmap.getCollaborators() != null && mindmap.getCollaborators().stream()
+                .anyMatch(c -> Objects.equals(c.getMysqlUserId(), userId) && "accepted".equals(c.getStatus()) && "EDITOR".equals(c.getRole()));
+        if (!isOwner && !isEditor) {
+            throw new MindmapAccessDeniedException(request.getMindmapId(), userId);
+        }
+
+        // find parent node
+        Optional<Map<String, Object>> parentOpt = mindmap.getNodes().stream()
+                .filter(n -> request.getNodeId().equals(String.valueOf(n.get("id"))))
+                .findFirst();
+        if (parentOpt.isEmpty()) {
+            throw new MindmapNotFoundException("Parent node không tồn tại trong mindmap", userId);
+        }
+
+        String parentLabel = extractLabel(parentOpt.get());
+        List<String> siblingLabels = findChildrenLabels(mindmap, request.getNodeId());
+
+        Map<String, Object> payload = buildGeminiPayloadForExpand(parentLabel, siblingLabels, request.getChildrenCount(), request.getLanguage(), request.getHints());
+        String json = callGemini(payload);
+        JsonNode root = parseJson(json);
+        JsonNode childrenNode = root.get("children");
+        if (childrenNode == null || !childrenNode.isArray() || childrenNode.isEmpty()) {
+            throw new InvalidMindmapDataException("children", "Phải là mảng label hợp lệ");
+        }
+
+        List<Map<String, Object>> newNodes = new ArrayList<>();
+        List<Map<String, Object>> newEdges = new ArrayList<>();
+
+        for (JsonNode c : childrenNode) {
+            String label = textOrNull(c.get("label"));
+            if (!StringUtils.hasText(label)) {
+                throw new InvalidMindmapDataException("child.label", "Thiếu label");
+            }
+            ensureLabelLength(label);
+            String newId = newNodeId();
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("label", label);
+            Map<String, Object> position = new HashMap<>();
+            position.put("x", 0);
+            position.put("y", 0);
+
+            Map<String, Object> rfNode = new HashMap<>();
+            rfNode.put("id", newId);
+            rfNode.put("type", "default");
+            rfNode.put("data", data);
+            rfNode.put("position", position);
+            newNodes.add(rfNode);
+
+            Map<String, Object> edge = new HashMap<>();
+            edge.put("id", newEdgeId());
+            edge.put("source", request.getNodeId());
+            edge.put("target", newId);
+            newEdges.add(edge);
+        }
+
+        // Merge with existing without changing old IDs
+        List<Map<String, Object>> mergedNodes = new ArrayList<>(mindmap.getNodes());
+        mergedNodes.addAll(newNodes);
+        List<Map<String, Object>> mergedEdges = new ArrayList<>(mindmap.getEdges());
+        mergedEdges.addAll(newEdges);
+
+        UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
+                .nodes(mergedNodes)
+                .edges(mergedEdges)
+                .build();
+
+        return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+    }
+
+    @Override
     public MindmapResponse optimize(OptimizeRequest request, Long userId) {
         Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
@@ -174,8 +256,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             // collect sibling labels to avoid duplicates
             List<String> siblingLabels = findSiblingLabels(mindmap, request.getNodeId());
 
-            Map<String, Object> payload = buildChatPayloadForOptimizeNode(currentLabel, siblingLabels, lang, request.getHints());
-            String json = callOpenAi(payload);
+            Map<String, Object> payload = buildGeminiPayloadForOptimizeNode(currentLabel, siblingLabels, lang, request.getHints());
+            String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode labelNode = root.get("label");
             String newLabel = labelNode != null && !labelNode.isNull() ? labelNode.asText() : null;
@@ -206,8 +288,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         } else if ("description".equalsIgnoreCase(target)) {
             String currentDesc = mindmap.getDescription();
             String title = mindmap.getTitle();
-            Map<String, Object> payload = buildChatPayloadForOptimizeDescription(title, currentDesc, lang, request.getHints(), "normal");
-            String json = callOpenAi(payload);
+            Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(title, currentDesc, lang, request.getHints(), "normal");
+            String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode descNode = root.get("description");
             String newDesc = descNode != null && !descNode.isNull() ? descNode.asText() : null;
@@ -246,10 +328,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .map(e -> String.valueOf(e.get("target")))
                 .collect(Collectors.toSet());
         return map.getNodes().stream()
-                .filter(n -> childIds.contains(String.valueOf(n.get("id"))))
-                .map(this::extractLabel)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+            .filter(n -> childIds.contains(String.valueOf(n.get("id"))))
+            .map(this::extractLabel)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
     }
 
     private List<String> findSiblingLabels(Mindmap map, String nodeId) {
@@ -277,10 +359,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         return node.isTextual() ? node.asText() : node.toString();
     }
 
-    private String callOpenAi(Map<String, Object> payload) {
+    private String callGemini(Map<String, Object> payload) {
         try {
-            Map<?, ?> resp = openAiWebClient.post()
-                    .uri("/v1/chat/completions")
+            Map<?, ?> resp = geminiWebClient.post()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/v1beta/models/{model}:generateContent")
+                            .queryParam("key", geminiApiKey)
+                            .build(model))
                     .body(BodyInserters.fromValue(payload))
                     .exchangeToMono(clientResponse -> {
                         if (clientResponse.statusCode().is2xxSuccessful()) {
@@ -288,25 +373,29 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                         } else {
                             return clientResponse.bodyToMono(String.class).map(body -> {
                                 int code = clientResponse.statusCode().value();
-                                log.error("OpenAI API error ({}): {}", code, body);
-                                throw new IllegalArgumentException(parseOpenAiError(body, code));
+                                log.error("Gemini API error ({}): {}", code, body);
+                                throw new com.riverflow.exception.AiUpstreamException(code, parseOpenAiError(body, code));
                             });
                         }
                     })
                     .block();
-            if (resp == null) throw new IllegalStateException("Empty response from OpenAI");
-            List<?> choices = (List<?>) resp.get("choices");
-            if (choices == null || choices.isEmpty()) throw new IllegalStateException("No choices from OpenAI");
-            Map<?, ?> choice0 = (Map<?, ?>) choices.get(0);
-            Map<?, ?> msg = (Map<?, ?>) choice0.get("message");
-            Object content = msg != null ? msg.get("content") : null;
-            if (!(content instanceof String s)) throw new IllegalStateException("Invalid OpenAI content");
+            if (resp == null) throw new IllegalStateException("Empty response from Gemini");
+            // Gemini response: candidates[0].content.parts[].text
+            List<?> candidates = (List<?>) resp.get("candidates");
+            if (candidates == null || candidates.isEmpty()) throw new IllegalStateException("No candidates from Gemini");
+            Map<?, ?> c0 = (Map<?, ?>) candidates.get(0);
+            Map<?, ?> content = (Map<?, ?>) c0.get("content");
+            if (content == null) throw new IllegalStateException("No content in candidate");
+            List<?> parts = (List<?>) content.get("parts");
+            if (parts == null || parts.isEmpty()) throw new IllegalStateException("No parts in content");
+            Map<?, ?> p0 = (Map<?, ?>) parts.get(0);
+            Object text = p0.get("text");
+            if (!(text instanceof String s)) throw new IllegalStateException("Invalid Gemini content");
             return s.trim();
-        } catch (IllegalArgumentException e) {
-            // propagate our mapped message (already meaningful)
+        } catch (com.riverflow.exception.AiUpstreamException e) {
             throw e;
         } catch (Exception e) {
-            log.error("OpenAI call failed: {}", e.getMessage());
+            log.error("Gemini call failed: {}", e.getMessage());
             throw new IllegalArgumentException("Không thể gọi AI vào lúc này, vui lòng thử lại.");
         }
     }
@@ -334,7 +423,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-    private Map<String, Object> buildChatPayloadForGenerate(String topic, int levels, int firstLevelCount, String lang, List<String> tags, String mode, int minFirst, int maxFirst) {
+    private Map<String, Object> buildGeminiPayloadForGenerate(String topic, int levels, int firstLevelCount, String lang, List<String> tags, String mode, int minFirst, int maxFirst) {
         String system = "Bạn là công cụ tạo mindmap. Trả về JSON hợp lệ, KHÔNG văn bản thừa. Quy tắc: label 1–4 từ; số node cấp 1 theo chỉ định; node con đúng ngữ nghĩa; không lặp; không giải thích.";
         String user = String.format("Tạo mindmap về chủ đề: '%s' (ngôn ngữ: %s). Độ sâu: %d. Số node cấp 1: %d (giới hạn %d–%d theo MODE: %s).\n" +
                 "Trả về JSON dạng:\n" +
@@ -344,17 +433,57 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (tags != null && !tags.isEmpty()) {
             user += "\nGợi ý bổ sung: " + String.join(", ", tags);
         }
-        Map<String, Object> sysMsg = Map.of("role", "system", "content", system);
-        Map<String, Object> userMsg = Map.of("role", "user", "content", user);
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system))
+        );
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+        generationConfig.put("response_mime_type", "application/json");
+
         Map<String, Object> payload = new HashMap<>();
-        payload.put("model", model);
-        payload.put("messages", List.of(sysMsg, userMsg));
-        // MODE normal ưu tiên tốc độ và tính ngắn gọn
-        payload.put("temperature", 0.4);
-        payload.put("response_format", Map.of("type", "json_object"));
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
-    private Map<String, Object> buildChatPayloadForOptimizeNode(String currentLabel, List<String> siblingLabels, String lang, List<String> hints) {
+
+    private Map<String, Object> buildGeminiPayloadForExpand(String parentLabel, List<String> siblingLabels, int childrenCount, String lang, List<String> hints) {
+        String system = "Bạn là công cụ mở rộng node mindmap. Trả JSON hợp lệ, không có văn bản thừa. Quy tắc: label 1–4 từ; đúng ngữ nghĩa với node cha; không trùng với node anh em.";
+        StringBuilder user = new StringBuilder();
+        user.append("Mở rộng node: '").append(parentLabel).append("' (ngôn ngữ: ").append(lang).append(")\n");
+        user.append("Số con cần tạo: ").append(childrenCount).append(".\n");
+        if (siblingLabels != null && !siblingLabels.isEmpty()) {
+            user.append("Các nhánh đã có: ").append(String.join(", ", siblingLabels)).append("\n");
+        }
+        if (hints != null && !hints.isEmpty()) {
+            user.append("Gợi ý bổ sung: ").append(String.join(", ", hints)).append("\n");
+        }
+        user.append("Trả JSON dạng: { \"children\": [ { \"label\": \"...\" } ] }\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "role", "system",
+                "parts", List.of(Map.of("text", system))
+        );
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString()))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.6);
+        generationConfig.put("response_mime_type", "application/json");
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    private Map<String, Object> buildGeminiPayloadForOptimizeNode(String currentLabel, List<String> siblingLabels, String lang, List<String> hints) {
         String system = "Bạn là công cụ tối ưu label của node mindmap. Chỉ trả JSON, không giải thích. Quy tắc: label 1–4 từ, rõ ràng, không trùng với các nhánh anh em, không thêm ký tự thừa.";
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
@@ -366,17 +495,27 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
         }
         user.append("Trả JSON: { \"label\": \"...\" }");
-        Map<String, Object> sysMsg = Map.of("role", "system", "content", system);
-        Map<String, Object> userMsg = Map.of("role", "user", "content", user.toString());
+
+        Map<String, Object> systemInstruction = Map.of(
+                "role", "system",
+                "parts", List.of(Map.of("text", system))
+        );
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString()))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+        generationConfig.put("response_mime_type", "application/json");
+
         Map<String, Object> payload = new HashMap<>();
-        payload.put("model", model);
-        payload.put("messages", List.of(sysMsg, userMsg));
-        payload.put("temperature", 0.4);
-        payload.put("response_format", Map.of("type", "json_object"));
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
-    private Map<String, Object> buildChatPayloadForOptimizeDescription(String title, String currentDesc, String lang, List<String> hints, String mode) {
+    private Map<String, Object> buildGeminiPayloadForOptimizeDescription(String title, String currentDesc, String lang, List<String> hints, String mode) {
         String system = "Bạn là công cụ tối ưu mô tả mindmap. Chỉ trả JSON, không giải thích. MODE normal: ưu tiên tốc độ, mô tả ngắn gọn 1–2 câu, rõ mục tiêu và phạm vi.";
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
@@ -386,13 +525,23 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
         }
         user.append("Trả JSON: { \"description\": \"...\" }");
-        Map<String, Object> sysMsg = Map.of("role", "system", "content", system);
-        Map<String, Object> userMsg = Map.of("role", "user", "content", user.toString());
+
+        Map<String, Object> systemInstruction = Map.of(
+                "role", "system",
+                "parts", List.of(Map.of("text", system))
+        );
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString()))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+        generationConfig.put("response_mime_type", "application/json");
+
         Map<String, Object> payload = new HashMap<>();
-        payload.put("model", model);
-        payload.put("messages", List.of(sysMsg, userMsg));
-        payload.put("temperature", 0.4);
-        payload.put("response_format", Map.of("type", "json_object"));
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
