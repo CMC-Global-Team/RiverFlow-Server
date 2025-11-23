@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
-import com.riverflow.dto.mindmap.ai.ExpandNodeRequest;
 import com.riverflow.dto.mindmap.ai.GenerateMindmapRequest;
 import com.riverflow.dto.mindmap.ai.OptimizeRequest;
 import com.riverflow.exception.mindmap.InvalidMindmapDataException;
@@ -152,82 +151,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     @Override
-    public MindmapResponse expandNode(ExpandNodeRequest request, Long userId) {
-        Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
-                .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
-
-        boolean isOwner = mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId);
-        boolean isEditor = mindmap.getCollaborators() != null && mindmap.getCollaborators().stream()
-                .anyMatch(c -> Objects.equals(c.getMysqlUserId(), userId) && "accepted".equals(c.getStatus()) && "EDITOR".equals(c.getRole()));
-        if (!isOwner && !isEditor) {
-            throw new MindmapAccessDeniedException(request.getMindmapId(), userId);
-        }
-
-        // find parent node
-        Optional<Map<String, Object>> parentOpt = mindmap.getNodes().stream()
-                .filter(n -> request.getNodeId().equals(String.valueOf(n.get("id"))))
-                .findFirst();
-        if (parentOpt.isEmpty()) {
-            throw new MindmapNotFoundException("Parent node không tồn tại trong mindmap", userId);
-        }
-
-        String parentLabel = extractLabel(parentOpt.get());
-        List<String> siblingLabels = findChildrenLabels(mindmap, request.getNodeId());
-
-        Map<String, Object> payload = buildGeminiPayloadForExpand(parentLabel, siblingLabels, request.getChildrenCount(), request.getLanguage(), request.getHints());
-        String json = callGemini(payload);
-        JsonNode root = parseJson(json);
-        JsonNode childrenNode = root.get("children");
-        if (childrenNode == null || !childrenNode.isArray() || childrenNode.isEmpty()) {
-            throw new InvalidMindmapDataException("children", "Phải là mảng label hợp lệ");
-        }
-
-        List<Map<String, Object>> newNodes = new ArrayList<>();
-        List<Map<String, Object>> newEdges = new ArrayList<>();
-
-        for (JsonNode c : childrenNode) {
-            String label = textOrNull(c.get("label"));
-            if (!StringUtils.hasText(label)) {
-                throw new InvalidMindmapDataException("child.label", "Thiếu label");
-            }
-            ensureLabelLength(label);
-            String newId = newNodeId();
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("label", label);
-            Map<String, Object> position = new HashMap<>();
-            position.put("x", 0);
-            position.put("y", 0);
-
-            Map<String, Object> rfNode = new HashMap<>();
-            rfNode.put("id", newId);
-            rfNode.put("type", "default");
-            rfNode.put("data", data);
-            rfNode.put("position", position);
-            newNodes.add(rfNode);
-
-            Map<String, Object> edge = new HashMap<>();
-            edge.put("id", newEdgeId());
-            edge.put("source", request.getNodeId());
-            edge.put("target", newId);
-            newEdges.add(edge);
-        }
-
-        // Merge with existing without changing old IDs
-        List<Map<String, Object>> mergedNodes = new ArrayList<>(mindmap.getNodes());
-        mergedNodes.addAll(newNodes);
-        List<Map<String, Object>> mergedEdges = new ArrayList<>(mindmap.getEdges());
-        mergedEdges.addAll(newEdges);
-
-        UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
-                .nodes(mergedNodes)
-                .edges(mergedEdges)
-                .build();
-
-        return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
-    }
-
-    @Override
     public MindmapResponse optimize(OptimizeRequest request, Long userId) {
         Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
@@ -363,7 +286,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         try {
             Map<?, ?> resp = geminiWebClient.post()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/v1beta/models/{model}:generateContent")
+                            .path("/v1/models/{model}:generateContent")
                             .queryParam("key", geminiApiKey)
                             .build(model))
                     .body(BodyInserters.fromValue(payload))
@@ -445,9 +368,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("systemInstruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction);
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig);
+        payload.put("generation_config", generationConfig);
         return payload;
     }
 
@@ -465,7 +388,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         user.append("Trả JSON dạng: { \"children\": [ { \"label\": \"...\" } ] }\n");
 
         Map<String, Object> systemInstruction = Map.of(
-                "role", "system",
                 "parts", List.of(Map.of("text", system))
         );
         Map<String, Object> userContent = Map.of(
@@ -477,9 +399,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("systemInstruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction);
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig);
+        payload.put("generation_config", generationConfig);
         return payload;
     }
 
@@ -497,7 +419,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         user.append("Trả JSON: { \"label\": \"...\" }");
 
         Map<String, Object> systemInstruction = Map.of(
-                "role", "system",
                 "parts", List.of(Map.of("text", system))
         );
         Map<String, Object> userContent = Map.of(
@@ -509,9 +430,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("systemInstruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction);
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig);
+        payload.put("generation_config", generationConfig);
         return payload;
     }
 
@@ -527,7 +448,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         user.append("Trả JSON: { \"description\": \"...\" }");
 
         Map<String, Object> systemInstruction = Map.of(
-                "role", "system",
                 "parts", List.of(Map.of("text", system))
         );
         Map<String, Object> userContent = Map.of(
@@ -539,9 +459,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("systemInstruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction);
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig);
+        payload.put("generation_config", generationConfig);
         return payload;
     }
 
