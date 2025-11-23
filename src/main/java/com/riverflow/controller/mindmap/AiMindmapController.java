@@ -2,7 +2,6 @@ package com.riverflow.controller.mindmap;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.mindmap.MindmapResponse;
-import com.riverflow.dto.mindmap.ai.ExpandNodeRequest;
 import com.riverflow.dto.mindmap.ai.GenerateMindmapRequest;
 import com.riverflow.dto.mindmap.ai.OptimizeRequest;
 import com.riverflow.model.User;
@@ -37,17 +36,7 @@ public class AiMindmapController {
         MindmapResponse response = aiMindmapService.generateMindmap(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-
-    @PostMapping("/expand-node")
-    public ResponseEntity<MindmapResponse> expandNode(
-            @Valid @RequestBody ExpandNodeRequest request,
-            Authentication authentication
-    ) {
-        Long userId = getUserIdFromAuth(authentication);
-        log.info("AI expand node {} in map {} by user {}", request.getNodeId(), request.getMindmapId(), userId);
-        MindmapResponse response = aiMindmapService.expandNode(request, userId);
-        return ResponseEntity.ok(response);
-    }
+//add optimize mindmap request
 
     @PostMapping("/optimize")
     public ResponseEntity<MindmapResponse> optimize(
