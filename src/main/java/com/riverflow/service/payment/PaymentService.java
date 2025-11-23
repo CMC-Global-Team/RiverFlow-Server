@@ -16,6 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import com.riverflow.dto.payment.PaymentHistoryResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -202,5 +206,27 @@ public class PaymentService {
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PaymentHistoryResponse> getUserTransactions(Long userId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+
+        Page<PaymentTransaction> transactionPage = transactionRepository
+                .findByUserIdOrderByCreatedAtDesc(userId, pageable);
+
+        return transactionPage.map(this::mapToHistoryResponse);
+    }
+
+    private PaymentHistoryResponse mapToHistoryResponse(PaymentTransaction entity) {
+        return PaymentHistoryResponse.builder()
+                .id(entity.getId())
+                .transactionCode(entity.getCode())
+                .amount(entity.getTransferAmount())
+                .status(entity.getStatus() != null ? entity.getStatus().name() : "unknown")
+                .date(entity.getCreatedAt())
+                .gateway(entity.getGateway())
+                .content(entity.getContent())
+                .build();
     }
 }
