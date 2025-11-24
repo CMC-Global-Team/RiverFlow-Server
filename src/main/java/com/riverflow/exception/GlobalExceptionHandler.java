@@ -145,6 +145,21 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Xử lý lỗi từ AI Upstream (giữ nguyên status như 429, 401, 503...)
+     */
+    @ExceptionHandler(AiUpstreamException.class)
+    public ResponseEntity<MessageResponse> handleAiUpstream(AiUpstreamException ex) {
+        log.error("AiUpstreamException: status={} message={}", ex.getStatus(), ex.getMessage());
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(ex.getStatus());
+        } catch (Exception ignore) {
+            status = HttpStatus.BAD_GATEWAY; // fallback
+        }
+        return ResponseEntity.status(status).body(new MessageResponse(ex.getMessage()));
+    }
+
+    /**
      * Xử lý các exception chung (Internal Server Error)
      */
     @ExceptionHandler(Exception.class)
