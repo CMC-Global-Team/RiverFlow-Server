@@ -59,7 +59,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
 
-        String json = callGeminiWithFallback(payload);
+        String json = callGemini(payload);
         JsonNode root = parseJson(json);
 
         // Validate schema: nodes array with parent-child, root must exist
@@ -182,7 +182,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             List<String> siblingLabels = findSiblingLabels(mindmap, request.getNodeId());
 
             Map<String, Object> payload = buildGeminiPayloadForOptimizeNode(currentLabel, siblingLabels, lang, request.getHints());
-            String json = callGeminiWithFallback(payload);
+            String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode labelNode = root.get("label");
             String newLabel = labelNode != null && !labelNode.isNull() ? labelNode.asText() : null;
@@ -214,7 +214,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String currentDesc = mindmap.getDescription();
             String title = mindmap.getTitle();
             Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(title, currentDesc, lang, request.getHints(), "normal");
-            String json = callGeminiWithFallback(payload);
+            String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode descNode = root.get("description");
             String newDesc = descNode != null && !descNode.isNull() ? descNode.asText() : null;
@@ -330,59 +330,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-    private String callGeminiWithFallback(Map<String, Object> payload) {
-        if (!org.springframework.util.StringUtils.hasText(geminiApiKey)) {
-            log.error("Gemini API key missing");
-            throw new com.riverflow.exception.AiUpstreamException(403, "Thiếu GEMINI_API_KEY trên server");
-        }
-        java.util.List<String> models = new java.util.ArrayList<>();
-        models.add(model);
-        models.add("gemini-1.5-flash-latest");
-        models.add("gemini-1.0-pro");
-        models.add("gemini-1.0-pro-latest");
-        for (String mdl : models) {
-            try {
-                log.info("Gemini call model={}, hasKey={}, keyMask={}", mdl, true, maskKey(geminiApiKey));
-                Map<?, ?> resp = geminiWebClient.post()
-                        .uri(uriBuilder -> uriBuilder
-                                .path("/v1/models/{model}:generateContent")
-                                .queryParam("key", geminiApiKey)
-                                .build(mdl))
-                        .body(BodyInserters.fromValue(payload))
-                        .exchangeToMono(clientResponse -> {
-                            if (clientResponse.statusCode().is2xxSuccessful()) {
-                                return clientResponse.bodyToMono(Map.class);
-                            } else {
-                                return clientResponse.bodyToMono(String.class).map(body -> {
-                                    int code = clientResponse.statusCode().value();
-                                    log.error("Gemini API error ({}): {}", code, body);
-                                    throw new com.riverflow.exception.AiUpstreamException(code, parseOpenAiError(body, code));
-                                });
-                            }
-                        })
-                        .block();
-                if (resp == null) throw new IllegalStateException("Empty response from Gemini");
-                java.util.List<?> candidates = (java.util.List<?>) resp.get("candidates");
-                if (candidates == null || candidates.isEmpty()) throw new IllegalStateException("No candidates from Gemini");
-                java.util.Map<?, ?> c0 = (java.util.Map<?, ?>) candidates.get(0);
-                java.util.Map<?, ?> content = (java.util.Map<?, ?>) c0.get("content");
-                if (content == null) throw new IllegalStateException("No content in candidate");
-                java.util.List<?> parts = (java.util.List<?>) content.get("parts");
-                if (parts == null || parts.isEmpty()) throw new IllegalStateException("No parts in content");
-                java.util.Map<?, ?> p0 = (java.util.Map<?, ?>) parts.get(0);
-                Object text = p0.get("text");
-                if (!(text instanceof String s)) throw new IllegalStateException("Invalid Gemini content");
-                return ensureJson(s);
-            } catch (com.riverflow.exception.AiUpstreamException ex) {
-                if (ex.getStatus() == 404) {
-                    log.warn("Gemini model not found or unsupported: {}", mdl);
-                    continue;
-                }
-                throw ex;
-            }
-        }
-        throw new com.riverflow.exception.AiUpstreamException(404, "Không tìm thấy model khả dụng cho generateContent");
-    }
 
     private String maskKey(String k) {
         if (k == null || k.isBlank()) return "";
