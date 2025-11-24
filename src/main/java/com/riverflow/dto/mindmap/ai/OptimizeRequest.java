@@ -20,7 +20,7 @@ public class OptimizeRequest {
 
     // node | description
     @NotBlank(message = "targetType is required")
-    @Pattern(regexp = "node|description", message = "targetType must be 'node' or 'description'")
+    @Pattern(regexp = "node|description|structure", message = "targetType must be 'node' or 'description' or 'structure'")
     private String targetType;
 
     // required when targetType = node
@@ -34,6 +34,10 @@ public class OptimizeRequest {
 
     // Optional guidance to bias optimization
     private List<String> hints;
+
+    private Integer levels;
+    private Integer firstLevelCount;
+    private List<String> tags;
 }
 
 
