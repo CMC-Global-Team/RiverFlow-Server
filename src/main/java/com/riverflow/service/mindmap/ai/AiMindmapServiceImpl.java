@@ -433,7 +433,22 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 Optional<Map<String, Object>> rootNodeOpt = mindmap.getNodes().stream()
                         .filter(n -> !targets.contains(String.valueOf(n.get("id"))))
                         .findFirst();
-                anchorNode = rootNodeOpt.orElseThrow(() -> new InvalidMindmapDataException("root", "Không tìm thấy node gốc"));
+                if (rootNodeOpt.isEmpty()) {
+                    Map<String, Object> defaultRoot = new HashMap<>();
+                    defaultRoot.put("id", newNodeId());
+                    defaultRoot.put("type", "default");
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("label", "Root Node");
+                    defaultRoot.put("data", data);
+                    Map<String, Object> position = new HashMap<>();
+                    position.put("x", 0);
+                    position.put("y", 0);
+                    defaultRoot.put("position", position);
+                    mindmap.getNodes().add(defaultRoot);
+                    anchorNode = defaultRoot;
+                } else {
+                    anchorNode = rootNodeOpt.get();
+                }
                 anchorNodeId = String.valueOf(anchorNode.get("id"));
             }
 
