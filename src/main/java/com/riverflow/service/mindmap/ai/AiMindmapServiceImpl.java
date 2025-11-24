@@ -314,7 +314,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             Map<?, ?> p0 = (Map<?, ?>) parts.get(0);
             Object text = p0.get("text");
             if (!(text instanceof String s)) throw new IllegalStateException("Invalid Gemini content");
-            return s.trim();
+            return ensureJson(s);
         } catch (com.riverflow.exception.AiUpstreamException e) {
             throw e;
         } catch (Exception e) {
@@ -402,7 +402,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         payload.put("generationConfig", generationConfig); 
         return payload;
     }
-
+    private String ensureJson(String text) {
+        if (text == null) return null;
+        String s = text.trim();
+        int start = s.indexOf('{');
+        int end = s.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+        return s.substring(start, end + 1).trim();
+        }
+        return s; // nếu không có { } thì vẫn trả về, parseJson sẽ báo lỗi phù hợp
+        }
+    
     private Map<String, Object> buildGeminiPayloadForOptimizeDescription(String title, String currentDesc, String lang, List<String> hints, String mode) {
         String system = "Bạn là công cụ tối ưu mô tả mindmap. Chỉ trả JSON, không giải thích. MODE normal: ưu tiên tốc độ, mô tả ngắn gọn 1–2 câu, rõ mục tiêu và phạm vi.";
         StringBuilder user = new StringBuilder();
