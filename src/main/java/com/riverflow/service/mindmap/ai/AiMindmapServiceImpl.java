@@ -42,6 +42,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     @Value("${gemini.api-key:}")
     private String geminiApiKey;
 
+    @Value("${realtime.server.url:}")
+    private String realtimeServerUrl;
+
     @Override
     public MindmapResponse generateMindmap(GenerateMindmapRequest request, Long userId) {
         String topic = request.getTopic().trim();
@@ -154,6 +157,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     @Override
     public MindmapResponse optimize(OptimizeRequest request, Long userId) {
+        List<String> agentLogs = new ArrayList<>();
         Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
 
@@ -165,6 +169,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
 
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
+        Map<String, Object> agentPlan = extractAgentPlanFromHints(request.getHints());
+        if (agentPlan != null) {
+            agentLogs.add("Agent Plan: " + agentPlan.getOrDefault("summary", agentPlan));
+        }
         String target = request.getTargetType();
         if ("auto".equalsIgnoreCase(target)) {
             String title = mindmap.getTitle();
@@ -256,7 +264,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                         .nodes(nextNodes)
                         .edges(nextEdges)
                         .build();
-                return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+                MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+                agentLogs.add("Pruned node " + nodeId + (wantsPruneSubtree ? " with subtree" : ""));
+                appendAgentLogs(updated, agentLogs);
+                broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+                return updated;
             }
 
             String currentLabel = extractLabel(node);
@@ -291,7 +303,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .nodes(mindmap.getNodes())
                     .edges(mindmap.getEdges())
                     .build();
-            return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            agentLogs.add("Edited label of node " + request.getNodeId());
+            appendAgentLogs(updated, agentLogs);
+            broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+            return updated;
         } else if ("description".equalsIgnoreCase(target)) {
             String currentDesc = mindmap.getDescription();
             String title = mindmap.getTitle();
@@ -307,8 +323,37 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                     .description(newDesc)
                     .build();
-            return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            agentLogs.add("Updated description");
+            appendAgentLogs(updated, agentLogs);
+            broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+            return updated;
         } else if ("structure".equalsIgnoreCase(target)) {
+            boolean isReplace = agentPlan != null && "replace".equalsIgnoreCase(String.valueOf(agentPlan.get("action")));
+            List<String> pruneLabels = agentPlan != null && agentPlan.get("pruneLabels") instanceof List<?> pl ? pl.stream().map(String::valueOf).collect(Collectors.toList()) : Collections.emptyList();
+            if (!pruneLabels.isEmpty()) {
+                Set<String> toRemove = new HashSet<>();
+                for (String lbl : pruneLabels) {
+                    String id = findNodeIdByLabel(mindmap, lbl);
+                    if (StringUtils.hasText(id)) toRemove.add(id);
+                }
+                if (!toRemove.isEmpty()) {
+                    List<Map<String, Object>> nextNodes0 = mindmap.getNodes().stream()
+                            .filter(n -> !toRemove.contains(String.valueOf(n.get("id"))))
+                            .collect(Collectors.toList());
+                    List<Map<String, Object>> nextEdges0 = mindmap.getEdges().stream()
+                            .filter(e -> {
+                                String s = String.valueOf(e.get("source"));
+                                String t = String.valueOf(e.get("target"));
+                                return !toRemove.contains(s) && !toRemove.contains(t);
+                            })
+                            .collect(Collectors.toList());
+                    mindmap.setNodes(nextNodes0);
+                    mindmap.setEdges(nextEdges0);
+                    agentLogs.add("Pruned labels: " + String.join(", ", pruneLabels));
+                    broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+                }
+            }
             String requestedNodeId = request.getNodeId();
             String anchorNodeId = requestedNodeId;
             Map<String, Object> anchorNode = null;
@@ -341,19 +386,24 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             firstLevelCount = Math.max(minFirst, Math.min(maxFirst, firstLevelCount));
 
             String sType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
-            Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, sType);
-            String json = callGemini(payload);
+            String json;
+            List<Map<String, Object>> rfNodes = new ArrayList<>();
+            List<Map<String, Object>> rfEdges = new ArrayList<>();
+            Map<String, String> idMap = new HashMap<>();
+            Map<String, String> parentByTempId = new HashMap<>();
+            if (isReplace) {
+                String topic = (request.getHints() != null && !request.getHints().isEmpty()) ? request.getHints().get(0) : anchorLabel;
+                Map<String, Object> payloadGen = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, null, mode, minFirst, maxFirst);
+                json = callGemini(payloadGen);
+            } else {
+                Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, sType);
+                json = callGemini(payload);
+            }
             JsonNode root = parseJson(json);
             JsonNode nodesNode = root.get("nodes");
             if (nodesNode == null || !nodesNode.isArray()) {
                 throw new InvalidMindmapDataException("nodes", "Phải là mảng node hợp lệ");
             }
-
-            List<Map<String, Object>> rfNodes = new ArrayList<>();
-            List<Map<String, Object>> rfEdges = new ArrayList<>();
-
-            Map<String, String> idMap = new HashMap<>();
-            Map<String, String> parentByTempId = new HashMap<>();
 
             for (JsonNode n : nodesNode) {
                 String tempId = textOrNull(n.get("id"));
@@ -474,8 +524,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 Map<String, Object> edge = new HashMap<>();
                 edge.put("id", newEdgeId());
                 if (parentTemp == null || parentTemp.isBlank()) {
-                    edge.put("source", anchorNodeId);
-                    edge.put("target", idMap.get(childTemp));
+                    if (isReplace) {
+                        // In replace mode, connect between newly generated root and its child if root exists
+                        // Find a synthetic root by picking the first tempId with no parent
+                        String syntheticRootId = idMap.get(childTemp);
+                        // edges to children will be added in subsequent iterations
+                        // Skip creating edge to old anchor
+                        continue;
+                    } else {
+                        edge.put("source", anchorNodeId);
+                        edge.put("target", idMap.get(childTemp));
+                    }
                 } else {
                     edge.put("source", idMap.get(parentTemp));
                     edge.put("target", idMap.get(childTemp));
@@ -485,16 +544,28 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 rfEdges.add(edge);
             }
 
-            List<Map<String, Object>> nextNodes = new ArrayList<>(mindmap.getNodes());
-            nextNodes.addAll(rfNodes);
-            List<Map<String, Object>> nextEdges = new ArrayList<>(mindmap.getEdges());
-            nextEdges.addAll(rfEdges);
+            List<Map<String, Object>> nextNodes;
+            List<Map<String, Object>> nextEdges;
+            if (isReplace) {
+                nextNodes = new ArrayList<>(rfNodes);
+                nextEdges = new ArrayList<>(rfEdges);
+                agentLogs.add("Replace: rebuilt structure with " + rfNodes.size() + " nodes");
+            } else {
+                nextNodes = new ArrayList<>(mindmap.getNodes());
+                nextNodes.addAll(rfNodes);
+                nextEdges = new ArrayList<>(mindmap.getEdges());
+                nextEdges.addAll(rfEdges);
+                agentLogs.add("Expand: added " + rfNodes.size() + " nodes");
+            }
 
             UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                     .nodes(nextNodes)
                     .edges(nextEdges)
                     .build();
-            return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            appendAgentLogs(updated, agentLogs);
+            for (String logMsg : agentLogs) broadcastAgentLog(mindmap.getId(), logMsg);
+            return updated;
         } else {
             throw new InvalidMindmapDataException("targetType", "Giá trị không hợp lệ: node|description|structure");
         }
@@ -804,5 +875,63 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     private String newEdgeId() {
         return "edge-" + UUID.randomUUID();
+    }
+
+    private Map<String, Object> extractAgentPlanFromHints(List<String> hints) {
+        try {
+            if (hints == null || hints.isEmpty()) return null;
+            // Look for embedded plan
+            for (String h : hints) {
+                if (h != null && h.startsWith("AGENT_PLAN:")) {
+                    String json = h.substring("AGENT_PLAN:".length()).trim();
+                    Map<String, Object> plan = objectMapper.readValue(json, Map.class);
+                    String action = String.valueOf(plan.getOrDefault("action", "expand"));
+                    List<String> pruneLabels = plan.get("pruneIds") instanceof List<?> pl ? null : (plan.get("pruneLabels") instanceof List<?> p2 ? (List<String>) (List<?>) p2 : Collections.emptyList());
+                    Map<String, Object> out = new HashMap<>();
+                    out.put("action", action);
+                    out.put("pruneLabels", pruneLabels != null ? pruneLabels : Collections.emptyList());
+                    out.put("summary", plan.getOrDefault("summary", action));
+                    return out;
+                }
+            }
+            // Heuristic fallback
+            String joined = String.join(" ", hints).toLowerCase();
+            String action = joined.matches(".*(sửa lại|đổi|thay|chuyển sang|thành|replace|change to|update to).*") ? "replace"
+                    : joined.matches(".*(xóa|xoá|remove|delete|loại bỏ|bỏ|drop).*") ? "prune"
+                    : joined.matches(".*(sửa|chỉnh|update|edit|điều chỉnh).*") ? "edit" : "expand";
+            Map<String, Object> out = new HashMap<>();
+            out.put("action", action);
+            out.put("pruneLabels", Collections.emptyList());
+            out.put("summary", "action=" + action);
+            return out;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void appendAgentLogs(MindmapResponse resp, List<String> logs) {
+        if (resp != null) {
+            resp.setAiAgentLogs(logs);
+        }
+    }
+
+    private void broadcastAgentLog(String mindmapId, String text) {
+        try {
+            if (!StringUtils.hasText(realtimeServerUrl)) return;
+            Map<String, Object> body = new HashMap<>();
+            body.put("mindmapId", mindmapId);
+            body.put("event", "chat:message");
+            Map<String, Object> data = new HashMap<>();
+            data.put("message", text);
+            data.put("from", "agent");
+            body.put("data", data);
+            WebClient.create(realtimeServerUrl)
+                    .post()
+                    .uri("/realtime/mindmap/event")
+                    .body(BodyInserters.fromValue(body))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .subscribe();
+        } catch (Exception ignored) { }
     }
 }
