@@ -173,39 +173,38 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (agentPlan != null) {
             agentLogs.add("Agent Plan: " + agentPlan.getOrDefault("summary", agentPlan));
         }
-        String target = request.getTargetType();
-        if ("auto".equalsIgnoreCase(target)) {
-            String title = mindmap.getTitle();
-            String desc = mindmap.getDescription();
-            List<String> labels = mindmap.getNodes().stream()
-                    .map(this::extractLabel)
-                    .filter(StringUtils::hasText)
-                    .limit(50)
-                    .collect(Collectors.toList());
-            Map<String, Object> payload = buildGeminiPayloadForClassifyAction(title, desc, labels, lang, request.getHints());
-            String json = callGemini(payload);
-            JsonNode root = parseJson(json);
-            String decidedTarget = textOrNull(root.get("targetType"));
-            String nodeLabel = textOrNull(root.get("nodeLabel"));
-            String sType = textOrNull(root.get("structureType"));
-            String outLang = textOrNull(root.get("language"));
-            if (StringUtils.hasText(decidedTarget)) {
-                request.setTargetType(decidedTarget);
-            } else {
-                request.setTargetType("structure");
-            }
-            if (StringUtils.hasText(nodeLabel) && !StringUtils.hasText(request.getNodeId())) {
-                String foundId = findNodeIdByLabel(mindmap, nodeLabel);
-                if (StringUtils.hasText(foundId)) request.setNodeId(foundId);
-            }
-            if (StringUtils.hasText(sType) && request.getStructureType() == null) {
-                request.setStructureType(sType);
-            }
-            if (StringUtils.hasText(outLang) && request.getLanguage() == null) {
-                request.setLanguage(outLang);
-            }
-            return optimize(request, userId);
+        String title = mindmap.getTitle();
+        String desc = mindmap.getDescription();
+        List<String> labels = mindmap.getNodes().stream()
+                .map(this::extractLabel)
+                .filter(StringUtils::hasText)
+                .limit(50)
+                .collect(Collectors.toList());
+        Map<String, Object> agentPayload = buildGeminiPayloadForClassifyAction(title, desc, labels, lang, request.getHints());
+        String agentJson = callGemini(agentPayload);
+        JsonNode agentRoot = parseJson(agentJson);
+        String decidedTarget = textOrNull(agentRoot.get("targetType"));
+        String nodeLabel = textOrNull(agentRoot.get("nodeLabel"));
+        String sType = textOrNull(agentRoot.get("structureType"));
+        String outLang = textOrNull(agentRoot.get("language"));
+        if (StringUtils.hasText(decidedTarget)) {
+            request.setTargetType(decidedTarget);
+        } else if (!StringUtils.hasText(request.getTargetType())) {
+            request.setTargetType("structure");
         }
+        if (StringUtils.hasText(nodeLabel) && !StringUtils.hasText(request.getNodeId())) {
+            String foundId = findNodeIdByLabel(mindmap, nodeLabel);
+            if (StringUtils.hasText(foundId)) request.setNodeId(foundId);
+        }
+        if (StringUtils.hasText(sType) && request.getStructureType() == null) {
+            request.setStructureType(sType);
+        }
+        if (StringUtils.hasText(outLang) && request.getLanguage() == null) {
+            request.setLanguage(outLang);
+        }
+        agentLogs.add("Agent Analyze: target=" + request.getTargetType() + (StringUtils.hasText(request.getNodeId()) ? ", nodeId=" + request.getNodeId() : "") + (StringUtils.hasText(request.getStructureType()) ? ", structureType=" + request.getStructureType() : ""));
+        broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+        String target = request.getTargetType();
 
         if ("node".equalsIgnoreCase(target)) {
             if (!StringUtils.hasText(request.getNodeId())) {
@@ -310,8 +309,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             return updated;
         } else if ("description".equalsIgnoreCase(target)) {
             String currentDesc = mindmap.getDescription();
-            String title = mindmap.getTitle();
-            Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(title, currentDesc, lang, request.getHints(), "normal");
+            String mapTitle = mindmap.getTitle();
+            Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(mapTitle, currentDesc, lang, request.getHints(), "normal");
             String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode descNode = root.get("description");
@@ -385,7 +384,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
             firstLevelCount = Math.max(minFirst, Math.min(maxFirst, firstLevelCount));
 
-            String sType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
+            String structureType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
             String json;
             List<Map<String, Object>> rfNodes = new ArrayList<>();
             List<Map<String, Object>> rfEdges = new ArrayList<>();
@@ -396,7 +395,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 Map<String, Object> payloadGen = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, null, mode, minFirst, maxFirst);
                 json = callGemini(payloadGen);
             } else {
-                Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, sType);
+                Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, structureType);
                 json = callGemini(payload);
             }
             JsonNode root = parseJson(json);
@@ -465,10 +464,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     idx = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
                     if (idx < 0) idx = 0;
                     double angle = idx * angleStep;
-                    if ("timeline".equalsIgnoreCase(sType)) {
+                    if ("timeline".equalsIgnoreCase(structureType)) {
                         position.put("x", anchorX + (idx + 1) * 220);
                         position.put("y", anchorY);
-                    } else if ("org".equalsIgnoreCase(sType) || "tree".equalsIgnoreCase(sType)) {
+                    } else if ("org".equalsIgnoreCase(structureType) || "tree".equalsIgnoreCase(structureType)) {
                         position.put("x", anchorX);
                         position.put("y", anchorY + (idx + 1) * 140);
                     } else {
@@ -496,13 +495,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     if (childIdx < 0) childIdx = 0;
                     double dx = 180 + childIdx * 90;
                     double dy = ((childIdx % 2 == 0) ? 1 : -1) * (140 + (lvl - 2) * 60);
-                    if ("timeline".equalsIgnoreCase(sType)) {
+                    if ("timeline".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
                         position.put("y", py + ((childIdx % 2 == 0) ? 120 : -120));
-                    } else if ("org".equalsIgnoreCase(sType) || "tree".equalsIgnoreCase(sType)) {
+                    } else if ("org".equalsIgnoreCase(structureType) || "tree".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
                         position.put("y", py + ((childIdx % 2 == 0) ? 0 : 120));
-                    } else if ("fishbone".equalsIgnoreCase(sType)) {
+                    } else if ("fishbone".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
                         position.put("y", py + ((childIdx % 2 == 0) ? -100 : 100));
                     } else {
@@ -525,11 +524,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 edge.put("id", newEdgeId());
                 if (parentTemp == null || parentTemp.isBlank()) {
                     if (isReplace) {
-                        // In replace mode, connect between newly generated root and its child if root exists
-                        // Find a synthetic root by picking the first tempId with no parent
-                        String syntheticRootId = idMap.get(childTemp);
-                        // edges to children will be added in subsequent iterations
-                        // Skip creating edge to old anchor
                         continue;
                     } else {
                         edge.put("source", anchorNodeId);
