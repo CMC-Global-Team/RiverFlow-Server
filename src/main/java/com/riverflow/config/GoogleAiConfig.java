@@ -12,11 +12,18 @@ public class GoogleAiConfig {
     @Value("${gemini.base-url:https://generativelanguage.googleapis.com}")
     private String baseUrl;
 
+    @Value("${gemini.api-key:}")
+    private String apiKey;
+
     @Bean
     public WebClient geminiWebClient() {
-        return WebClient.builder()
+        WebClient.Builder builder = WebClient.builder()
                 .baseUrl(baseUrl)
-                .defaultHeader("Content-Type", "application/json")
+                .defaultHeader("Content-Type", "application/json");
+        if (apiKey != null && !apiKey.isBlank()) {
+            builder.defaultHeader("x-goog-api-key", apiKey);
+        }
+        return builder
                 .filter(ExchangeFilterFunction.ofResponseProcessor(clientResponse ->
                         reactor.core.publisher.Mono.just(clientResponse)))
                 .build();
