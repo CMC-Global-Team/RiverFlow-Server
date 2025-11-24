@@ -20,8 +20,9 @@ public class OptimizeRequest {
 
     // node | description
     @NotBlank(message = "targetType is required")
-    @Pattern(regexp = "node|description|structure", message = "targetType must be 'node' or 'description' or 'structure'")
-    private String targetType;
+    @Pattern(regexp = "node|description|structure|auto", message = "targetType must be 'node' or 'description' or 'structure' or 'auto'")
+    @Builder.Default
+    private String targetType = "auto";
 
     // required when targetType = node
     private String nodeId;
