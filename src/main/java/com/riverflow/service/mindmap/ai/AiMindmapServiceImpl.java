@@ -227,11 +227,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .build();
             return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
         } else if ("structure".equalsIgnoreCase(target)) {
-            String anchorNodeId = request.getNodeId();
+            String requestedNodeId = request.getNodeId();
+            String anchorNodeId = requestedNodeId;
             Map<String, Object> anchorNode = null;
-            if (StringUtils.hasText(anchorNodeId)) {
+            if (StringUtils.hasText(requestedNodeId)) {
+                final String searchId = requestedNodeId;
                 anchorNode = mindmap.getNodes().stream()
-                        .filter(n -> anchorNodeId.equals(String.valueOf(n.get("id"))))
+                        .filter(n -> searchId.equals(String.valueOf(n.get("id"))))
                         .findFirst()
                         .orElse(null);
             }
