@@ -9,28 +9,22 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Configuration
 public class OpenAiConfig {
 
-    @Value("${openai.base-url:https://api.openai.com}")
+    // Switch to Gemini service configuration (keep bean name for compatibility)
+    @Value("${gemini.base-url:https://generativelanguage.googleapis.com}")
     private String baseUrl;
 
-    @Value("${openai.api-key:}")
+    @Value("${gemini.api-key:}")
     private String apiKey;
 
     @Bean
     public WebClient openAiWebClient() {
-        WebClient.Builder builder = WebClient.builder()
+        // Gemini uses API key via query parameter (?key=...), not Authorization header
+        return WebClient.builder()
                 .baseUrl(baseUrl)
-                .defaultHeader("Content-Type", "application/json");
-        if (apiKey != null && !apiKey.isBlank()) {
-            builder.defaultHeader("Authorization", "Bearer " + apiKey);
-        }
-        return builder
-                .filter(ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
-                    // Do not expose stacktrace; propagate status for handler
-                    return reactor.core.publisher.Mono.just(clientResponse);
-                }))
+                .defaultHeader("Content-Type", "application/json")
+                .filter(ExchangeFilterFunction.ofResponseProcessor(clientResponse ->
+                        reactor.core.publisher.Mono.just(clientResponse)))
                 .build();
     }
 }
-
-
 
