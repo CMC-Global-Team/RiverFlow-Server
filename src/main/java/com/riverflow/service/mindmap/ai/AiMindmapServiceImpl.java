@@ -226,8 +226,105 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .description(newDesc)
                     .build();
             return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+        } else if ("structure".equalsIgnoreCase(target)) {
+            String anchorNodeId = request.getNodeId();
+            Map<String, Object> anchorNode = null;
+            if (StringUtils.hasText(anchorNodeId)) {
+                anchorNode = mindmap.getNodes().stream()
+                        .filter(n -> anchorNodeId.equals(String.valueOf(n.get("id"))))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (anchorNode == null) {
+                Set<String> targets = mindmap.getEdges().stream()
+                        .map(e -> String.valueOf(e.get("target")))
+                        .collect(Collectors.toSet());
+                Optional<Map<String, Object>> rootNodeOpt = mindmap.getNodes().stream()
+                        .filter(n -> !targets.contains(String.valueOf(n.get("id"))))
+                        .findFirst();
+                anchorNode = rootNodeOpt.orElseThrow(() -> new InvalidMindmapDataException("root", "Không tìm thấy node gốc"));
+                anchorNodeId = String.valueOf(anchorNode.get("id"));
+            }
+
+            String anchorLabel = extractLabel(anchorNode);
+            List<String> existingChildren = findChildrenLabels(mindmap, anchorNodeId);
+            String mode = request.getMode() != null ? request.getMode() : "normal";
+            int levels = request.getLevels() != null ? request.getLevels() : 2;
+            int defaultFirst = "normal".equalsIgnoreCase(mode) ? 4 : 5;
+            int firstLevelCount = request.getFirstLevelCount() != null ? request.getFirstLevelCount() : defaultFirst;
+            int minFirst = "normal".equalsIgnoreCase(mode) ? 3 : 4;
+            int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
+            firstLevelCount = Math.max(minFirst, Math.min(maxFirst, firstLevelCount));
+
+            Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels);
+            String json = callGemini(payload);
+            JsonNode root = parseJson(json);
+            JsonNode nodesNode = root.get("nodes");
+            if (nodesNode == null || !nodesNode.isArray()) {
+                throw new InvalidMindmapDataException("nodes", "Phải là mảng node hợp lệ");
+            }
+
+            List<Map<String, Object>> rfNodes = new ArrayList<>();
+            List<Map<String, Object>> rfEdges = new ArrayList<>();
+
+            Map<String, String> idMap = new HashMap<>();
+            Map<String, String> parentByTempId = new HashMap<>();
+
+            for (JsonNode n : nodesNode) {
+                String tempId = textOrNull(n.get("id"));
+                String label = textOrNull(n.get("label"));
+                String parentTempId = textOrNull(n.get("parentId"));
+                if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
+                    throw new InvalidMindmapDataException("node", "Thiếu id hoặc label");
+                }
+                parentByTempId.put(tempId, parentTempId);
+            }
+
+            for (JsonNode n : nodesNode) {
+                String tempId = textOrNull(n.get("id"));
+                String label = textOrNull(n.get("label"));
+                String newId = newNodeId();
+                idMap.put(tempId, newId);
+                Map<String, Object> data = new HashMap<>();
+                data.put("label", label);
+                Map<String, Object> position = new HashMap<>();
+                position.put("x", 0);
+                position.put("y", 0);
+                Map<String, Object> rfNode = new HashMap<>();
+                rfNode.put("id", newId);
+                rfNode.put("type", "default");
+                rfNode.put("data", data);
+                rfNode.put("position", position);
+                rfNodes.add(rfNode);
+            }
+
+            for (Map.Entry<String, String> e : parentByTempId.entrySet()) {
+                String childTemp = e.getKey();
+                String parentTemp = e.getValue();
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", newEdgeId());
+                if (parentTemp == null || parentTemp.isBlank()) {
+                    edge.put("source", anchorNodeId);
+                    edge.put("target", idMap.get(childTemp));
+                } else {
+                    edge.put("source", idMap.get(parentTemp));
+                    edge.put("target", idMap.get(childTemp));
+                }
+                rfEdges.add(edge);
+            }
+
+            List<Map<String, Object>> nextNodes = new ArrayList<>(mindmap.getNodes());
+            nextNodes.addAll(rfNodes);
+            List<Map<String, Object>> nextEdges = new ArrayList<>(mindmap.getEdges());
+            nextEdges.addAll(rfEdges);
+
+            UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
+                    .nodes(nextNodes)
+                    .edges(nextEdges)
+                    .build();
+            return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
         } else {
-            throw new InvalidMindmapDataException("targetType", "Giá trị không hợp lệ: node|description");
+            throw new InvalidMindmapDataException("targetType", "Giá trị không hợp lệ: node|description|structure");
         }
     }
 
@@ -455,6 +552,31 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
         payload.put("generationConfig", generationConfig); 
+        return payload;
+    }
+
+    private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren, String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels) {
+        StringBuilder user = new StringBuilder();
+        user.append("Mở rộng mindmap cho nhánh: ");
+        user.append(anchorLabel != null ? anchorLabel : "ROOT");
+        user.append(". Ngôn ngữ: ").append(lang).append(". ");
+        user.append("Độ sâu: ").append(levels).append(". Số node cấp 1: ").append(firstLevelCount).append(" (giới hạn ").append(minFirst).append("–").append(maxFirst).append(")").append(".\n");
+        if (existingChildren != null && !existingChildren.isEmpty()) {
+            user.append("Tránh trùng các nhánh hiện có: ").append(String.join(", ", existingChildren)).append("\n");
+        }
+        if (hints != null && !hints.isEmpty()) {
+            user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
+        }
+        user.append("Trả JSON: { \"nodes\": [ {\"id\": \"n1\", \"label\": \"...\", \"parentId\": null }, {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\" } ] }\n");
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString()))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
