@@ -1,7 +1,9 @@
 package com.riverflow.model.mindmap;
 
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -17,39 +19,53 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 public class CollaborationInvitation {
-    
+
     @Id
     private String id;
-    
+
     @Indexed
     private String mindmapId;
-    
+
     private Long invitedByUserId;
-    
+
     @Indexed
     private String invitedEmail;
-    
+
     private Long invitedUserId;
-    
-    private String role; // editor, viewer
-    
+
+    private Role role;
+
     @Indexed
     @Builder.Default
     private String status = "pending"; // pending, accepted, rejected, cancelled, expired
-    
+
     @Indexed
     private String token;
-    
+
     private String message;
-    
+
     @Indexed
     private LocalDateTime expiresAt;
-    
+
     private LocalDateTime acceptedAt;
-    
+
+    private Long acceptedByUserId;
+
+    private LocalDateTime rejectedAt;
+
+    private Long rejectedByUserId;
+
     private Map<String, Object> metadata; // sentViaEmail, emailSentAt, reminderCount
-    
+
+    @CreatedDate
     private LocalDateTime createdAt;
+
+    @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    public enum Role {
+        EDITOR,
+        VIEWER
+    }
 }
 

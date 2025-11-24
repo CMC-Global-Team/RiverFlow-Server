@@ -69,6 +69,9 @@ public class SecurityConfig {
                 // Tắt CSRF (Cross-Site Request Forgery) vì chúng ta dùng API stateless
                 .csrf(csrf -> csrf.disable())
 
+                .formLogin(form -> form.disable())
+                .httpBasic(httpBasic -> httpBasic.disable())
+
                 // Cấu hình phân quyền cho các request
                 .authorizeHttpRequests(authz -> authz
                         // Cho phép tất cả OPTIONS requests (CORS preflight)
@@ -82,6 +85,28 @@ public class SecurityConfig {
                                 "/swagger-ui/**",       // Tài nguyên của Swagger
                                 "/v3/api-docs/**"       // File JSON định nghĩa OpenAPI
                         ).permitAll()
+                        .requestMatchers("/web-hook/**").permitAll()
+                        
+                        // Public mindmap & invitation access (NO AUTH) - MUST come before /mindmaps/**
+                        .requestMatchers("/mindmaps/public/**").permitAll()
+                        .requestMatchers(
+                                "/mindmaps/verify-invitation/**",
+                                "/mindmaps/accept-invitation/**",
+                                "/mindmaps/reject-invitation/**",
+                                "/invitations/**"
+                        ).permitAll()
+                        
+                        // GET avatar - public access
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/user/avatar/**").permitAll()
+
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/mindmaps/*/history").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/mindmaps/*/history").permitAll()
+
+                        .requestMatchers("/mindmaps/**").authenticated()
+                        .requestMatchers("/payments/**").authenticated()
+                        
+                        // POST upload avatar - requires authentication
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/user/avatar/upload").authenticated()
 
                         // Bất kỳ request nào khác đều yêu cầu phải xác thực
                         .anyRequest().authenticated()

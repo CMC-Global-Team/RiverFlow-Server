@@ -5,7 +5,7 @@ import com.riverflow.model.PasswordReset;
 import com.riverflow.model.User;
 import com.riverflow.repository.PasswordResetRepository;
 import com.riverflow.repository.UserRepository;
-import com.riverflow.service.EmailService;
+import com.riverflow.service.SmtpEmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,7 +25,7 @@ public class ForgotPasswordService {
 
     private final UserRepository userRepository;
     private final PasswordResetRepository passwordResetRepository;
-    private final EmailService emailService;
+    private final SmtpEmailService smtpEmailService;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -55,18 +55,9 @@ public class ForgotPasswordService {
 
         passwordResetRepository.save(resetToken);
 
-        // Send reset email
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
-        String emailBody = "Chào " + user.getFullName() + ",\n\n"
-                + "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.\n"
-                + "Vui lòng nhấn vào đường link bên dưới để đặt lại mật khẩu:\n"
-                + resetLink + "\n\n"
-                + "Liên kết sẽ hết hạn sau " + resetTokenExpireMinutes + " phút.\n\n"
-                + "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n"
-                + "Trân trọng,\nĐội ngũ RiverFlow.";
-
-        emailService.sendSimpleMessage(user.getEmail(), "Đặt lại mật khẩu RiverFlow", emailBody);
-        log.info("Password reset email sent to {}", user.getEmail());
+        // Send reset email via SMTP Server
+        smtpEmailService.sendResetPasswordEmail(user.getEmail(), token);
+        log.info("Password reset email sent to {} via SMTP server", user.getEmail());
     }
 }
 

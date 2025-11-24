@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.apache.catalina.connector.ClientAbortException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -119,11 +120,17 @@ public class GlobalExceptionHandler {
      * Xử lý MindmapAccessDeniedException (Forbidden)
      */
     @ExceptionHandler(MindmapAccessDeniedException.class)
-    public ResponseEntity<MessageResponse> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
+    public ResponseEntity<Map<String, Object>> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
         log.error("MindmapAccessDeniedException: {}", ex.getMessage());
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", ex.getMessage());
+        // Include shareToken if available (for public mindmaps)
+        if (ex.getShareToken() != null) {
+            response.put("shareToken", ex.getShareToken());
+        }
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(new MessageResponse(ex.getMessage()));
+                .body(response);
     }
 
     /**
@@ -146,6 +153,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau."));
+    }
+
+    /**
+     * ClientAbortException xảy ra khi client đóng kết nối trước khi server ghi xong response.
+     * Trường hợp này không phải lỗi ứng dụng, chỉ ghi log cảnh báo và trả No Content.
+     */
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbort(ClientAbortException ex) {
+        log.warn("Client aborted connection: {}", ex.getMessage());
+        return ResponseEntity.noContent().build();
     }
 }
 

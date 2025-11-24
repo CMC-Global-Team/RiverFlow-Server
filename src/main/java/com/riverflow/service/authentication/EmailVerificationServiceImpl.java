@@ -39,17 +39,54 @@ public class EmailVerificationServiceImpl {
      */
     @Transactional
     public void verifyEmail(String token) {
-        // Find token
-        EmailVerification verificationToken = emailVerificationRepository.findByToken(token)
-                .orElseThrow(() -> new InvalidTokenException("Token xác thực không hợp lệ."));
+        // Trim token to handle any whitespace issues
+        final String trimmedToken = (token != null) ? token.trim() : null;
+        
+        log.info("Starting email verification for token: {} (length: {})", 
+            trimmedToken != null ? trimmedToken.substring(0, Math.min(8, trimmedToken.length())) + "..." : "null",
+            trimmedToken != null ? trimmedToken.length() : 0);
+        
+        if (trimmedToken == null || trimmedToken.isEmpty()) {
+            log.warn("Email verification attempted with null or empty token");
+            throw new InvalidTokenException("Token xác thực không hợp lệ.");
+        }
+
+        // Find token - try exact match first
+        EmailVerification verificationToken = emailVerificationRepository.findByToken(trimmedToken)
+                .orElseThrow(() -> {
+                    log.error("Email verification token not found in database. Token: {} (length: {})", 
+                        trimmedToken.substring(0, Math.min(8, trimmedToken.length())) + "...", 
+                        trimmedToken.length());
+                    log.error("Attempting to find token with different variations...");
+                    
+                    // Try to find similar tokens for debugging (case-insensitive, trimmed)
+                    try {
+                        final String searchToken = trimmedToken; // Make final for lambda
+                        emailVerificationRepository.findAll().forEach(v -> {
+                            if (v.getToken() != null && v.getToken().trim().equalsIgnoreCase(searchToken)) {
+                                log.error("Found similar token (case-insensitive match): stored='{}' (length: {}), requested='{}' (length: {})", 
+                                    v.getToken(), v.getToken().length(), searchToken, searchToken.length());
+                            }
+                        });
+                    } catch (Exception e) {
+                        log.error("Error while searching for similar tokens: {}", e.getMessage());
+                    }
+                    
+                    return new InvalidTokenException("Token xác thực không hợp lệ.");
+                });
+
+        log.debug("Found verification token for user: {}", verificationToken.getUser().getEmail());
 
         // Check if token already used
         if (verificationToken.getVerifiedAt() != null) {
+            log.warn("Email verification attempted with already used token for user: {}", verificationToken.getUser().getEmail());
             throw new InvalidTokenException("Token này đã được sử dụng.");
         }
 
         // Check if token expired
         if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("Email verification attempted with expired token for user: {}, expired at: {}", 
+                verificationToken.getUser().getEmail(), verificationToken.getExpiresAt());
             throw new InvalidTokenException("Token đã hết hạn. Vui lòng yêu cầu link mới.");
         }
 
@@ -58,10 +95,12 @@ public class EmailVerificationServiceImpl {
         user.setEmailVerified(true);
         user.setEmailVerifiedAt(LocalDateTime.now());
         userRepository.save(user);
+        log.debug("User email verified flag set to true for: {}", user.getEmail());
 
         // Mark token as used
         verificationToken.setVerifiedAt(LocalDateTime.now());
         emailVerificationRepository.save(verificationToken);
+        log.debug("Verification token marked as used");
 
         log.info("Email verified successfully for user: {}", user.getEmail());
     }

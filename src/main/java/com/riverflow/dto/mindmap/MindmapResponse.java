@@ -44,6 +44,8 @@ public class MindmapResponse {
     // Sharing & Collaboration
     private Boolean isPublic;
     
+    private String publicAccessLevel; // view, edit, private
+    
     private String shareToken;
     
     private List<Collaborator> collaborators;
@@ -72,5 +74,12 @@ public class MindmapResponse {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+
+    private boolean canUndo;
+    private boolean canRedo;
+    
+    // Owner info (for public mindmaps)
+    private String ownerName;
+    private String ownerAvatar;
 }
 

@@ -48,10 +48,25 @@ public class User {
     private String fullName;
     
     /**
-     * URL to user's avatar image
+     * URL to user's avatar image (deprecated - use avatar_data instead)
      */
     @Column(length = 500)
     private String avatar;
+    
+    /**
+     * Avatar image binary data (LONGBLOB)
+     * Stored directly in database for reliability
+     * Max size: 4GB (but practically limited to max file upload size of 5MB)
+     */
+    @Lob
+    @Column(name = "avatar_data", columnDefinition = "LONGBLOB")
+    private byte[] avatarData;
+    
+    /**
+     * MIME type of avatar image (e.g., "image/png", "image/jpeg")
+     */
+    @Column(name = "avatar_mime_type", length = 50)
+    private String avatarMimeType;
     
     /**
      * Account status
@@ -59,6 +74,11 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserStatus status = UserStatus.active;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 10)
+    @Builder.Default
+    private Role role = Role.user;
     
     // OAuth fields
     
@@ -109,6 +129,10 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private Theme theme = Theme.light;
+
+    @Column(name = "credit", nullable = false)
+    @Builder.Default
+    private Long credit = 3L;
     
     // Timestamps
     
@@ -145,6 +169,11 @@ public class User {
         light,
         dark,
         auto
+    }
+
+    public enum Role {
+        admin,
+        user
     }
 }
 

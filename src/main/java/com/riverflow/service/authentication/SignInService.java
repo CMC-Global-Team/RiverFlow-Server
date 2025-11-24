@@ -65,6 +65,16 @@ public class SignInService {
 
             log.info("User {} signed in successfully", user.getEmail());
 
+            // Generate avatar URL if avatar data exists in database
+            // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
+            String avatarUrl = null;
+            if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+                avatarUrl = "/user/avatar/" + user.getId();
+            } else if (user.getAvatar() != null) {
+                // Fallback to legacy URL-based avatar
+                avatarUrl = user.getAvatar();
+            }
+
             // Build response
             return SignInResponse.builder()
                     .accessToken(accessToken)
@@ -74,7 +84,9 @@ public class SignInService {
                     .userId(user.getId())
                     .email(user.getEmail())
                     .fullName(user.getFullName())
-                    .role("USER") // All users have USER role
+                    .role(user.getRole() != null ? user.getRole().name().toUpperCase() : "USER")
+                    .credit(user.getCredit() != null ? user.getCredit() : 0L)
+                    .avatar(avatarUrl)
                     .build();
 
         } catch (EmailNotVerifiedException e) {

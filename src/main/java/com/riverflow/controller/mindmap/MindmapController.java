@@ -2,12 +2,19 @@ package com.riverflow.controller.mindmap;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.MessageResponse;
+import com.riverflow.dto.collaboration.InviteCollaboratorRequest;
 import com.riverflow.dto.mindmap.CreateMindmapRequest;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.MindmapSummaryResponse;
 import com.riverflow.dto.mindmap.UpdateMindmapRequest;
+import com.riverflow.exception.mindmap.MindmapNotFoundException;
 import com.riverflow.model.User;
+import com.riverflow.model.mindmap.CollaborationInvitation;
+import com.riverflow.model.mindmap.Mindmap;
+import com.riverflow.repository.mindmap.MindmapRepository;
+import com.riverflow.service.mindmap.CollaborationService;
 import com.riverflow.service.mindmap.MindmapService;
+import com.riverflow.service.mindmap.UndoRedoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * Controller for Mindmap CRUD operations
@@ -29,7 +36,10 @@ public class MindmapController {
     
     private final MindmapService mindmapService;
     private final CustomUserDetailsService userDetailsService;
-    
+    private final UndoRedoService undoRedoService;
+    private final CollaborationService collaborationService;
+    private final MindmapRepository mindmapRepository;
+
     /**
      * Create a new mindmap
      * POST /api/mindmaps
@@ -70,8 +80,18 @@ public class MindmapController {
             @PathVariable String id,
             Authentication authentication) {
         
-        Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting mindmap: {} for user: {}", id, userId);
+        // Handle unauthenticated users - allow access if mindmap is public
+        Long userId = null;
+        if (authentication != null) {
+            try {
+                userId = getUserIdFromAuth(authentication);
+            } catch (Exception e) {
+                log.warn("Failed to get userId from authentication, treating as unauthenticated: {}", e.getMessage());
+                userId = null;
+            }
+        }
+        
+        log.info("Getting mindmap: {} for user: {}", id, userId != null ? userId : "unauthenticated");
         
         MindmapResponse response = mindmapService.getMindmapById(id, userId);
         return ResponseEntity.ok(response);
@@ -124,6 +144,22 @@ public class MindmapController {
         
         mindmapService.permanentlyDeleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap permanently deleted"));
+    }
+
+    /**
+     * Nhân bản (duplicate) một mindmap
+     * POST /api/mindmaps/{id}/duplicate
+     */
+    @PostMapping("/{id}/duplicate")
+    public ResponseEntity<MindmapResponse> duplicateMindmap(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Duplicating mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = mindmapService.duplicateMindmap(id, userId);
+        return ResponseEntity.ok(response);
     }
     
     /**
@@ -235,11 +271,268 @@ public class MindmapController {
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{id}/undo")
+    public ResponseEntity<MindmapResponse> undo(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Undoing mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = undoRedoService.undo(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/redo")
+    public ResponseEntity<MindmapResponse> redo(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Redoing mindmap: {} for user: {}", id, userId);
+
+        MindmapResponse response = undoRedoService.redo(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/collaborators/invite")
+    public ResponseEntity<CollaborationInvitation> inviteCollaborator(
+            @PathVariable String id,
+            @Valid @RequestBody InviteCollaboratorRequest request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Request invite collaborator to map: {} by user: {}", id, userId);
+
+        CollaborationInvitation invitation = collaborationService.inviteCollaborator(id, request, userId);
+
+        return ResponseEntity.ok(invitation);
+    }
+
+    /**
+     * Get all collaborators for a mindmap
+     * GET /api/mindmaps/{id}/collaborators
+     */
+    @GetMapping("/{id}/collaborators")
+    public ResponseEntity<?> getCollaborators(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Getting collaborators for mindmap: {} by user: {}", id, userId);
+
+        var response = collaborationService.getCollaborators(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get pending invitations for a mindmap
+     * GET /api/mindmaps/{id}/pending-invitations
+     */
+    @GetMapping("/{id}/pending-invitations")
+    public ResponseEntity<?> getPendingInvitations(
+            @PathVariable String id,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Getting pending invitations for mindmap: {} by user: {}", id, userId);
+
+        var response = collaborationService.getPendingInvitations(id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update collaborator role
+     * PUT /api/mindmaps/{id}/collaborators/{email}/role
+     */
+    @PutMapping("/{id}/collaborators/{email}/role")
+    public ResponseEntity<?> updateCollaboratorRole(
+            @PathVariable String id,
+            @PathVariable String email,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Updating collaborator role for mindmap: {} by user: {}", id, userId);
+
+        String role = request.get("role");
+        var response = collaborationService.updateCollaboratorRole(id, email, role, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Remove collaborator from mindmap
+     * DELETE /api/mindmaps/{id}/collaborators/{email}
+     */
+    @DeleteMapping("/{id}/collaborators/{email}")
+    public ResponseEntity<MessageResponse> removeCollaborator(
+            @PathVariable String id,
+            @PathVariable String email,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Removing collaborator from mindmap: {} by user: {}", id, userId);
+
+        collaborationService.removeCollaborator(id, email, userId);
+        return ResponseEntity.ok(new MessageResponse("Collaborator removed successfully"));
+    }
+
+    /**
+     * Update public access level of mindmap
+     * PUT /api/mindmaps/{id}/public-access
+     */
+    @PutMapping("/{id}/public-access")
+    public ResponseEntity<MindmapResponse> updatePublicAccess(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        Boolean isPublic = (Boolean) request.get("isPublic");
+        String accessLevel = (String) request.get("accessLevel");
+        
+        log.info("Updating public access for mindmap: {} by user: {}", id, userId);
+
+        MindmapResponse response = mindmapService.updatePublicAccess(id, isPublic, accessLevel, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Accept collaboration invitation
+     * POST /api/mindmaps/accept-invitation/{token}
+     */
+    @PostMapping("/accept-invitation/{token}")
+    public ResponseEntity<?> acceptInvitation(
+            @PathVariable String token,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} accepting invitation with token: {}", userId, token);
+
+        try {
+            collaborationService.acceptInvitation(token, userId);
+            
+            // Get invitation details to return mindmapId
+            CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
+            Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
+                    .orElseThrow(() -> new MindmapNotFoundException(invitation.getMindmapId(), userId));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Lời mời được chấp nhận thành công. Mindmap đã được thêm vào bộ sưu tập của bạn.");
+            response.put("mindmapId", mindmap.getId());
+            response.put("mindmapTitle", mindmap.getTitle());
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    /**
+     * Reject collaboration invitation
+     * POST /api/mindmaps/reject-invitation/{token}
+     */
+    @PostMapping("/reject-invitation/{token}")
+    public ResponseEntity<MessageResponse> rejectInvitation(
+            @PathVariable String token,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} rejecting invitation with token: {}", userId, token);
+
+        collaborationService.rejectInvitation(token, userId);
+        return ResponseEntity.ok(new MessageResponse("Invitation rejected successfully."));
+    }
+
+    /**
+     * Verify collaboration invitation
+     * GET /api/mindmaps/verify-invitation/{token}
+     */
+    @GetMapping("/verify-invitation/{token}")
+    public ResponseEntity<?> verifyInvitation(@PathVariable String token) {
+        log.info("Verifying invitation with token: {}", token);
+
+        try {
+            CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
+            
+            if (invitation == null || "expired".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has expired."));
+            }
+
+            if ("accepted".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has already been accepted."));
+            }
+
+            if ("rejected".equals(invitation.getStatus())) {
+                return ResponseEntity.status(400).body(new MessageResponse("Invitation has been rejected."));
+            }
+
+            Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
+                    .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found"));
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("mindmapId", mindmap.getId());
+            response.put("mindmapTitle", mindmap.getTitle());
+            response.put("invitedBy", invitation.getInvitedByUserId());
+            response.put("expiresAt", invitation.getExpiresAt());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to verify invitation: {}", e.getMessage());
+            return ResponseEntity.status(400).body(new MessageResponse("Invalid or expired invitation."));
+        }
+    }
+
+    /**
+     * Leave collaboration - collaborator removes themselves from mindmap
+     * POST /api/mindmaps/{id}/leave-collaboration
+     */
+    @PostMapping("/{id}/leave-collaboration")
+    public ResponseEntity<MessageResponse> leaveCollaboration(
+            @PathVariable String id,
+            Authentication authentication) {
+        
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("User {} leaving collaboration on mindmap {}", userId, id);
+        
+        collaborationService.leaveCollaboration(id, userId);
+        return ResponseEntity.ok(new MessageResponse("Bạn đã rời khỏi project thành công."));
+    }
+
+    /**
+     * Get public mindmap by share token (NO AUTH REQUIRED)
+     * GET /api/mindmaps/public/{shareToken}
+     */
+    @PutMapping("/public/{shareToken}")
+    public ResponseEntity<MindmapResponse> updatePublicMindmap(
+            @PathVariable String shareToken,
+            @Valid @RequestBody UpdateMindmapRequest request) {
+        log.info("Updating public mindmap with shareToken: {}", shareToken);
+        MindmapResponse response = mindmapService.updateMindmapByShareToken(shareToken, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/public/{shareToken}")
+    public ResponseEntity<MindmapResponse> getPublicMindmap(
+            @PathVariable String shareToken) {
+        
+        log.info("Getting public mindmap with shareToken: {}", shareToken);
+        
+        MindmapResponse response = mindmapService.getMindmapByShareToken(shareToken);
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Helper method to get user ID from authentication
      */
     private Long getUserIdFromAuth(Authentication authentication) {
+        if (authentication == null) return null;
         String email = authentication.getName();
         User user = userDetailsService.loadUserEntityByEmail(email);
         return user.getId();

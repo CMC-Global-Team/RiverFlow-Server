@@ -76,5 +76,31 @@ public interface MindmapService {
      * Search mindmaps by title or description
      */
     List<MindmapSummaryResponse> searchMindmaps(Long userId, String keyword);
+
+    /**
+     * Nhân bản (duplicate) một mindmap đã có.
+     *
+     * @param originalMapId ID của mindmap gốc
+     * @param userId ID (MySQL) của người dùng (sẽ là owner mới)
+     * @return MindmapResponse của mindmap MỚI đã được nhân bản
+     */
+    MindmapResponse duplicateMindmap(String originalMapId, Long userId);
+
+    /**
+     * Update public access level for a mindmap
+     * @param mindmapId ID của mindmap
+     * @param isPublic Có công khai hay không
+     * @param accessLevel Quyền truy cập: view, edit, private
+     * @param userId ID (MySQL) của người dùng
+     */
+    MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId);
+
+    /**
+     * Get public mindmap by share token (NO AUTH REQUIRED)
+     * @param shareToken Share token của mindmap công khai
+     */
+    MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request);
+
+    MindmapResponse getMindmapByShareToken(String shareToken);
 }
 
