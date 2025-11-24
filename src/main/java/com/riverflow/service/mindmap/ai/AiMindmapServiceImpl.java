@@ -184,7 +184,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         Map<String, Object> agentPlan = extractAgentPlanFromHints(request.getHints());
         if (agentPlan != null) {
-            agentLogs.add("Agent Plan: " + agentPlan.getOrDefault("summary", agentPlan));
+            String planMsg = "Agent Plan: " + agentPlan.getOrDefault("summary", agentPlan);
+            agentLogs.add(planMsg);
+            broadcastAgentLog(mindmap.getId(), planMsg);
         }
         String title = mindmap.getTitle();
         String desc = mindmap.getDescription();
