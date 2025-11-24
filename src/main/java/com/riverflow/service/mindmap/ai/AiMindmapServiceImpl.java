@@ -286,6 +286,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     private String callGemini(Map<String, Object> payload) {
         try {
+            if (!org.springframework.util.StringUtils.hasText(geminiApiKey)) {
+                log.error("Gemini API key missing");
+                throw new com.riverflow.exception.AiUpstreamException(403, "Thiếu GEMINI_API_KEY trên server");
+            }
+            log.info("Gemini call model={}, hasKey={}, keyMask={}", model, true, maskKey(geminiApiKey));
             Map<?, ?> resp = geminiWebClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/v1/models/{model}:generateContent")
@@ -323,6 +328,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             log.error("Gemini call failed: {}", e.getMessage());
             throw new IllegalArgumentException("Không thể gọi AI vào lúc này, vui lòng thử lại.");
         }
+    }
+
+    private String maskKey(String k) {
+        if (k == null || k.isBlank()) return "";
+        int len = k.length();
+        String start = k.substring(0, Math.min(4, len));
+        String end = k.substring(Math.max(len - 4, 0));
+        return start + "***" + end;
     }
 
     private String parseOpenAiError(String body, int status) {
