@@ -258,7 +258,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
             firstLevelCount = Math.max(minFirst, Math.min(maxFirst, firstLevelCount));
 
-            Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels);
+            String sType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
+            Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, sType);
             String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode nodesNode = root.get("nodes");
@@ -282,6 +283,35 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 parentByTempId.put(tempId, parentTempId);
             }
 
+            Map<String, Integer> levelIndex = new HashMap<>();
+            Map<String, Integer> nodeLevel = new HashMap<>();
+            // compute levels
+            for (JsonNode n : nodesNode) {
+                String tempId = textOrNull(n.get("id"));
+                String parentTempId = parentByTempId.get(tempId);
+                int lvl = (parentTempId == null || parentTempId.isBlank()) ? 1 : (nodeLevel.getOrDefault(parentTempId, 1) + 1);
+                nodeLevel.put(tempId, lvl);
+                levelIndex.put(tempId, levelIndex.getOrDefault(parentTempId == null ? "__root__" : parentTempId, 0));
+                levelIndex.put(parentTempId == null ? "__root__" : parentTempId, levelIndex.getOrDefault(parentTempId == null ? "__root__" : parentTempId, 0) + 1);
+            }
+
+            double anchorX = 0.0, anchorY = 0.0;
+            Object posObj = anchorNode.get("position");
+            if (posObj instanceof Map<?,?> m) {
+                Object px = m.get("x");
+                Object py = m.get("y");
+                try {
+                    anchorX = px != null ? Double.parseDouble(String.valueOf(px)) : 0.0;
+                    anchorY = py != null ? Double.parseDouble(String.valueOf(py)) : 0.0;
+                } catch (Exception ignored) { }
+            }
+
+            int topLevelCount = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).count();
+            double baseRadius = 180.0;
+            double angleStep = topLevelCount > 0 ? (2 * Math.PI / topLevelCount) : (Math.PI / 3);
+
+            Random rand = new Random();
+
             for (JsonNode n : nodesNode) {
                 String tempId = textOrNull(n.get("id"));
                 String label = textOrNull(n.get("label"));
@@ -289,9 +319,65 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 idMap.put(tempId, newId);
                 Map<String, Object> data = new HashMap<>();
                 data.put("label", label);
+                // simple diversity
+                String[] shapes = new String[]{"rectangle", "circle", "diamond", "hexagon", "ellipse", "roundedRectangle"};
+                data.put("shape", shapes[rand.nextInt(shapes.length)]);
+                String[] colors = new String[]{"#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"};
+                data.put("color", colors[rand.nextInt(colors.length)]);
                 Map<String, Object> position = new HashMap<>();
-                position.put("x", 0);
-                position.put("y", 0);
+                String parentTempId = parentByTempId.get(tempId);
+                int lvl = nodeLevel.getOrDefault(tempId, 1);
+                if (parentTempId == null || parentTempId.isBlank()) {
+                    int idx = levelIndex.getOrDefault("__root__", 0);
+                    // compute index among top-level by scanning up to tempId
+                    idx = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
+                    if (idx < 0) idx = 0;
+                    double angle = idx * angleStep;
+                    if ("timeline".equalsIgnoreCase(sType)) {
+                        position.put("x", anchorX + (idx + 1) * 220);
+                        position.put("y", anchorY);
+                    } else if ("org".equalsIgnoreCase(sType) || "tree".equalsIgnoreCase(sType)) {
+                        position.put("x", anchorX);
+                        position.put("y", anchorY + (idx + 1) * 140);
+                    } else {
+                        position.put("x", anchorX + baseRadius * Math.cos(angle));
+                        position.put("y", anchorY + baseRadius * Math.sin(angle));
+                    }
+                } else {
+                    String parentNewId = idMap.get(parentTempId);
+                    // default relative layout around parent
+                    double px = anchorX, py = anchorY;
+                    // try get parent rfNode we added
+                    Optional<Map<String, Object>> parentNodeOpt = rfNodes.stream().filter(nn -> String.valueOf(nn.get("id")).equals(parentNewId)).findFirst();
+                    if (parentNodeOpt.isPresent()) {
+                        Object ppos = parentNodeOpt.get().get("position");
+                        if (ppos instanceof Map<?,?> pm) {
+                            Object pxo = pm.get("x");
+                            Object pyo = pm.get("y");
+                            try {
+                                px = pxo != null ? Double.parseDouble(String.valueOf(pxo)) : anchorX;
+                                py = pyo != null ? Double.parseDouble(String.valueOf(pyo)) : anchorY;
+                            } catch (Exception ignored) { }
+                        }
+                    }
+                    int childIdx = (int) parentByTempId.entrySet().stream().filter(e -> Objects.equals(e.getValue(), parentTempId)).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
+                    if (childIdx < 0) childIdx = 0;
+                    double dx = 140 + childIdx * 60;
+                    double dy = ((childIdx % 2 == 0) ? 1 : -1) * (100 + (lvl - 2) * 40);
+                    if ("timeline".equalsIgnoreCase(sType)) {
+                        position.put("x", px + dx);
+                        position.put("y", py + ((childIdx % 2 == 0) ? 80 : -80));
+                    } else if ("org".equalsIgnoreCase(sType) || "tree".equalsIgnoreCase(sType)) {
+                        position.put("x", px + dx);
+                        position.put("y", py + ((childIdx % 2 == 0) ? 0 : 80));
+                    } else if ("fishbone".equalsIgnoreCase(sType)) {
+                        position.put("x", px + dx);
+                        position.put("y", py + ((childIdx % 2 == 0) ? -60 : 60));
+                    } else {
+                        position.put("x", px + dx * Math.cos(childIdx + 1));
+                        position.put("y", py + dy);
+                    }
+                }
                 Map<String, Object> rfNode = new HashMap<>();
                 rfNode.put("id", newId);
                 rfNode.put("type", "default");
@@ -312,6 +398,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     edge.put("source", idMap.get(parentTemp));
                     edge.put("target", idMap.get(childTemp));
                 }
+                edge.put("type", "smoothstep");
+                edge.put("animated", true);
                 rfEdges.add(edge);
             }
 
@@ -557,7 +645,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         return payload;
     }
 
-    private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren, String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels) {
+    private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren, String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels, String structureType) {
         StringBuilder user = new StringBuilder();
         user.append("Mở rộng mindmap cho nhánh: ");
         user.append(anchorLabel != null ? anchorLabel : "ROOT");
@@ -569,6 +657,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (hints != null && !hints.isEmpty()) {
             user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
         }
+        user.append("Kiểu cấu trúc: ").append(structureType).append("\n");
         user.append("Trả JSON: { \"nodes\": [ {\"id\": \"n1\", \"label\": \"...\", \"parentId\": null }, {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\" } ] }\n");
         Map<String, Object> userContent = Map.of(
                 "role", "user",

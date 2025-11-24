@@ -38,6 +38,8 @@ public class OptimizeRequest {
     private Integer levels;
     private Integer firstLevelCount;
     private List<String> tags;
+
+    private String structureType; // mindmap, logic, brace, org, tree, timeline, fishbone
 }
 
 
