@@ -166,6 +166,38 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         String target = request.getTargetType();
+        if ("auto".equalsIgnoreCase(target)) {
+            String title = mindmap.getTitle();
+            String desc = mindmap.getDescription();
+            List<String> labels = mindmap.getNodes().stream()
+                    .map(this::extractLabel)
+                    .filter(StringUtils::hasText)
+                    .limit(50)
+                    .collect(Collectors.toList());
+            Map<String, Object> payload = buildGeminiPayloadForClassifyAction(title, desc, labels, lang, request.getHints());
+            String json = callGemini(payload);
+            JsonNode root = parseJson(json);
+            String decidedTarget = textOrNull(root.get("targetType"));
+            String nodeLabel = textOrNull(root.get("nodeLabel"));
+            String sType = textOrNull(root.get("structureType"));
+            String outLang = textOrNull(root.get("language"));
+            if (StringUtils.hasText(decidedTarget)) {
+                request.setTargetType(decidedTarget);
+            } else {
+                request.setTargetType("structure");
+            }
+            if (StringUtils.hasText(nodeLabel) && !StringUtils.hasText(request.getNodeId())) {
+                String foundId = findNodeIdByLabel(mindmap, nodeLabel);
+                if (StringUtils.hasText(foundId)) request.setNodeId(foundId);
+            }
+            if (StringUtils.hasText(sType) && request.getStructureType() == null) {
+                request.setStructureType(sType);
+            }
+            if (StringUtils.hasText(outLang) && request.getLanguage() == null) {
+                request.setLanguage(outLang);
+            }
+            return optimize(request, userId);
+        }
 
         if ("node".equalsIgnoreCase(target)) {
             if (!StringUtils.hasText(request.getNodeId())) {
@@ -643,6 +675,50 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         payload.put("contents", List.of(userContent));
         payload.put("generationConfig", generationConfig); 
         return payload;
+    }
+
+    private Map<String, Object> buildGeminiPayloadForClassifyAction(String title, String currentDesc, List<String> nodeLabels, String lang, List<String> hints) {
+        StringBuilder user = new StringBuilder();
+        user.append("Bạn là hệ thống phân tích yêu cầu người dùng cho mindmap hiện tại.\n");
+        user.append("Tiêu đề: ").append(title).append("\n");
+        if (StringUtils.hasText(currentDesc)) user.append("Mô tả: ").append(currentDesc).append("\n");
+        if (nodeLabels != null && !nodeLabels.isEmpty()) {
+            user.append("Các node hiện có: ").append(String.join(", ", nodeLabels)).append("\n");
+        }
+        if (hints != null && !hints.isEmpty()) {
+            user.append("Yêu cầu người dùng: ").append(String.join(" \n ", hints)).append("\n");
+        }
+        user.append("Hãy quyết định hành động tốt nhất: \"structure\" để mở rộng cấu trúc (nêu rõ \"structureType\": mindmap|logic|brace|org|tree|timeline|fishbone), \"description\" để tối ưu mô tả, hoặc \"node\" để chỉnh sửa một node (nêu rõ \"nodeLabel\").\n");
+        user.append("Trả JSON đúng định dạng: { \"targetType\": \"structure|description|node\", \"nodeLabel\": \"...\", \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\", \"language\": \"vi|en\" }\n");
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString()))
+        );
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.2);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    private String findNodeIdByLabel(Mindmap mindmap, String nodeLabel) {
+        if (!StringUtils.hasText(nodeLabel)) return null;
+        String targetLower = nodeLabel.trim().toLowerCase();
+        Optional<Map<String, Object>> exact = mindmap.getNodes().stream()
+                .filter(n -> {
+                    String l = extractLabel(n);
+                    return StringUtils.hasText(l) && l.trim().equalsIgnoreCase(nodeLabel.trim());
+                })
+                .findFirst();
+        if (exact.isPresent()) return String.valueOf(exact.get().get("id"));
+        Optional<Map<String, Object>> contains = mindmap.getNodes().stream()
+                .filter(n -> {
+                    String l = extractLabel(n);
+                    return StringUtils.hasText(l) && l.toLowerCase().contains(targetLower);
+                })
+                .findFirst();
+        return contains.map(n -> String.valueOf(n.get("id"))).orElse(null);
     }
 
     private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren, String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels, String structureType) {
