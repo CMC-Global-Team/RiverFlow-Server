@@ -36,7 +36,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final MindmapService mindmapService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${gemini.model:gemini-1.5-flash}")
+    @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
 
     @Value("${gemini.api-key:}")
@@ -368,40 +368,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction); // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generation_config", generationConfig);
-        return payload;
-    }
-
-    private Map<String, Object> buildGeminiPayloadForExpand(String parentLabel, List<String> siblingLabels, int childrenCount, String lang, List<String> hints) {
-        String system = "Bạn là công cụ mở rộng node mindmap. Trả JSON hợp lệ, không có văn bản thừa. Quy tắc: label 1–4 từ; đúng ngữ nghĩa với node cha; không trùng với node anh em.";
-        StringBuilder user = new StringBuilder();
-        user.append("Mở rộng node: '").append(parentLabel).append("' (ngôn ngữ: ").append(lang).append(")\n");
-        user.append("Số con cần tạo: ").append(childrenCount).append(".\n");
-        if (siblingLabels != null && !siblingLabels.isEmpty()) {
-            user.append("Các nhánh đã có: ").append(String.join(", ", siblingLabels)).append("\n");
-        }
-        if (hints != null && !hints.isEmpty()) {
-            user.append("Gợi ý bổ sung: ").append(String.join(", ", hints)).append("\n");
-        }
-        user.append("Trả JSON dạng: { \"children\": [ { \"label\": \"...\" } ] }\n");
-
-        Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
-        Map<String, Object> userContent = Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
-        );
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.6);
-        generationConfig.put("response_mime_type", "application/json");
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction);
-        payload.put("contents", List.of(userContent));
-        payload.put("generation_config", generationConfig);
+        payload.put("generationConfig", generationConfig); 
         return payload;
     }
 
@@ -430,9 +399,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction); // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generation_config", generationConfig);
+        payload.put("generationConfig", generationConfig); 
         return payload;
     }
 
@@ -459,9 +428,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         generationConfig.put("response_mime_type", "application/json");
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction);
+        payload.put("system_instruction", systemInstruction); // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generation_config", generationConfig);
+        payload.put("generationConfig", generationConfig); 
         return payload;
     }
 
