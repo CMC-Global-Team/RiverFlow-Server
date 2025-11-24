@@ -12,6 +12,7 @@ import com.riverflow.exception.mindmap.MindmapAccessDeniedException;
 import com.riverflow.exception.mindmap.MindmapNotFoundException;
 import com.riverflow.model.mindmap.Mindmap;
 import com.riverflow.repository.mindmap.MindmapRepository;
+import com.riverflow.repository.UserRepository;
 import com.riverflow.service.mindmap.MindmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final WebClient geminiWebClient; // configured Gemini client
     private final MindmapRepository mindmapRepository;
     private final MindmapService mindmapService;
+    private final UserRepository userRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${gemini.model:gemini-2.5-flash}")
@@ -59,6 +61,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         int minFirst = "normal".equalsIgnoreCase(mode) ? 3 : 4;
         int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
         int firstLevelCount = Math.max(minFirst, Math.min(maxFirst, reqFirst));
+
+        long cost = "max".equalsIgnoreCase(mode) ? 5L : ("thinking".equalsIgnoreCase(mode) ? 3L : 1L);
+        if (userId != null) {
+            com.riverflow.model.User user = userRepository.findById(userId).orElseThrow();
+            long current = user.getCredit() == null ? 0L : user.getCredit();
+            if (current < cost) {
+                throw new InvalidMindmapDataException("credit", "Không đủ credit");
+            }
+            user.setCredit(current - cost);
+            userRepository.save(user);
+        }
 
         Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
 
@@ -468,6 +481,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             List<Map<String, Object>> rfEdges = new ArrayList<>();
             Map<String, String> idMap = new HashMap<>();
             Map<String, String> parentByTempId = new HashMap<>();
+            long cost = "max".equalsIgnoreCase(mode) ? 5L : ("thinking".equalsIgnoreCase(mode) ? 3L : 1L);
+            if (userId != null) {
+                com.riverflow.model.User user = userRepository.findById(userId).orElseThrow();
+                long current = user.getCredit() == null ? 0L : user.getCredit();
+                if (current < cost) {
+                    throw new InvalidMindmapDataException("credit", "Không đủ credit");
+                }
+                user.setCredit(current - cost);
+                userRepository.save(user);
+            }
+
             if (isReplace) {
                 String topic = (request.getHints() != null && !request.getHints().isEmpty()) ? request.getHints().get(0) : anchorLabel;
                 Map<String, Object> payloadGen = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, null, mode, minFirst, maxFirst);
