@@ -187,6 +187,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String nodeLabel = textOrNull(agentRoot.get("nodeLabel"));
         String sType = textOrNull(agentRoot.get("structureType"));
         String outLang = textOrNull(agentRoot.get("language"));
+        List<Map<String, Object>> agentOps = new ArrayList<>();
+        JsonNode opsNode = agentRoot.get("ops");
+        if (opsNode != null && opsNode.isArray()) {
+            for (JsonNode op : opsNode) {
+                try {
+                    Map<String, Object> m = objectMapper.convertValue(op, Map.class);
+                    agentOps.add(m);
+                } catch (Exception ignored) {}
+            }
+        }
         if (StringUtils.hasText(decidedTarget)) {
             request.setTargetType(decidedTarget);
         } else if (!StringUtils.hasText(request.getTargetType())) {
@@ -205,6 +215,59 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         agentLogs.add("Agent Analyze: target=" + request.getTargetType() + (StringUtils.hasText(request.getNodeId()) ? ", nodeId=" + request.getNodeId() : "") + (StringUtils.hasText(request.getStructureType()) ? ", structureType=" + request.getStructureType() : ""));
         broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
         String target = request.getTargetType();
+        if (!agentOps.isEmpty()) {
+            for (Map<String, Object> op : agentOps) {
+                String type = String.valueOf(op.getOrDefault("type", ""));
+                if (!StringUtils.hasText(type)) continue;
+                if (type.equals("delete_node") || type.equals("delete_subtree")) {
+                    String lbl = String.valueOf(op.getOrDefault("nodeLabel", ""));
+                    String id = findNodeIdByLabel(mindmap, lbl);
+                    if (StringUtils.hasText(id)) {
+                        Set<String> toRemove = new HashSet<>();
+                        toRemove.add(id);
+                        if (type.equals("delete_subtree")) {
+                            Map<String, List<String>> children = new HashMap<>();
+                            for (Map<String, Object> e : mindmap.getEdges()) {
+                                String sId = String.valueOf(e.get("source"));
+                                String tId = String.valueOf(e.get("target"));
+                                children.computeIfAbsent(sId, k -> new ArrayList<>()).add(tId);
+                            }
+                            Deque<String> dq = new ArrayDeque<>();
+                            dq.add(id);
+                            while (!dq.isEmpty()) {
+                                String cur = dq.pollFirst();
+                                List<String> kids = children.getOrDefault(cur, Collections.emptyList());
+                                for (String c : kids) if (toRemove.add(c)) dq.addLast(c);
+                            }
+                        }
+                        mindmap.setNodes(mindmap.getNodes().stream().filter(n -> !toRemove.contains(String.valueOf(n.get("id")))).collect(Collectors.toList()));
+                        mindmap.setEdges(mindmap.getEdges().stream().filter(e -> {
+                            String sId = String.valueOf(e.get("source"));
+                            String tId = String.valueOf(e.get("target"));
+                            return !toRemove.contains(sId) && !toRemove.contains(tId);
+                        }).collect(Collectors.toList()));
+                        agentLogs.add((type.equals("delete_subtree") ? "Pruned subtree of " : "Deleted node ") + lbl);
+                        broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+                    }
+                } else if (type.equals("update_node")) {
+                    String lbl = String.valueOf(op.getOrDefault("nodeLabel", ""));
+                    String newLabel = String.valueOf(op.getOrDefault("newLabel", ""));
+                    String id = findNodeIdByLabel(mindmap, lbl);
+                    if (StringUtils.hasText(id) && StringUtils.hasText(newLabel)) {
+                        for (Map<String, Object> n : mindmap.getNodes()) {
+                            if (id.equals(String.valueOf(n.get("id")))) {
+                                Map<String, Object> data = (Map<String, Object>) n.getOrDefault("data", new HashMap<>());
+                                data.put("label", newLabel);
+                                n.put("data", data);
+                                agentLogs.add("Updated node label: " + lbl + " → " + newLabel);
+                                broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         if ("node".equalsIgnoreCase(target)) {
             if (!StringUtils.hasText(request.getNodeId())) {
@@ -438,7 +501,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
 
             int topLevelCount = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).count();
-            double baseRadius = 300.0;
+            double baseRadius = 900.0;
             double angleStep = topLevelCount > 0 ? (2 * Math.PI / topLevelCount) : (Math.PI / 3);
 
             Random rand = new Random();
@@ -465,11 +528,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     if (idx < 0) idx = 0;
                     double angle = idx * angleStep;
                     if ("timeline".equalsIgnoreCase(structureType)) {
-                        position.put("x", anchorX + (idx + 1) * 220);
+                        position.put("x", anchorX + (idx + 1) * 600);
                         position.put("y", anchorY);
                     } else if ("org".equalsIgnoreCase(structureType) || "tree".equalsIgnoreCase(structureType)) {
                         position.put("x", anchorX);
-                        position.put("y", anchorY + (idx + 1) * 140);
+                        position.put("y", anchorY + (idx + 1) * 420);
                     } else {
                         position.put("x", anchorX + baseRadius * Math.cos(angle));
                         position.put("y", anchorY + baseRadius * Math.sin(angle));
@@ -493,17 +556,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     }
                     int childIdx = (int) parentByTempId.entrySet().stream().filter(e -> Objects.equals(e.getValue(), parentTempId)).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
                     if (childIdx < 0) childIdx = 0;
-                    double dx = 180 + childIdx * 90;
-                    double dy = ((childIdx % 2 == 0) ? 1 : -1) * (140 + (lvl - 2) * 60);
+                    double dx = 360 + childIdx * 180;
+                    double dy = ((childIdx % 2 == 0) ? 1 : -1) * (260 + (lvl - 2) * 120);
                     if ("timeline".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? 120 : -120));
+                        position.put("y", py + ((childIdx % 2 == 0) ? 240 : -240));
                     } else if ("org".equalsIgnoreCase(structureType) || "tree".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? 0 : 120));
+                        position.put("y", py + ((childIdx % 2 == 0) ? 0 : 240));
                     } else if ("fishbone".equalsIgnoreCase(structureType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? -100 : 100));
+                        position.put("y", py + ((childIdx % 2 == 0) ? -220 : 220));
                     } else {
                         position.put("x", px + dx * Math.cos(childIdx + 1));
                         position.put("y", py + dy);
@@ -800,12 +863,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (nodeLabels != null && !nodeLabels.isEmpty()) {
             user.append("Các node hiện có: ").append(String.join(", ", nodeLabels)).append("\n");
         }
+        user.append("Yêu cầu: Hãy xuất một kế hoạch (plan) chi tiết, dùng đúng ID/label node hiện có. Plan là JSON: {\n  \"targetType\": \"structure|description|node\",\n  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n  \"language\": \"vi|en\",\n  \"ops\": [\n    {\"type\": \"delete_node\", \"nodeLabel\": \"...\"},\n    {\"type\": \"delete_subtree\", \"nodeLabel\": \"...\"},\n    {\"type\": \"update_node\", \"nodeLabel\": \"...\", \"newLabel\": \"...\"},\n    {\"type\": \"add_node\", \"parentLabel\": \"...\", \"label\": \"...\"},\n    {\"type\": \"add_edge\", \"sourceLabel\": \"...\", \"targetLabel\": \"...\"}\n  ]\n}\n");
+        user.append("Nếu người dùng nói rõ Thêm/Sửa/Xóa/Cập nhật thì plan phải nêu chính xác node/edge liên quan theo label/ID hiện có. Nếu không chắc, hãy chọn nhánh gốc (ROOT) làm parentLabel.\n");
         if (hints != null && !hints.isEmpty()) {
             user.append("Yêu cầu người dùng: ").append(String.join(" \n ", hints)).append("\n");
         }
         user.append("Nếu người dùng có ưu tiên về cấu trúc/ ngôn ngữ thì hãy ưu tiên theo lựa chọn đó.\n");
-        user.append("Hãy quyết định hành động tốt nhất: \"structure\" để mở rộng cấu trúc (nêu rõ \"structureType\": mindmap|logic|brace|org|tree|timeline|fishbone), \"description\" để tối ưu mô tả, hoặc \"node\" để chỉnh sửa một node (nêu rõ \"nodeLabel\"). Nếu yêu cầu là xóa hãy chọn node và xóa.\n");
-        user.append("Trả JSON đúng định dạng: { \"targetType\": \"structure|description|node\", \"nodeLabel\": \"...\", \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\", \"language\": \"vi|en\" }\n");
+        user.append("Hãy quyết định hành động chính (targetType) và xuất \"ops\" chi tiết như mẫu trên, chỉ trả JSON hợp lệ.\n");
         Map<String, Object> userContent = Map.of(
                 "role", "user",
                 "parts", List.of(Map.of("text", user.toString()))
