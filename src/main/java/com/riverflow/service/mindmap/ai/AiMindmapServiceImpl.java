@@ -76,6 +76,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         Map<String, String> idMap = new HashMap<>();
         // parent relations by tempId
         Map<String, String> parentByTempId = new HashMap<>();
+        // sanitized labels by tempId
+        Map<String, String> labelByTempId = new HashMap<>();
 
         for (JsonNode n : nodesNode) {
             String tempId = textOrNull(n.get("id"));
@@ -84,7 +86,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
                 throw new InvalidMindmapDataException("node", "Thiếu id hoặc label");
             }
-            ensureLabelLength(label);
+            // ensureLabelLength(label);
             parentByTempId.put(tempId, parentTempId);
         }
 
@@ -187,7 +189,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (!StringUtils.hasText(newLabel)) {
                 throw new InvalidMindmapDataException("label", "AI không trả label hợp lệ");
             }
-            ensureLabelLength(newLabel);
+            // ensureLabelLength(newLabel);
             if (siblingLabels.stream().anyMatch(s -> s.equalsIgnoreCase(newLabel))) {
                 throw new InvalidMindmapDataException("label", "Label trùng với nhánh khác");
             }
@@ -229,12 +231,12 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-    private void ensureLabelLength(String label) {
-        int words = Arrays.stream(label.trim().split("\\s+")).filter(s -> !s.isBlank()).toArray().length;
-        if (words < 1 || words > 4) {
-            throw new InvalidMindmapDataException("label", "Độ dài label phải 1–4 từ");
-        }
-    }
+    // private void ensureLabelLength(String label) {
+    //     int words = Arrays.stream(label.trim().split("\\s+")).filter(s -> !s.isBlank()).toArray().length;
+    //     if (words < 1 || words > 4) {
+    //         throw new InvalidMindmapDataException("label", "Độ dài label phải 1–4 từ");
+    //     }
+    // }
 
     private String extractLabel(Map<String, Object> node) {
         Object data = node.get("data");
