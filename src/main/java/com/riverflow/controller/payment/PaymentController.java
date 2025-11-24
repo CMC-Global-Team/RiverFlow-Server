@@ -1,50 +1,41 @@
 package com.riverflow.controller.payment;
 
 import com.riverflow.config.jwt.CustomUserDetailsService;
-import com.riverflow.config.jwt.UserPrincipal;
-import com.riverflow.dto.payment.CreateTopupIntentRequest;
-import com.riverflow.dto.payment.PaymentHistoryResponse;
-import com.riverflow.dto.payment.TopupIntentResponse;
-import com.riverflow.model.payment.CreditTopupRequest;
+import com.riverflow.model.User;
 import com.riverflow.service.payment.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/payments")
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentController {
 
     private final PaymentService paymentService;
     private final CustomUserDetailsService userDetailsService;
 
-    @PostMapping("/topup-intent")
-    public ResponseEntity<TopupIntentResponse> createTopupIntent(@RequestBody CreateTopupIntentRequest request,
-                                                                 Authentication authentication) {
-        Long userId = userDetailsService.loadUserEntityByEmail(authentication.getName()).getId();
-        CreditTopupRequest req = paymentService.createTopupRequest(userId, request.getAmount());
-        String qrUrl = paymentService.buildSepayQrUrl(req.getAmount(), req.getCode());
-        return ResponseEntity.ok(new TopupIntentResponse(req.getCode(), req.getAmount(), qrUrl));
+    @GetMapping("/history")
+    public ResponseEntity<List<Map<String, Object>>> getHistory(Authentication authentication) {
+        Long userId = getUserIdFromAuth(authentication);
+        log.info("Fetching payment history for user: {}", userId);
+        var response = paymentService.getPaymentHistory(userId);
+        return ResponseEntity.ok(response);
     }
 
-    /**
-     * API Lấy lịch sử giao dịch
-     * GET /api/payments/history?page=0&size=10
-     */
-    @GetMapping("/history")
-    public ResponseEntity<Page<PaymentHistoryResponse>> getPaymentHistory(
-            @AuthenticationPrincipal UserPrincipal currentUser,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        Long userId = currentUser.getId();
-
-        Page<PaymentHistoryResponse> history = paymentService.getUserTransactions(userId, page, size);
-
-        return ResponseEntity.ok(history);
+    private Long getUserIdFromAuth(Authentication authentication) {
+        if (authentication == null) return null;
+        String email = authentication.getName();
+        User user = userDetailsService.loadUserEntityByEmail(email);
+        return user.getId();
     }
 }
+
