@@ -356,19 +356,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (tags != null && !tags.isEmpty()) {
             user += "\nGợi ý bổ sung: " + String.join(", ", tags);
         }
-        Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
+        String prompt = system + "\n\n" + user;
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user))
+                "parts", List.of(Map.of("text", prompt))
         );
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        generationConfig.put("response_mime_type", "application/json");
+        
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction); // dùng snake_case!
+        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
         payload.put("generationConfig", generationConfig); 
         return payload;
@@ -396,10 +394,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         );
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        generationConfig.put("response_mime_type", "application/json");
+        
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction); // dùng snake_case!
+        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
         payload.put("generationConfig", generationConfig); 
         return payload;
@@ -425,10 +423,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         );
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        generationConfig.put("response_mime_type", "application/json");
+        
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("system_instruction", systemInstruction); // dùng snake_case!
+        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
         payload.put("generationConfig", generationConfig); 
         return payload;
