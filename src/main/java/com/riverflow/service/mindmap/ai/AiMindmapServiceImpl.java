@@ -209,6 +209,56 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .findFirst()
                     .orElseThrow(() -> new MindmapNotFoundException("Node không tồn tại trong mindmap", userId));
 
+            boolean wantsDelete = false;
+            boolean wantsPruneSubtree = false;
+            if (request.getHints() != null) {
+                for (String h : request.getHints()) {
+                    String t = h == null ? "" : h.toLowerCase();
+                    if (t.matches(".*(xóa|xoá|remove|delete|bỏ|loại bỏ|drop).*")) wantsDelete = true;
+                    if (t.matches(".*(nhánh|branch|subtree|con|hậu duệ).*")) wantsPruneSubtree = true;
+                }
+            }
+
+            if (wantsDelete) {
+                String nodeId = request.getNodeId();
+                Set<String> toRemove = new HashSet<>();
+                toRemove.add(nodeId);
+                if (wantsPruneSubtree) {
+                    // Collect descendants via edges source->target
+                    Map<String, List<String>> children = new HashMap<>();
+                    for (Map<String, Object> e : mindmap.getEdges()) {
+                        String s = String.valueOf(e.get("source"));
+                        String t = String.valueOf(e.get("target"));
+                        children.computeIfAbsent(s, k -> new ArrayList<>()).add(t);
+                    }
+                    Deque<String> dq = new ArrayDeque<>();
+                    dq.add(nodeId);
+                    while (!dq.isEmpty()) {
+                        String cur = dq.pollFirst();
+                        List<String> kids = children.getOrDefault(cur, Collections.emptyList());
+                        for (String c : kids) {
+                            if (toRemove.add(c)) dq.addLast(c);
+                        }
+                    }
+                }
+                List<Map<String, Object>> nextNodes = mindmap.getNodes().stream()
+                        .filter(n -> !toRemove.contains(String.valueOf(n.get("id"))))
+                        .collect(Collectors.toList());
+                List<Map<String, Object>> nextEdges = mindmap.getEdges().stream()
+                        .filter(e -> {
+                            String s = String.valueOf(e.get("source"));
+                            String t = String.valueOf(e.get("target"));
+                            return !toRemove.contains(s) && !toRemove.contains(t);
+                        })
+                        .collect(Collectors.toList());
+
+                UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
+                        .nodes(nextNodes)
+                        .edges(nextEdges)
+                        .build();
+                return mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
+            }
+
             String currentLabel = extractLabel(node);
             // collect sibling labels to avoid duplicates
             List<String> siblingLabels = findSiblingLabels(mindmap, request.getNodeId());
@@ -339,7 +389,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
 
             int topLevelCount = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).count();
-            double baseRadius = 180.0;
+            double baseRadius = 300.0;
             double angleStep = topLevelCount > 0 ? (2 * Math.PI / topLevelCount) : (Math.PI / 3);
 
             Random rand = new Random();
@@ -394,17 +444,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     }
                     int childIdx = (int) parentByTempId.entrySet().stream().filter(e -> Objects.equals(e.getValue(), parentTempId)).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
                     if (childIdx < 0) childIdx = 0;
-                    double dx = 140 + childIdx * 60;
-                    double dy = ((childIdx % 2 == 0) ? 1 : -1) * (100 + (lvl - 2) * 40);
+                    double dx = 180 + childIdx * 90;
+                    double dy = ((childIdx % 2 == 0) ? 1 : -1) * (140 + (lvl - 2) * 60);
                     if ("timeline".equalsIgnoreCase(sType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? 80 : -80));
+                        position.put("y", py + ((childIdx % 2 == 0) ? 120 : -120));
                     } else if ("org".equalsIgnoreCase(sType) || "tree".equalsIgnoreCase(sType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? 0 : 80));
+                        position.put("y", py + ((childIdx % 2 == 0) ? 0 : 120));
                     } else if ("fishbone".equalsIgnoreCase(sType)) {
                         position.put("x", px + dx);
-                        position.put("y", py + ((childIdx % 2 == 0) ? -60 : 60));
+                        position.put("y", py + ((childIdx % 2 == 0) ? -100 : 100));
                     } else {
                         position.put("x", px + dx * Math.cos(childIdx + 1));
                         position.put("y", py + dy);
@@ -688,7 +738,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (hints != null && !hints.isEmpty()) {
             user.append("Yêu cầu người dùng: ").append(String.join(" \n ", hints)).append("\n");
         }
-        user.append("Hãy quyết định hành động tốt nhất: \"structure\" để mở rộng cấu trúc (nêu rõ \"structureType\": mindmap|logic|brace|org|tree|timeline|fishbone), \"description\" để tối ưu mô tả, hoặc \"node\" để chỉnh sửa một node (nêu rõ \"nodeLabel\").\n");
+        user.append("Nếu người dùng có ưu tiên về cấu trúc/ ngôn ngữ thì hãy ưu tiên theo lựa chọn đó.\n");
+        user.append("Hãy quyết định hành động tốt nhất: \"structure\" để mở rộng cấu trúc (nêu rõ \"structureType\": mindmap|logic|brace|org|tree|timeline|fishbone), \"description\" để tối ưu mô tả, hoặc \"node\" để chỉnh sửa một node (nêu rõ \"nodeLabel\"). Nếu yêu cầu là xóa hãy chọn node và xóa.\n");
         user.append("Trả JSON đúng định dạng: { \"targetType\": \"structure|description|node\", \"nodeLabel\": \"...\", \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\", \"language\": \"vi|en\" }\n");
         Map<String, Object> userContent = Map.of(
                 "role", "user",
