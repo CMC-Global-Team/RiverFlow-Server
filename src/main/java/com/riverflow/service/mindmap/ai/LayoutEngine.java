@@ -64,7 +64,7 @@ public class LayoutEngine {
         List<Map<String, Object>> level1 = nodesByLevel.getOrDefault(1, new ArrayList<>());
         int numLevel1 = level1.size();
         double angleStep = 2 * Math.PI / Math.max(numLevel1, 1);
-        int radius = 300;
+        int radius = 400;
 
         for (int i = 0; i < level1.size(); i++) {
             double angle = i * angleStep - Math.PI / 2; // Start from top
@@ -76,7 +76,7 @@ public class LayoutEngine {
         // Layout deeper levels
         for (int level = 2; level <= 5; level++) {
             List<Map<String, Object>> levelNodes = nodesByLevel.getOrDefault(level, new ArrayList<>());
-            layoutChildrenAroundParents(levelNodes, nodes, edges, 200);
+            layoutChildrenAroundParents(levelNodes, nodes, edges, 300);
         }
     }
 
@@ -376,9 +376,9 @@ public class LayoutEngine {
                         baseAngle = Math.atan2(parentY - 400, parentX - 500);
                     }
 
-                    // Distribute children in a fan (e.g., 120 degrees arc)
+                    // Distribute children in a fan (e.g., 160 degrees arc)
                     int count = siblings.size();
-                    double arc = Math.toRadians(120); // 120 degrees coverage
+                    double arc = Math.toRadians(160); // Wider arc for better spread
                     double startAngle = baseAngle - arc / 2;
                     double step = count > 1 ? arc / (count - 1) : 0;
 
@@ -386,10 +386,14 @@ public class LayoutEngine {
                         startAngle = baseAngle;
                     }
 
+                    // Dynamic radius based on level to prevent overlap
+                    // Deeper levels need more space
+                    int dynamicRadius = radius + (count * 10);
+
                     for (int i = 0; i < count; i++) {
                         double angle = startAngle + i * step;
-                        int x = (int) (parentX + radius * Math.cos(angle));
-                        int y = (int) (parentY + radius * Math.sin(angle));
+                        int x = (int) (parentX + dynamicRadius * Math.cos(angle));
+                        int y = (int) (parentY + dynamicRadius * Math.sin(angle));
                         setPosition(siblings.get(i), x, y);
                     }
                 }

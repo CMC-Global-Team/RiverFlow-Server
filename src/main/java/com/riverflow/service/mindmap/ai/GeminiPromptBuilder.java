@@ -199,6 +199,7 @@ public class GeminiPromptBuilder {
                                 .append(")\\\",\\n");
                 user.append("      \\\"parentId\\\": \\\"parent-id or null\\\",\\n");
                 user.append("      \\\"nodeType\\\": \\\"default|input|output|decision|process\\\",\\n");
+                user.append("      \\\"shape\\\": \\\"rectangle|circle|diamond|hexagon|ellipse|roundedRectangle\\\",\\n");
                 user.append("      \\\"color\\\": \\\"#hex-color\\\",\\n");
                 user.append("      \\\"background\\\": \\\"#hex-color\\\",\\n");
                 user.append("      \\\"icon\\\": \\\"emoji\\\"\\n");
@@ -216,8 +217,13 @@ public class GeminiPromptBuilder {
                 user.append("    }\\n");
                 user.append("  ]\\n");
                 user.append("}\\n\\n");
-                user.append("CRITICAL: Every node MUST have description in ").append(language).append("!");
-                user.append(" Vary edge types and handles for diverse connections!");
+                user.append("CRITICAL RULES:\\n");
+                user.append("1. LANGUAGE: ALL titles and descriptions MUST be in ").append(language).append(".\\n");
+                user.append("2. SHAPES: Use diverse shapes (rectangle, circle, diamond, hexagon, ellipse, roundedRectangle).\\n");
+                user.append("3. COLORS: Use vibrant, diverse colors for different branches.\\n");
+                user.append("4. DESCRIPTIONS: Every node MUST have a detailed description in ").append(language)
+                                .append(".\\n");
+                user.append("5. EDGES: Vary edge types and handles for visual interest.\\n");
 
                 Map<String, Object> systemInstruction = Map.of(
                                 "parts", List.of(Map.of("text", system.toString())));
