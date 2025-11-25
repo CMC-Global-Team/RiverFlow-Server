@@ -313,20 +313,23 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String url = "/v1beta/models/" + model + ":streamGenerateContent";
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
-            boolean jsonStarted = false;
+            final boolean[] jsonStarted = { false }; // Use array to make it effectively final
 
             // Send streaming start event
             if (mindmapId != null) {
                 sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
             }
 
-            Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
+            @SuppressWarnings("unchecked")
+            Flux<Map> responseFlux = geminiWebClient.post()
                     .uri(url)
                     .body(BodyInserters.fromValue(payload))
                     .retrieve()
-                    .bodyToFlux((Class<Map>) (Class<?>) Map.class);
+                    .bodyToFlux(Map.class);
 
-            responseFlux.toIterable().forEach(chunk -> {
+            @SuppressWarnings("unchecked")
+            Iterable<Map> iterable = responseFlux.toIterable();
+            iterable.forEach(chunk -> {
                 try {
                     List<?> candidates = (List<?>) chunk.get("candidates");
                     if (candidates != null && !candidates.isEmpty()) {
@@ -341,10 +344,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                     fullText.append(text);
 
                                     // Only send natural language part to client (before JSON)
-                                    if (!jsonStarted) {
+                                    if (!jsonStarted[0]) {
                                         // Check if this chunk starts JSON
                                         if (text.contains("```json") || text.contains("{")) {
-                                            jsonStarted = true;
+                                            jsonStarted[0] = true;
                                             // Send only the part before JSON marker
                                             String beforeJson = extractNaturalLanguage(text);
                                             if (!beforeJson.isEmpty()) {
