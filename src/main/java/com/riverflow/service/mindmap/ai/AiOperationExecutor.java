@@ -170,10 +170,12 @@ public class AiOperationExecutor {
                 // Update colors in style
                 if (StringUtils.hasText(newColor) && !"null".equals(newColor)) {
                     style.put("color", newColor);
+                    data.put("color", newColor);
                 }
 
                 if (StringUtils.hasText(newBackground) && !"null".equals(newBackground)) {
                     style.put("background", newBackground);
+                    data.put("bgColor", newBackground);
                 }
 
                 // Update node type
@@ -259,9 +261,11 @@ public class AiOperationExecutor {
         Map<String, Object> style = new HashMap<>();
         if (StringUtils.hasText(background) && !"null".equals(background)) {
             style.put("background", background);
+            data.put("bgColor", background);
         }
         if (StringUtils.hasText(color) && !"null".equals(color)) {
             style.put("color", color);
+            data.put("color", color);
         }
 
         Map<String, Object> position = new HashMap<>();

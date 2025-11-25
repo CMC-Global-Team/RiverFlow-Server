@@ -142,9 +142,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             Map<String, Object> style = new HashMap<>();
             if (StringUtils.hasText(background)) {
                 style.put("background", background);
+                data.put("bgColor", background); // For frontend custom nodes
             }
             if (StringUtils.hasText(color)) {
                 style.put("color", color);
+                data.put("color", color); // For frontend custom nodes
             }
 
             Map<String, Object> rfNode = new HashMap<>();
@@ -465,14 +467,12 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
             }
 
-            @SuppressWarnings("unchecked")
             Flux<Map> responseFlux = geminiWebClient.post()
                     .uri(url)
                     .body(BodyInserters.fromValue(payload))
                     .retrieve()
                     .bodyToFlux(Map.class);
 
-            @SuppressWarnings("unchecked")
             Iterable<Map> iterable = responseFlux.toIterable();
             iterable.forEach(chunk -> {
                 try {

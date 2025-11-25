@@ -326,10 +326,11 @@ public class LayoutEngine {
 
     private void layoutChildrenAroundParents(List<Map<String, Object>> children,
             List<Map<String, Object>> allNodes, List<Map<String, Object>> edges, int radius) {
+
+        // Group children by parent
+        Map<String, List<Map<String, Object>>> childrenByParent = new HashMap<>();
         for (Map<String, Object> child : children) {
             String childId = String.valueOf(child.get("id"));
-
-            // Find parent
             String parentId = edges.stream()
                     .filter(e -> childId.equals(String.valueOf(e.get("target"))))
                     .map(e -> String.valueOf(e.get("source")))
@@ -337,19 +338,59 @@ public class LayoutEngine {
                     .orElse(null);
 
             if (parentId != null) {
-                Map<String, Object> parent = findNodeById(allNodes, parentId);
-                if (parent != null) {
-                    Map<?, ?> parentPos = (Map<?, ?>) parent.get("position");
-                    if (parentPos != null) {
-                        int parentX = ((Number) parentPos.get("x")).intValue();
-                        int parentY = ((Number) parentPos.get("y")).intValue();
+                childrenByParent.computeIfAbsent(parentId, k -> new ArrayList<>()).add(child);
+            }
+        }
 
-                        // Offset from parent
-                        int offsetAngle = (int) (Math.random() * 360);
-                        int x = (int) (parentX + radius * Math.cos(Math.toRadians(offsetAngle)));
-                        int y = (int) (parentY + radius * Math.sin(Math.toRadians(offsetAngle)));
+        // Layout children for each parent
+        for (Map.Entry<String, List<Map<String, Object>>> entry : childrenByParent.entrySet()) {
+            String parentId = entry.getKey();
+            List<Map<String, Object>> siblings = entry.getValue();
+            Map<String, Object> parent = findNodeById(allNodes, parentId);
 
-                        setPosition(child, x, y);
+            if (parent != null) {
+                Map<?, ?> parentPos = (Map<?, ?>) parent.get("position");
+                if (parentPos != null) {
+                    int parentX = ((Number) parentPos.get("x")).intValue();
+                    int parentY = ((Number) parentPos.get("y")).intValue();
+
+                    // Find grandparent to determine direction
+                    String grandParentId = edges.stream()
+                            .filter(e -> parentId.equals(String.valueOf(e.get("target"))))
+                            .map(e -> String.valueOf(e.get("source")))
+                            .findFirst()
+                            .orElse(null);
+
+                    double baseAngle = 0;
+                    if (grandParentId != null) {
+                        Map<String, Object> grandParent = findNodeById(allNodes, grandParentId);
+                        if (grandParent != null) {
+                            Map<?, ?> gpPos = (Map<?, ?>) grandParent.get("position");
+                            int gpX = ((Number) gpPos.get("x")).intValue();
+                            int gpY = ((Number) gpPos.get("y")).intValue();
+                            baseAngle = Math.atan2(parentY - gpY, parentX - gpX);
+                        }
+                    } else {
+                        // If root (or no grandparent), base angle depends on position relative to
+                        // center
+                        baseAngle = Math.atan2(parentY - 400, parentX - 500);
+                    }
+
+                    // Distribute children in a fan (e.g., 120 degrees arc)
+                    int count = siblings.size();
+                    double arc = Math.toRadians(120); // 120 degrees coverage
+                    double startAngle = baseAngle - arc / 2;
+                    double step = count > 1 ? arc / (count - 1) : 0;
+
+                    if (count == 1) {
+                        startAngle = baseAngle;
+                    }
+
+                    for (int i = 0; i < count; i++) {
+                        double angle = startAngle + i * step;
+                        int x = (int) (parentX + radius * Math.cos(angle));
+                        int y = (int) (parentY + radius * Math.sin(angle));
+                        setPosition(siblings.get(i), x, y);
                     }
                 }
             }

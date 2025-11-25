@@ -99,6 +99,8 @@ public class GeminiPromptBuilder {
                 user.append("    {\\\"type\\\": \\\"delete_node\\\", \\\"nodeLabel\\\": \\\"...\\\"},\\n");
                 user.append("    {\\\"type\\\": \\\"delete_subtree\\\", \\\"nodeLabel\\\": \\\"...\\\"}  // Delete node and all children\\n");
                 user.append("  ]\\n}\\n```\\n");
+                user.append("CRITICAL: When adding nodes, ALWAYS provide a detailed 'description' in ").append(language)
+                                .append(".\\n");
 
                 Map<String, Object> systemInstruction = Map.of(
                                 "parts", List.of(Map.of("text", system.toString())));
