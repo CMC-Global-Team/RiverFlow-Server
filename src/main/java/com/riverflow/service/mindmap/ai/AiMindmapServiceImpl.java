@@ -201,16 +201,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     // === Helper Methods ===
 
     private AiDecision askAiForDecision(Mindmap mindmap, OptimizeRequest request, String lang) {
-        List<String> labels = mindmap.getNodes().stream()
-                .map(this::extractLabel)
-                .filter(StringUtils::hasText)
-                .limit(50)
-                .collect(Collectors.toList());
-
         Map<String, Object> payload = promptBuilder.buildClassifyActionPrompt(
                 mindmap.getTitle(),
                 mindmap.getDescription(),
-                labels,
+                mindmap.getNodes(),
+                mindmap.getEdges(),
                 lang,
                 request.getHints());
 

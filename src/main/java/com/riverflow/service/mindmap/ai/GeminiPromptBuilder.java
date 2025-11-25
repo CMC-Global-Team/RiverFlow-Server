@@ -17,7 +17,8 @@ public class GeminiPromptBuilder {
         public Map<String, Object> buildClassifyActionPrompt(
                         String title,
                         String description,
-                        List<String> nodeLabels,
+                        List<Map<String, Object>> nodes,
+                        List<Map<String, Object>> edges,
                         String language,
                         List<String> hints) {
                 StringBuilder system = new StringBuilder();
@@ -33,8 +34,47 @@ public class GeminiPromptBuilder {
                 if (StringUtils.hasText(description)) {
                         user.append("- Mô tả: ").append(description).append("\\n");
                 }
-                if (nodeLabels != null && !nodeLabels.isEmpty()) {
-                        user.append("- Các node hiện có: ").append(String.join(", ", nodeLabels)).append("\\n");
+
+                // Build comprehensive mindmap structure context
+                if (nodes != null && !nodes.isEmpty()) {
+                        user.append("- Tổng số nodes: ").append(nodes.size()).append("\\n");
+                        user.append("\\nCấu trúc mindmap chi tiết:\\n");
+
+                        // Build parent-child relationship map
+                        Map<String, List<String>> childrenMap = new HashMap<>();
+                        Set<String> allTargets = new HashSet<>();
+
+                        if (edges != null) {
+                                for (Map<String, Object> edge : edges) {
+                                        String source = String.valueOf(edge.get("source"));
+                                        String target = String.valueOf(edge.get("target"));
+                                        childrenMap.computeIfAbsent(source, k -> new ArrayList<>()).add(target);
+                                        allTargets.add(target);
+                                }
+                        }
+
+                        // Find root nodes (nodes with no incoming edges)
+                        List<Map<String, Object>> rootNodes = nodes.stream()
+                                        .filter(n -> !allTargets.contains(String.valueOf(n.get("id"))))
+                                        .toList();
+
+                        // Build node ID to label map
+                        Map<String, String> idToLabel = new HashMap<>();
+                        for (Map<String, Object> node : nodes) {
+                                String id = String.valueOf(node.get("id"));
+                                String label = extractNodeLabel(node);
+                                idToLabel.put(id, label);
+                        }
+
+                        // Display hierarchical structure
+                        for (Map<String, Object> rootNode : rootNodes) {
+                                String rootId = String.valueOf(rootNode.get("id"));
+                                String rootLabel = idToLabel.get(rootId);
+                                user.append("ROOT: ").append(rootLabel).append(" [ID: ").append(rootId).append("]\\n");
+                                buildNodeHierarchy(rootId, childrenMap, idToLabel, user, "  ", 0);
+                        }
+
+                        user.append("\\n");
                 }
                 user.append("\\n");
 
@@ -43,22 +83,22 @@ public class GeminiPromptBuilder {
                         user.append(String.join("\\n", hints)).append("\\n\\n");
                 }
 
-                user.append("Hãy:\n");
+                user.append("Hãy:\\n");
                 user.append("1. QUAN TRỌNG: Giải thích bằng ngôn ngữ tự nhiên (").append(language)
-                                .append(") chi tiết, thân thiện những gì bạn sẽ làm (2-3 câu)\n");
-                user.append("2. Sau đó xuất JSON plan với format:\n");
-                user.append("```json\n{\n");
-                user.append("  \"targetType\": \"structure|description|node\",\n");
-                user.append("  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n");
-                user.append("  \"language\": \"vi|en\",\n");
-                user.append("  \"ops\": [\n");
+                                .append(") chi tiết, thân thiện những gì bạn sẽ làm (2-3 câu)\\n");
+                user.append("2. Sau đó xuất JSON plan với format:\\n");
+                user.append("```json\\n{\\n");
+                user.append("  \\\"targetType\\\": \\\"structure|description|node\\\",\\n");
+                user.append("  \\\"structureType\\\": \\\"mindmap|logic|brace|org|tree|timeline|fishbone\\\",\\n");
+                user.append("  \\\"language\\\": \\\"vi|en\\\",\\n");
+                user.append("  \\\"ops\\\": [\\n");
                 user.append(
-                                "    {\"type\": \"add_node\", \"parentLabel\": \"...\", \"label\": \"...\"},\n");
+                                "    {\\\"type\\\": \\\"add_node\\\", \\\"parentLabel\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\"},\\n");
                 user.append(
-                                "    {\"type\": \"update_node\", \"nodeLabel\": \"...\", \"newLabel\": \"...\"},\n");
-                user.append("    {\"type\": \"delete_node\", \"nodeLabel\": \"...\"},\n");
-                user.append("    {\"type\": \"delete_subtree\", \"nodeLabel\": \"...\"}  // Xóa node và tất cả node con\n");
-                user.append("  ]\n}\n```\n");
+                                "    {\\\"type\\\": \\\"update_node\\\", \\\"nodeLabel\\\": \\\"...\\\", \\\"newLabel\\\": \\\"...\\\"},\\n");
+                user.append("    {\\\"type\\\": \\\"delete_node\\\", \\\"nodeLabel\\\": \\\"...\\\"},\\n");
+                user.append("    {\\\"type\\\": \\\"delete_subtree\\\", \\\"nodeLabel\\\": \\\"...\\\"}  // Xóa node và tất cả node con\\n");
+                user.append("  ]\\n}\\n```\\n");
 
                 Map<String, Object> systemInstruction = Map.of(
                                 "parts", List.of(Map.of("text", system.toString())));
@@ -74,6 +114,37 @@ public class GeminiPromptBuilder {
                 payload.put("contents", List.of(userContent));
                 payload.put("generationConfig", generationConfig);
                 return payload;
+        }
+
+        /**
+         * Build hierarchical display of nodes recursively
+         */
+        private void buildNodeHierarchy(String nodeId, Map<String, List<String>> childrenMap,
+                        Map<String, String> idToLabel, StringBuilder output,
+                        String indent, int depth) {
+                // Limit depth to prevent overwhelming output
+                if (depth > 5)
+                        return;
+
+                List<String> children = childrenMap.getOrDefault(nodeId, new ArrayList<>());
+                for (String childId : children) {
+                        String childLabel = idToLabel.get(childId);
+                        output.append(indent).append("└─ ").append(childLabel)
+                                        .append(" [ID: ").append(childId).append("]\\n");
+                        buildNodeHierarchy(childId, childrenMap, idToLabel, output, indent + "  ", depth + 1);
+                }
+        }
+
+        /**
+         * Extract label from node data
+         */
+        private String extractNodeLabel(Map<String, Object> node) {
+                Object data = node.get("data");
+                if (data instanceof Map<?, ?> m) {
+                        Object label = m.get("label");
+                        return label != null ? String.valueOf(label) : String.valueOf(node.get("id"));
+                }
+                return String.valueOf(node.get("id"));
         }
 
         /**
