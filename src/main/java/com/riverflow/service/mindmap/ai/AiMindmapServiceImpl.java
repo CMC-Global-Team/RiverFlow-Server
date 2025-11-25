@@ -203,6 +203,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String sType = textOrNull(agentRoot.get("structureType"));
         String outLang = textOrNull(agentRoot.get("language"));
         List<Map<String, Object>> agentOps = new ArrayList<>();
+        boolean opsChangedGraph = false;
         JsonNode opsNode = agentRoot.get("ops");
         if (opsNode != null && opsNode.isArray()) {
             for (JsonNode op : opsNode) {
@@ -261,6 +262,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                             String tId = String.valueOf(e.get("target"));
                             return !toRemove.contains(sId) && !toRemove.contains(tId);
                         }).collect(Collectors.toList()));
+                        opsChangedGraph = true;
                         agentLogs.add((type.equals("delete_subtree") ? "Pruned subtree of " : "Deleted node ") + lbl);
                         broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
                     }
@@ -274,10 +276,67 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                 Map<String, Object> data = (Map<String, Object>) n.getOrDefault("data", new HashMap<>());
                                 data.put("label", newLabel);
                                 n.put("data", data);
+                                opsChangedGraph = true;
                                 agentLogs.add("Updated node label: " + lbl + " → " + newLabel);
                                 broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
                                 break;
                             }
+                        }
+                    }
+                } else if (type.equals("add_node")) {
+                    String parentLabel = String.valueOf(op.getOrDefault("parentLabel", ""));
+                    String label = String.valueOf(op.getOrDefault("label", ""));
+                    if (StringUtils.hasText(label)) {
+                        String parentId = StringUtils.hasText(parentLabel) ? findNodeIdByLabel(mindmap, parentLabel) : null;
+                        if (!StringUtils.hasText(parentId)) {
+                            Set<String> targets = mindmap.getEdges().stream().map(e -> String.valueOf(e.get("target"))).collect(Collectors.toSet());
+                            Optional<Map<String, Object>> rootNodeOpt = mindmap.getNodes().stream().filter(n -> !targets.contains(String.valueOf(n.get("id")))).findFirst();
+                            if (rootNodeOpt.isPresent()) parentId = String.valueOf(rootNodeOpt.get().get("id"));
+                            else if (!mindmap.getNodes().isEmpty()) parentId = String.valueOf(mindmap.getNodes().get(0).get("id"));
+                        }
+                        String newId = newNodeId();
+                        Map<String, Object> data = new HashMap<>();
+                        data.put("label", label);
+                        Map<String, Object> position = new HashMap<>();
+                        position.put("x", 0);
+                        position.put("y", 0);
+                        Map<String, Object> rfNode = new HashMap<>();
+                        rfNode.put("id", newId);
+                        rfNode.put("type", "default");
+                        rfNode.put("data", data);
+                        rfNode.put("position", position);
+                        mindmap.getNodes().add(rfNode);
+                        if (StringUtils.hasText(parentId)) {
+                            Map<String, Object> edge = new HashMap<>();
+                            edge.put("id", newEdgeId());
+                            edge.put("source", parentId);
+                            edge.put("target", newId);
+                            edge.put("type", "smoothstep");
+                            edge.put("animated", true);
+                            mindmap.getEdges().add(edge);
+                        }
+                        opsChangedGraph = true;
+                        agentLogs.add("Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : ""));
+                        broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
+                    }
+                } else if (type.equals("add_edge")) {
+                    String sourceLabel = String.valueOf(op.getOrDefault("sourceLabel", ""));
+                    String targetLabel = String.valueOf(op.getOrDefault("targetLabel", ""));
+                    String sId = findNodeIdByLabel(mindmap, sourceLabel);
+                    String tId = findNodeIdByLabel(mindmap, targetLabel);
+                    if (StringUtils.hasText(sId) && StringUtils.hasText(tId)) {
+                        boolean exists = mindmap.getEdges().stream().anyMatch(e -> Objects.equals(String.valueOf(e.get("source")), sId) && Objects.equals(String.valueOf(e.get("target")), tId));
+                        if (!exists) {
+                            Map<String, Object> edge = new HashMap<>();
+                            edge.put("id", newEdgeId());
+                            edge.put("source", sId);
+                            edge.put("target", tId);
+                            edge.put("type", "smoothstep");
+                            edge.put("animated", true);
+                            mindmap.getEdges().add(edge);
+                            opsChangedGraph = true;
+                            agentLogs.add("Added edge: " + sourceLabel + " → " + targetLabel);
+                            broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
                         }
                     }
                 }
@@ -397,9 +456,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 throw new InvalidMindmapDataException("description", "AI không trả description hợp lệ");
             }
 
-            UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
-                    .description(newDesc)
-                    .build();
+            UpdateMindmapRequest.UpdateMindmapRequestBuilder builder = UpdateMindmapRequest.builder().description(newDesc);
+            if (opsChangedGraph) {
+                builder.nodes(mindmap.getNodes()).edges(mindmap.getEdges());
+            }
+            UpdateMindmapRequest updateReq = builder.build();
             MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
             agentLogs.add("Updated description");
             appendAgentLogs(updated, agentLogs);
