@@ -43,20 +43,22 @@ public class GeminiPromptBuilder {
             user.append(String.join("\\n", hints)).append("\\n\\n");
         }
 
-        user.append("Hãy:\\n");
-        user.append("1. Giải thích ngắn gọn (1-2 câu) bạn sẽ làm gì\\n");
-        user.append("2. Sau đó xuất JSON plan với format:\\n");
-        user.append("```json\\n{\\n");
-        user.append("  \\\"targetType\\\": \\\"structure|description|node\\\",\\n");
-        user.append("  \\\"structureType\\\": \\\"mindmap|logic|brace|org|tree|timeline|fishbone\\\",\\n");
-        user.append("  \\\"language\\\": \\\"vi|en\\\",\\n");
-        user.append("  \\\"ops\\\": [\\n");
+        user.append("Hãy:\n");
+        user.append("1. QUAN TRỌNG: Giải thích bằng ngôn ngữ tự nhiên (").append(language)
+                .append(") chi tiết, thân thiện những gì bạn sẽ làm (2-3 câu)\n");
+        user.append("2. Sau đó xuất JSON plan với format:\n");
+        user.append("```json\n{\n");
+        user.append("  \"targetType\": \"structure|description|node\",\n");
+        user.append("  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n");
+        user.append("  \"language\": \"vi|en\",\n");
+        user.append("  \"ops\": [\n");
         user.append(
-                "    {\\\"type\\\": \\\"add_node\\\", \\\"parentLabel\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\"},\\n");
+                "    {\"type\": \"add_node\", \"parentLabel\": \"...\", \"label\": \"...\"},\n");
         user.append(
-                "    {\\\"type\\\": \\\"update_node\\\", \\\"nodeLabel\\\": \\\"...\\\", \\\"newLabel\\\": \\\"...\\\"},\\n");
-        user.append("    {\\\"type\\\": \\\"delete_node\\\", \\\"nodeLabel\\\": \\\"...\\\"}\\n");
-        user.append("  ]\\n}\\n```\\n");
+                "    {\"type\": \"update_node\", \"nodeLabel\": \"...\", \"newLabel\": \"...\"},\n");
+        user.append("    {\"type\": \"delete_node\", \"nodeLabel\": \"...\"},\n");
+        user.append("    {\"type\": \"delete_subtree\", \"nodeLabel\": \"...\"}  // Xóa node và tất cả node con\n");
+        user.append("  ]\n}\n```\n");
 
         Map<String, Object> systemInstruction = Map.of(
                 "parts", List.of(Map.of("text", system.toString())));

@@ -168,17 +168,21 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         validatePermissions(mindmap, userId);
 
-        // 2. Ask Gemini AI to analyze and plan operations
+        // 2. Deduct credits based on mode
+        String mode = determineMode(request.getMode());
+        deductCredits(userId, mode);
+
+        // 3. Ask Gemini AI to analyze and plan operations
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         AiDecision decision = askAiForDecision(mindmap, request, lang);
 
-        // 3. Execute AI-decided operations
+        // 4. Execute AI-decided operations
         List<String> logs = new ArrayList<>();
         if (decision.hasOps()) {
             logs.addAll(operationExecutor.executeOperations(decision.ops(), mindmap));
         }
 
-        // 4. Save changes
+        // 5. Save changes
         UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                 .nodes(mindmap.getNodes())
                 .edges(mindmap.getEdges())
