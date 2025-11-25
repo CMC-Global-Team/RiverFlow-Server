@@ -394,23 +394,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     /**
-     * Call Gemini without streaming (for backward compatibility)
-     */
-    private String callGemini(Map<String, Object> payload) {
-        try {
-            String url = "/v1beta/models/" + model + ":generateContent";
-            Map<?, ?> response = geminiWebClient.post()
-                    .uri(url)
-                    .body(BodyInserters.fromValue(payload))
-                    .retrieve()
-                    .bodyToMono(Map.class)
-                    .block();
-
-            if (response == null) {
-                throw new RuntimeException("Gemini API returned null");
-            }
-                    
-
             List<?> candidates = (List<?>) response.get("candidates");
             if (candidates == null || candidates.isEmpty()) {
                 throw new RuntimeException("No candidates in Gemini response");
