@@ -314,16 +314,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
             boolean jsonStarted = false;
-            
+
             // Send streaming start event
             if (mindmapId != null) {
                 sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
             }
 
             Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
-             
 
-                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
+                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
             responseFlux.toIterable().forEach(chunk -> {
                 try {
@@ -338,7 +338,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                 String text = String.valueOf(part.get("text"));
                                 if (text != null && !"null".equals(text)) {
                                     fullText.append(text);
-                                    
+
                                     // Only send natural language part to client (before JSON)
                                     if (!jsonStarted) {
                                         // Check if this chunk starts JSON
@@ -349,16 +349,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                             if (!beforeJson.isEmpty()) {
                                                 naturalLanguagePart.append(beforeJson);
                                                 if (mindmapId != null) {
-                                                    sendRealtimeEvent(mindmapId, "ai:stream:chunk", 
-                                                        Map.of("chunk", beforeJson, "done", false));
+                                                    sendRealtimeEvent(mindmapId, "ai:stream:chunk",
+                                                            Map.of("chunk", beforeJson, "done", false));
                                                 }
                                             }
                                         } else {
                                             // This is pure natural language, send it
                                             naturalLanguagePart.append(text);
                                             if (mindmapId != null) {
-                                                sendRealtimeEvent(mindmapId, "ai:stream:chunk", 
-                                                    Map.of("chunk", text, "done", false));
+                                                sendRealtimeEvent(mindmapId, "ai:stream:chunk",
+                                                        Map.of("chunk", text, "done", false));
                                             }
                                         }
                                     }
@@ -378,16 +378,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 if (naturalLangFinal.isEmpty()) {
                     naturalLangFinal = extractNaturalLanguage(fullText.toString());
                 }
-                sendRealtimeEvent(mindmapId, "ai:stream:done", 
-                    Map.of("fullText", naturalLangFinal));
+                sendRealtimeEvent(mindmapId, "ai:stream:done",
+                        Map.of("fullText", naturalLangFinal));
             }
 
             return fullText.toString();
         } catch (Exception e) {
             log.error("Gemini streaming API error: {}", e.getMessage());
             if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:stream:error", 
-                    Map.of("error", e.getMessage()));
+                sendRealtimeEvent(mindmapId, "ai:stream:error",
+                        Map.of("error", e.getMessage()));
             }
             throw new RuntimeException("AI service failed: " + e.getMessage());
         }
@@ -409,7 +409,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (response == null) {
                 throw new RuntimeException("Gemini API returned null");
             }
-                    
 
             List<?> candidates = (List<?>) response.get("candidates");
             if (candidates == null || candidates.isEmpty()) {
