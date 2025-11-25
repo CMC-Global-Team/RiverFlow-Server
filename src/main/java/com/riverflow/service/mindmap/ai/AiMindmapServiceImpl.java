@@ -324,7 +324,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .uri(url)
                     .body(BodyInserters.fromValue(payload))
                     .retrieve()
-                    .bodyToFlux(Map.class);
+                    .bodyToFlux((Class<Map>) (Class<?>) Map.class);
 
             responseFlux.toIterable().forEach(chunk -> {
                 try {
