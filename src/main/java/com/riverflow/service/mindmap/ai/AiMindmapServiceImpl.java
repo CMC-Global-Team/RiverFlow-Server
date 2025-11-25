@@ -23,6 +23,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -204,8 +210,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 lang,
                 request.getHints());
 
-        String json = callGemini(payload);
-        return responseParser.parseClassifyResponse(promptBuilder.ensureJson(json));
+        // Use streaming to send AI's natural language response to client
+        String response = callGeminiStream(payload, String.valueOf(mindmap.getId()));
+        return responseParser.parseClassifyResponse(promptBuilder.ensureJson(response));
     }
 
     private void validatePermissions(Mindmap mindmap, Long userId) {
@@ -239,6 +246,107 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         userRepository.save(user);
     }
 
+    /**
+     * Send realtime event to WebSocket server
+     */
+    private void sendRealtimeEvent(String mindmapId, String event, Map<String, Object> data) {
+        if (realtimeServerUrl == null || realtimeServerUrl.isBlank()) {
+            log.warn("Realtime server URL not configured, skipping event: {}", event);
+            return;
+        }
+        try {
+            String room = "mindmap:" + mindmapId;
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("room", room);
+            payload.put("event", event);
+            payload.put("data", data != null ? data : Map.of());
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(realtimeServerUrl + "/realtime/mindmap/event"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+                    .thenAccept(resp -> {
+                        if (resp.statusCode() >= 400) {
+                            log.warn("Failed to send realtime event {}: status={}", event, resp.statusCode());
+                        }
+                    })
+                    .exceptionally(ex -> {
+                        log.warn("Error sending realtime event {}: {}", event, ex.getMessage());
+                        return null;
+                    });
+        } catch (Exception e) {
+            log.warn("Error preparing realtime event {}: {}", event, e.getMessage());
+        }
+    }
+
+    /**
+     * Call Gemini with streaming support
+     */
+    private String callGeminiStream(Map<String, Object> payload, String mindmapId) {
+        try {
+            String url = "/v1beta/models/" + model + ":streamGenerateContent";
+            StringBuilder fullText = new StringBuilder();
+
+            if (mindmapId != null) {
+                sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
+            }
+
+            Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
+                    .uri(url)
+                    .body(BodyInserters.fromValue(payload))
+                    .retrieve()
+                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
+
+            responseFlux.toIterable().forEach(chunk -> {
+                try {
+                    List<?> candidates = (List<?>) chunk.get("candidates");
+                    if (candidates != null && !candidates.isEmpty()) {
+                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                        if (content != null) {
+                            List<?> parts = (List<?>) content.get("parts");
+                            if (parts != null && !parts.isEmpty()) {
+                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                                String text = String.valueOf(part.get("text"));
+                                if (text != null && !"null".equals(text)) {
+                                    fullText.append(text);
+                                    // Send each chunk to realtime server
+                                    if (mindmapId != null) {
+                                        sendRealtimeEvent(mindmapId, "ai:stream:chunk",
+                                                Map.of("chunk", text, "done", false));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Error processing stream chunk: {}", e.getMessage());
+                }
+            });
+
+            // Send streaming done event
+            if (mindmapId != null) {
+                sendRealtimeEvent(mindmapId, "ai:stream:done", Map.of("fullText", fullText.toString()));
+            }
+
+            return fullText.toString();
+        } catch (Exception e) {
+            log.error("Gemini streaming API error: {}", e.getMessage());
+            if (mindmapId != null) {
+                sendRealtimeEvent(mindmapId, "ai:stream:error",
+                        Map.of("error", e.getMessage()));
+            }
+            throw new RuntimeException("AI service failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Call Gemini without streaming (for backward compatibility)
+     */
     private String callGemini(Map<String, Object> payload) {
         try {
             String url = "/v1beta/models/" + model + ":generateContent";
