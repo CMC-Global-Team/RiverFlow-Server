@@ -284,67 +284,29 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     /**
-     * Call Gemini with streaming support
+     * Extract natural language part (before JSON block)
      */
-    private String callGeminiStream(Map<String, Object> payload, String mindmapId) {
-        try {
-            String url = "/v1beta/models/" + model + ":streamGenerateContent";
-            StringBuilder fullText = new StringBuilder();
+    private String extractNaturalLanguage(String text) {
+        if (text == null)
+            return "";
 
-            if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
-            }
-
-            Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
-                    .uri(url)
-                    .body(BodyInserters.fromValue(payload))
-                    .retrieve()
-                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
-
-            responseFlux.toIterable().forEach(chunk -> {
-                try {
-                    List<?> candidates = (List<?>) chunk.get("candidates");
-                    if (candidates != null && !candidates.isEmpty()) {
-                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
-                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
-                        if (content != null) {
-                            List<?> parts = (List<?>) content.get("parts");
-                            if (parts != null && !parts.isEmpty()) {
-                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
-                                String text = String.valueOf(part.get("text"));
-                                if (text != null && !"null".equals(text)) {
-                                    fullText.append(text);
-                                    // Send each chunk to realtime server
-                                    if (mindmapId != null) {
-                                        sendRealtimeEvent(mindmapId, "ai:stream:chunk",
-                                                Map.of("chunk", text, "done", false));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (Exception e) {
-                    log.warn("Error processing stream chunk: {}", e.getMessage());
-                }
-            });
-
-            // Send streaming done event
-            if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:stream:done", Map.of("fullText", fullText.toString()));
-            }
-
-            return fullText.toString();
-        } catch (Exception e) {
-            log.error("Gemini streaming API error: {}", e.getMessage());
-            if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:stream:error",
-                        Map.of("error", e.getMessage()));
-            }
-            throw new RuntimeException("AI service failed: " + e.getMessage());
+        // Find the start of JSON block
+        int jsonStart = text.indexOf("```json");
+        if (jsonStart < 0) {
+            jsonStart = text.indexOf('{');
         }
+
+        if (jsonStart > 0) {
+            // Return everything before the JSON
+            return text.substring(0, jsonStart).trim();
+        }
+
+        // If no JSON found, return the whole text
+        return text.trim();
     }
 
     /**
+     * Call Gemini with streaming support
      * Call Gemini without streaming (for backward compatibility)
      */
     private String callGemini(Map<String, Object> payload) {
@@ -360,6 +322,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (response == null) {
                 throw new RuntimeException("Gemini API returned null");
             }
+                    
 
             List<?> candidates = (List<?>) response.get("candidates");
             if (candidates == null || candidates.isEmpty()) {
