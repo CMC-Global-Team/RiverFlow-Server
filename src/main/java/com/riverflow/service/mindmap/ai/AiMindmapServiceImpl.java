@@ -167,7 +167,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
 
         log.info("[AI Optimize] Loaded mindmap: id={}, title={}, nodes={}, edges={}",
-                mindmap.getId(), mindmap.getTitle(), 
+                mindmap.getId(), mindmap.getTitle(),
                 mindmap.getNodes() != null ? mindmap.getNodes().size() : 0,
                 mindmap.getEdges() != null ? mindmap.getEdges().size() : 0);
 
@@ -180,13 +180,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         // 3. Ask Gemini AI to analyze and plan operations
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         log.info("[AI Optimize] User hints: {}", request.getHints());
-        
+
         AiDecision decision = askAiForDecision(mindmap, request, lang);
-        
+
         log.info("[AI Optimize] AI Decision: targetType={}, hasOps={}, opsCount={}",
-                decision.targetType(), decision.hasOps(), 
+                decision.targetType(), decision.hasOps(),
                 decision.hasOps() ? decision.ops().size() : 0);
-        
+
         if (decision.hasOps()) {
             log.info("[AI Optimize] Operations to execute:");
             for (Map<String, Object> op : decision.ops()) {
@@ -205,7 +205,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         // 5. Save changes
         log.info("[AI Optimize] Saving changes: nodes={}, edges={}",
                 mindmap.getNodes().size(), mindmap.getEdges().size());
-        
+
         UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                 .nodes(mindmap.getNodes())
                 .edges(mindmap.getEdges())
@@ -213,11 +213,24 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
 
+        // Verify the changes persisted by reloading from database
+        Mindmap reloaded = mindmapRepository.findById(mindmap.getId()).orElse(null);
+        if (reloaded != null) {
+            log.info("[AI Verify] Reloaded mindmap from DB: nodes={}, edges={}",
+                    reloaded.getNodes().size(), reloaded.getEdges().size());
+            // Log all node labels to verify updates
+            for (Map<String, Object> node : reloaded.getNodes()) {
+                String label = extractLabel(node);
+                String id = String.valueOf(node.get("id"));
+                log.info("[AI Verify] Node: id='{}', label='{}'", id, label);
+            }
+        }
+
         // Log what AI did
         for (String logMsg : logs) {
             log.info("[AI Action] {}", logMsg);
         }
-        
+
         log.info("[AI Optimize] Completed successfully");
 
         return updated;
@@ -229,7 +242,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         log.info("[AI Decision] Building prompt for mindmap with {} nodes and {} edges",
                 mindmap.getNodes() != null ? mindmap.getNodes().size() : 0,
                 mindmap.getEdges() != null ? mindmap.getEdges().size() : 0);
-        
+
         Map<String, Object> payload = promptBuilder.buildClassifyActionPrompt(
                 mindmap.getTitle(),
                 mindmap.getDescription(),
@@ -240,15 +253,15 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         // Use streaming to send AI's natural language response to client
         String response = callGeminiStream(payload, String.valueOf(mindmap.getId()));
-        
+
         log.info("[AI Decision] Raw AI response length: {} chars", response != null ? response.length() : 0);
-        
+
         String jsonResponse = promptBuilder.ensureJson(response);
         log.info("[AI Decision] Extracted JSON: {}", jsonResponse);
-        
+
         AiDecision decision = responseParser.parseClassifyResponse(jsonResponse);
         log.info("[AI Decision] Parsed decision successfully");
-        
+
         return decision;
     }
 

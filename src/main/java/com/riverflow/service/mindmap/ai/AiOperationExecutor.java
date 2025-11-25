@@ -52,9 +52,18 @@ public class AiOperationExecutor {
         String nodeLabel = String.valueOf(op.getOrDefault("nodeLabel", ""));
         String nodeId = findNodeIdByLabel(mindmap, nodeLabel);
 
+        log.info("[Delete Node] Attempting to delete node '{}'", nodeLabel);
+
         if (!StringUtils.hasText(nodeId)) {
+            log.warn("[Delete Node] Node not found: {}", nodeLabel);
             return "Node not found: " + nodeLabel;
         }
+
+        int beforeNodes = mindmap.getNodes().size();
+        int beforeEdges = mindmap.getEdges().size();
+
+        log.info("[Delete Node] Found node to delete: id='{}', label='{}'", nodeId, nodeLabel);
+        log.info("[Delete Node] Before deletion: nodes={}, edges={}", beforeNodes, beforeEdges);
 
         mindmap.setNodes(mindmap.getNodes().stream()
                 .filter(n -> !nodeId.equals(String.valueOf(n.get("id"))))
@@ -65,7 +74,15 @@ public class AiOperationExecutor {
                         && !nodeId.equals(String.valueOf(e.get("target"))))
                 .collect(Collectors.toList()));
 
-        return "Deleted node: " + nodeLabel;
+        int afterNodes = mindmap.getNodes().size();
+        int afterEdges = mindmap.getEdges().size();
+
+        log.info("[Delete Node] After deletion: nodes={}, edges={}", afterNodes, afterEdges);
+        log.info("[Delete Node] Deleted {} nodes and {} edges", beforeNodes - afterNodes, beforeEdges - afterEdges);
+
+        String result = "Deleted node: " + nodeLabel;
+        log.info("[Delete Node] Success: {}", result);
+        return result;
     }
 
     private String deleteSubtree(Map<String, Object> op, Mindmap mindmap) {
@@ -121,14 +138,23 @@ public class AiOperationExecutor {
             return "Failed to update node: " + oldLabel;
         }
 
+        boolean updated = false;
         for (Map<String, Object> node : mindmap.getNodes()) {
             if (nodeId.equals(String.valueOf(node.get("id")))) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) node.getOrDefault("data", new HashMap<>());
                 data.put("label", newLabel);
                 node.put("data", data);
-                return "Updated node label: " + oldLabel + " → " + newLabel;
+                updated = true;
+                break;
             }
+        }
+
+        if (updated) {
+            // Force MongoDB change detection by creating new ArrayList
+            mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
+            log.info("[Update Node] Forced change detection for mindmap nodes");
+            return "Updated node label: " + oldLabel + " → " + newLabel;
         }
 
         return "Node not found: " + oldLabel;
@@ -172,6 +198,8 @@ public class AiOperationExecutor {
         newNode.put("position", position);
 
         mindmap.getNodes().add(newNode);
+        // Force MongoDB change detection by creating new ArrayList
+        mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
         log.info("[Add Node] Created new node: id='{}', label='{}'", newId, label);
 
         if (StringUtils.hasText(parentId)) {
@@ -182,9 +210,12 @@ public class AiOperationExecutor {
             edge.put("type", "smoothstep");
             edge.put("animated", true);
             mindmap.getEdges().add(edge);
+            // Force MongoDB change detection by creating new ArrayList
+            mindmap.setEdges(new ArrayList<>(mindmap.getEdges()));
             log.info("[Add Node] Created edge from '{}' to '{}'", parentId, newId);
         }
 
+        log.info("[Add Node] Forced change detection for mindmap nodes and edges");
         String result = "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
         log.info("[Add Node] Success: {}", result);
         return result;
@@ -216,6 +247,9 @@ public class AiOperationExecutor {
         edge.put("type", "smoothstep");
         edge.put("animated", true);
         mindmap.getEdges().add(edge);
+        // Force MongoDB change detection by creating new ArrayList
+        mindmap.setEdges(new ArrayList<>(mindmap.getEdges()));
+        log.info("[Add Edge] Forced change detection for mindmap edges");
 
         return "Added edge: " + sourceLabel + " → " + targetLabel;
     }
