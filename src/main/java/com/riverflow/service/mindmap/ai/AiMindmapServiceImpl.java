@@ -307,6 +307,93 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     /**
      * Call Gemini with streaming support
+     */
+    private String callGeminiStream(Map<String, Object> payload, String mindmapId) {
+        try {
+            String url = "/v1beta/models/" + model + ":streamGenerateContent";
+            StringBuilder fullText = new StringBuilder();
+            StringBuilder naturalLanguagePart = new StringBuilder();
+            boolean jsonStarted = false;
+            
+            // Send streaming start event
+            if (mindmapId != null) {
+                sendRealtimeEvent(mindmapId, "ai:stream:start", Map.of());
+            }
+
+            Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
+             
+
+                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
+
+            responseFlux.toIterable().forEach(chunk -> {
+                try {
+                    List<?> candidates = (List<?>) chunk.get("candidates");
+                    if (candidates != null && !candidates.isEmpty()) {
+                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                        if (content != null) {
+                            List<?> parts = (List<?>) content.get("parts");
+                            if (parts != null && !parts.isEmpty()) {
+                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                                String text = String.valueOf(part.get("text"));
+                                if (text != null && !"null".equals(text)) {
+                                    fullText.append(text);
+                                    
+                                    // Only send natural language part to client (before JSON)
+                                    if (!jsonStarted) {
+                                        // Check if this chunk starts JSON
+                                        if (text.contains("```json") || text.contains("{")) {
+                                            jsonStarted = true;
+                                            // Send only the part before JSON marker
+                                            String beforeJson = extractNaturalLanguage(text);
+                                            if (!beforeJson.isEmpty()) {
+                                                naturalLanguagePart.append(beforeJson);
+                                                if (mindmapId != null) {
+                                                    sendRealtimeEvent(mindmapId, "ai:stream:chunk", 
+                                                        Map.of("chunk", beforeJson, "done", false));
+                                                }
+                                            }
+                                        } else {
+                                            // This is pure natural language, send it
+                                            naturalLanguagePart.append(text);
+                                            if (mindmapId != null) {
+                                                sendRealtimeEvent(mindmapId, "ai:stream:chunk", 
+                                                    Map.of("chunk", text, "done", false));
+                                            }
+                                        }
+                                    }
+                                    // If JSON already started, don't send those chunks
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Error processing stream chunk: {}", e.getMessage());
+                }
+            });
+
+            // Send streaming done event with natural language summary
+            if (mindmapId != null) {
+                String naturalLangFinal = naturalLanguagePart.toString().trim();
+                if (naturalLangFinal.isEmpty()) {
+                    naturalLangFinal = extractNaturalLanguage(fullText.toString());
+                }
+                sendRealtimeEvent(mindmapId, "ai:stream:done", 
+                    Map.of("fullText", naturalLangFinal));
+            }
+
+            return fullText.toString();
+        } catch (Exception e) {
+            log.error("Gemini streaming API error: {}", e.getMessage());
+            if (mindmapId != null) {
+                sendRealtimeEvent(mindmapId, "ai:stream:error", 
+                    Map.of("error", e.getMessage()));
+            }
+            throw new RuntimeException("AI service failed: " + e.getMessage());
+        }
+    }
+
+    /**
      * Call Gemini without streaming (for backward compatibility)
      */
     private String callGemini(Map<String, Object> payload) {
