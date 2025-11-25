@@ -159,21 +159,82 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
 
         // Third pass: create edges
-        for (Map.Entry<String, String> entry : parentByTempId.entrySet()) {
-            String childTemp = entry.getKey();
-            String parentTemp = entry.getValue();
+        // Check if AI provided edges directly
+        JsonNode edgesNode = root.get("edges");
+        if (edgesNode != null && edgesNode.isArray() && edgesNode.size() > 0) {
+            // AI provided edges - use them
+            for (JsonNode e : edgesNode) {
+                String sourceTemp = textOrNull(e.get("source"));
+                String targetTemp = textOrNull(e.get("target"));
 
-            if (!StringUtils.hasText(parentTemp) || !idMap.containsKey(parentTemp) || !idMap.containsKey(childTemp)) {
-                continue;
+                if (!StringUtils.hasText(sourceTemp) || !StringUtils.hasText(targetTemp) ||
+                        !idMap.containsKey(sourceTemp) || !idMap.containsKey(targetTemp)) {
+                    continue;
+                }
+
+                String edgeType = textOrNull(e.get("type"));
+                String sourceHandle = textOrNull(e.get("sourceHandle"));
+                String targetHandle = textOrNull(e.get("targetHandle"));
+                String markerEnd = textOrNull(e.get("markerEnd"));
+                String label = textOrNull(e.get("label"));
+                JsonNode animatedNode = e.get("animated");
+
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", "edge-" + UUID.randomUUID());
+                edge.put("source", idMap.get(sourceTemp));
+                edge.put("target", idMap.get(targetTemp));
+                edge.put("type", StringUtils.hasText(edgeType) ? edgeType : "smoothstep");
+                edge.put("animated",
+                        animatedNode != null && animatedNode.isBoolean() ? animatedNode.asBoolean() : true);
+
+                if (StringUtils.hasText(sourceHandle))
+                    edge.put("sourceHandle", sourceHandle);
+                if (StringUtils.hasText(targetHandle))
+                    edge.put("targetHandle", targetHandle);
+                if (StringUtils.hasText(markerEnd)) {
+                    edge.put("markerEnd", Map.of("type", markerEnd));
+                }
+                if (StringUtils.hasText(label))
+                    edge.put("label", label);
+
+                rfEdges.add(edge);
             }
+        } else {
+            // AI didn't provide edges - build from parentId relationships with variety
+            String[] edgeTypes = { "smoothstep", "step", "straight", "bezier" };
+            String[] handles = { "a", "b", "c", "d" };
+            int typeIndex = 0;
 
-            Map<String, Object> edge = new HashMap<>();
-            edge.put("id", "edge-" + UUID.randomUUID());
-            edge.put("source", idMap.get(parentTemp));
-            edge.put("target", idMap.get(childTemp));
-            edge.put("type", "smoothstep");
-            edge.put("animated", true);
-            rfEdges.add(edge);
+            for (Map.Entry<String, String> entry : parentByTempId.entrySet()) {
+                String childTemp = entry.getKey();
+                String parentTemp = entry.getValue();
+
+                if (!StringUtils.hasText(parentTemp) || !idMap.containsKey(parentTemp)
+                        || !idMap.containsKey(childTemp)) {
+                    continue;
+                }
+
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", "edge-" + UUID.randomUUID());
+                edge.put("source", idMap.get(parentTemp));
+                edge.put("target", idMap.get(childTemp));
+                edge.put("type", edgeTypes[typeIndex % edgeTypes.length]);
+                edge.put("animated", typeIndex % 2 == 0);
+
+                // Vary handles for diversity
+                if (typeIndex % 3 == 0) {
+                    edge.put("sourceHandle", handles[(typeIndex / 2) % handles.length]);
+                    edge.put("targetHandle", handles[(typeIndex / 3) % handles.length]);
+                }
+
+                // Add markers occasionally
+                if (typeIndex % 4 == 0) {
+                    edge.put("markerEnd", Map.of("type", "arrowclosed"));
+                }
+
+                rfEdges.add(edge);
+                typeIndex++;
+            }
         }
 
         // Apply layout based on structure type

@@ -93,11 +93,11 @@ public class GeminiPromptBuilder {
                 user.append("  \\\"language\\\": \\\"vi|en\\\",\\n");
                 user.append("  \\\"ops\\\": [\\n");
                 user.append(
-                                "    {\\\"type\\\": \\\"add_node\\\", \\\"parentLabel\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\"},\\n");
+                                "    {\\\"type\\\": \\\"add_node\\\", \\\"parentLabel\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"description\\\": \\\"...\\\", \\\"color\\\": \\\"#...\\\", \\\"background\\\": \\\"#...\\\", \\\"icon\\\": \\\"emoji\\\"},\\n");
                 user.append(
-                                "    {\\\"type\\\": \\\"update_node\\\", \\\"nodeLabel\\\": \\\"...\\\", \\\"newLabel\\\": \\\"...\\\"},\\n");
+                                "    {\\\"type\\\": \\\"update_node\\\", \\\"nodeLabel\\\": \\\"...\\\", \\\"newLabel\\\": \\\"...\\\", \\\"newDescription\\\": \\\"...\\\", \\\"newColor\\\": \\\"#...\\\", \\\"newBackground\\\": \\\"#...\\\", \\\"newNodeType\\\": \\\"...\\\", \\\"newIcon\\\": \\\"...\\\"},\\n");
                 user.append("    {\\\"type\\\": \\\"delete_node\\\", \\\"nodeLabel\\\": \\\"...\\\"},\\n");
-                user.append("    {\\\"type\\\": \\\"delete_subtree\\\", \\\"nodeLabel\\\": \\\"...\\\"}  // Xóa node và tất cả node con\\n");
+                user.append("    {\\\"type\\\": \\\"delete_subtree\\\", \\\"nodeLabel\\\": \\\"...\\\"}  // Delete node and all children\\n");
                 user.append("  ]\\n}\\n```\\n");
 
                 Map<String, Object> systemInstruction = Map.of(
@@ -161,43 +161,61 @@ public class GeminiPromptBuilder {
                         int maxFirst,
                         String structureType) {
                 StringBuilder system = new StringBuilder();
-                system.append("Bạn là công cụ tạo mindmap. JSON ONLY, không text thừa. Quy tắc:\\n");
+                system.append("You are a mindmap generator. JSON ONLY, no extra text. Rules:\\n");
+                system.append("- LANGUAGE: ALL content (labels, descriptions) MUST be in ").append(language)
+                                .append("\\n");
                 system.append("- Structure type: ").append(structureType).append("\\n");
-                system.append("- Tiêu đề node rõ ràng, 1-4 từ\\n");
+                system.append("- Node titles: clear, 1-4 words in ").append(language).append("\\n");
                 system.append("- FirstLevel: ").append(firstLevelCount)
-                                .append(" nhánh, PHẢI có parentId=null hoặc rỗng\\n");
-                system.append("- Tổng phụ node/nhánh tối đa ").append(levels).append(" cấp, không quá sâu.\\n");
-                system.append("- Đa dạng nội dung, tránh lặp\\n");
-                system.append("- Node properties: Thêm nodeType, style (colors, background), description, metadata\\n");
+                                .append(" branches, MUST have parentId=null or empty\\n");
+                system.append("- Max depth: ").append(levels).append(" levels\\n");
+                system.append("- Diverse content, avoid repetition\\n");
+                system.append("- Node properties: nodeType, colors, background, description, icons\\n");
+                system.append("- Edge properties: type, animated, sourceHandle, targetHandle, markerEnd\\n");
                 system.append(buildStructureGuidance(structureType));
-                system.append("- JSON chuẩn, không markdown```");
+                system.append("- Pure JSON output, no markdown```");
 
                 StringBuilder user = new StringBuilder();
-                user.append("Chủ đề: ").append(topic).append("\\n");
-                user.append("Ngôn ngữ: ").append(language).append("\\n");
+                user.append("Topic: ").append(topic).append("\\n");
+                user.append("Language: ").append(language)
+                                .append(" (REQUIRED - all content must be in this language)\\n");
                 user.append("Structure: ").append(structureType).append("\\n");
-                user.append("Số cấp: ").append(levels).append("\\n");
-                user.append("Số nhánh chính: ").append(firstLevelCount).append("\\n");
+                user.append("Levels: ").append(levels).append("\\n");
+                user.append("First level count: ").append(firstLevelCount).append("\\n");
                 if (tags != null && !tags.isEmpty()) {
                         user.append("Tags: ").append(String.join(", ", tags)).append("\\n");
                 }
                 user.append("Mode: ").append(mode).append("\\n\\n");
-                user.append("Tạo mindmap chi tiết với properties phong phú:\\n");
-                user.append("JSON format: {\\n");
+                user.append("Create detailed mindmap with rich properties:\\n");
+                user.append("JSON format:\\n");
+                user.append("{\\n");
                 user.append("  \\\"nodes\\\": [\\n");
                 user.append("    {\\n");
                 user.append("      \\\"id\\\": \\\"unique-id\\\",\\n");
-                user.append("      \\\"label\\\": \\\"Node title (ngắn gọn)\\\",\\n");
-                user.append("      \\\"description\\\": \\\"Chi tiết mô tả node (1-2 câu)\\\",\\n");
+                user.append("      \\\"label\\\": \\\"Node title (concise, in ").append(language).append(")\\\",\\n");
+                user.append("      \\\"description\\\": \\\"Detailed description (1-2 sentences, in ").append(language)
+                                .append(")\\\",\\n");
                 user.append("      \\\"parentId\\\": \\\"parent-id or null\\\",\\n");
                 user.append("      \\\"nodeType\\\": \\\"default|input|output|decision|process\\\",\\n");
-                user.append("      \\\"color\\\": \\\"#hex-color (optional)\\\",\\n");
-                user.append("      \\\"background\\\": \\\"#hex-color (optional)\\\",\\n");
-                user.append("      \\\"icon\\\": \\\"emoji or icon name (optional)\\\"\\n");
+                user.append("      \\\"color\\\": \\\"#hex-color\\\",\\n");
+                user.append("      \\\"background\\\": \\\"#hex-color\\\",\\n");
+                user.append("      \\\"icon\\\": \\\"emoji\\\"\\n");
+                user.append("    }\\n");
+                user.append("  ],\\n");
+                user.append("  \\\"edges\\\": [\\n");
+                user.append("    {\\n");
+                user.append("      \\\"source\\\": \\\"parent-id\\\",\\n");
+                user.append("      \\\"target\\\": \\\"child-id\\\",\\n");
+                user.append("      \\\"type\\\": \\\"smoothstep|step|straight|bezier (vary types)\\\",\\n");
+                user.append("      \\\"animated\\\": true,\\n");
+                user.append("      \\\"sourceHandle\\\": \\\"a|b|c|d (optional, varies)\\\",\\n");
+                user.append("      \\\"targetHandle\\\": \\\"a|b|c|d (optional, varies)\\\",\\n");
+                user.append("      \\\"markerEnd\\\": \\\"arrow|arrowclosed (optional)\\\"\\n");
                 user.append("    }\\n");
                 user.append("  ]\\n");
-                user.append("}\\n");
-                user.append("\\nLƯU Ý: MỌI node đều PHẢI có description chi tiết và phù hợp!");
+                user.append("}\\n\\n");
+                user.append("CRITICAL: Every node MUST have description in ").append(language).append("!");
+                user.append(" Vary edge types and handles for diverse connections!");
 
                 Map<String, Object> systemInstruction = Map.of(
                                 "parts", List.of(Map.of("text", system.toString())));

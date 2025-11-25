@@ -132,10 +132,16 @@ public class AiOperationExecutor {
     private String updateNode(Map<String, Object> op, Mindmap mindmap) {
         String oldLabel = String.valueOf(op.getOrDefault("nodeLabel", ""));
         String newLabel = String.valueOf(op.getOrDefault("newLabel", ""));
+        String newDescription = String.valueOf(op.getOrDefault("newDescription", ""));
+        String newNodeType = String.valueOf(op.getOrDefault("newNodeType", ""));
+        String newColor = String.valueOf(op.getOrDefault("newColor", ""));
+        String newBackground = String.valueOf(op.getOrDefault("newBackground", ""));
+        String newIcon = String.valueOf(op.getOrDefault("newIcon", ""));
+
         String nodeId = findNodeIdByLabel(mindmap, oldLabel);
 
-        if (!StringUtils.hasText(nodeId) || !StringUtils.hasText(newLabel)) {
-            return "Failed to update node: " + oldLabel;
+        if (!StringUtils.hasText(nodeId)) {
+            return "Failed to update node: " + oldLabel + " not found";
         }
 
         boolean updated = false;
@@ -143,8 +149,43 @@ public class AiOperationExecutor {
             if (nodeId.equals(String.valueOf(node.get("id")))) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> data = (Map<String, Object>) node.getOrDefault("data", new HashMap<>());
-                data.put("label", newLabel);
+                @SuppressWarnings("unchecked")
+                Map<String, Object> style = (Map<String, Object>) node.getOrDefault("style", new HashMap<>());
+
+                // Update label
+                if (StringUtils.hasText(newLabel) && !"null".equals(newLabel)) {
+                    data.put("label", newLabel);
+                }
+
+                // Update description
+                if (StringUtils.hasText(newDescription) && !"null".equals(newDescription)) {
+                    data.put("description", newDescription);
+                }
+
+                // Update icon
+                if (StringUtils.hasText(newIcon) && !"null".equals(newIcon)) {
+                    data.put("icon", newIcon);
+                }
+
+                // Update colors in style
+                if (StringUtils.hasText(newColor) && !"null".equals(newColor)) {
+                    style.put("color", newColor);
+                }
+
+                if (StringUtils.hasText(newBackground) && !"null".equals(newBackground)) {
+                    style.put("background", newBackground);
+                }
+
+                // Update node type
+                if (StringUtils.hasText(newNodeType) && !"null".equals(newNodeType)) {
+                    node.put("type", newNodeType);
+                }
+
                 node.put("data", data);
+                if (!style.isEmpty()) {
+                    node.put("style", style);
+                }
+
                 updated = true;
                 break;
             }
@@ -154,7 +195,22 @@ public class AiOperationExecutor {
             // Force MongoDB change detection by creating new ArrayList
             mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
             log.info("[Update Node] Forced change detection for mindmap nodes");
-            return "Updated node label: " + oldLabel + " → " + newLabel;
+
+            List<String> changes = new ArrayList<>();
+            if (StringUtils.hasText(newLabel) && !"null".equals(newLabel))
+                changes.add("label→" + newLabel);
+            if (StringUtils.hasText(newDescription) && !"null".equals(newDescription))
+                changes.add("description");
+            if (StringUtils.hasText(newColor) && !"null".equals(newColor))
+                changes.add("color→" + newColor);
+            if (StringUtils.hasText(newBackground) && !"null".equals(newBackground))
+                changes.add("background→" + newBackground);
+            if (StringUtils.hasText(newNodeType) && !"null".equals(newNodeType))
+                changes.add("type→" + newNodeType);
+            if (StringUtils.hasText(newIcon) && !"null".equals(newIcon))
+                changes.add("icon→" + newIcon);
+
+            return "Updated node '" + oldLabel + "': " + String.join(", ", changes);
         }
 
         return "Node not found: " + oldLabel;
