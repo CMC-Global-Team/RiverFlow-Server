@@ -45,38 +45,87 @@ public class LayoutEngine {
     }
 
     /**
-     * Mindmap style: Radial layout around center
+     * Mindmap style: Weighted Radial Layout (Collision-free)
      */
     private void layoutMindmapStyle(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
-        Map<String, Integer> levels = buildLevelMap(nodes, edges);
-        Map<Integer, List<Map<String, Object>>> nodesByLevel = groupNodesByLevel(nodes, levels);
-
-        // Find root
         String rootId = findRootNode(nodes, edges);
-        if (rootId != null) {
-            Map<String, Object> root = findNodeById(nodes, rootId);
-            if (root != null) {
-                setPosition(root, 500, 400); // Center position
+        if (rootId == null) return;
+
+        // 1. Calculate subtree weights (leaf counts)
+        Map<String, Integer> subtreeWeights = new HashMap<>();
+        calculateSubtreeWeights(rootId, edges, subtreeWeights);
+
+        // 2. Set Root Position at (0,0) temporarily
+        Map<String, Object> root = findNodeById(nodes, rootId);
+        if (root != null) {
+            setPosition(root, 0, 0);
+        }
+
+        // 3. Recursive Radial Layout
+        // Start with full circle (0 to 2*PI)
+        layoutRadialRecursive(rootId, nodes, edges, subtreeWeights, 0, 2 * Math.PI, 0);
+
+        // 4. Offset nodes to center (500, 400)
+        offsetNodes(nodes, 500, 400);
+    }
+
+    private int calculateSubtreeWeights(String nodeId, List<Map<String, Object>> edges, Map<String, Integer> weights) {
+        List<String> children = findChildren(nodeId, edges);
+        if (children.isEmpty()) {
+            weights.put(nodeId, 1);
+            return 1;
+        }
+        int weight = 0;
+        for (String childId : children) {
+            weight += calculateSubtreeWeights(childId, edges, weights);
+        }
+        weights.put(nodeId, weight);
+        return weight;
+    }
+
+    private void layoutRadialRecursive(String parentId, List<Map<String, Object>> nodes, List<Map<String, Object>> edges,
+                                       Map<String, Integer> weights, double startAngle, double endAngle, int depth) {
+        List<String> children = findChildren(parentId, edges);
+        if (children.isEmpty()) return;
+
+        int totalWeight = weights.get(parentId);
+        double currentAngle = startAngle;
+        double totalSector = endAngle - startAngle;
+
+        // Dynamic radius: Increase slightly as we go deeper to allow more space
+        int radius = (depth + 1) * LEVEL_SPACING;
+
+        for (String childId : children) {
+            int childWeight = weights.get(childId);
+
+            // Allocate sector based on subtree weight
+            double childSector = (double) childWeight / totalWeight * totalSector;
+
+            // Place child in the middle of its sector
+            double midAngle = currentAngle + childSector / 2;
+
+            int x = (int) (radius * Math.cos(midAngle));
+            int y = (int) (radius * Math.sin(midAngle));
+
+            Map<String, Object> childNode = findNodeById(nodes, childId);
+            setPosition(childNode, x, y);
+
+            // Recurse for grandchildren within the child's sector
+            layoutRadialRecursive(childId, nodes, edges, weights, currentAngle, currentAngle + childSector, depth + 1);
+
+            currentAngle += childSector;
+        }
+    }
+
+    private void offsetNodes(List<Map<String, Object>> nodes, int dx, int dy) {
+        for (Map<String, Object> node : nodes) {
+            Map<String, Object> pos = (Map<String, Object>) node.get("position");
+            if (pos != null) {
+                int x = (int) pos.get("x");
+                int y = (int) pos.get("y");
+                pos.put("x", x + dx);
+                pos.put("y", y + dy);
             }
-        }
-
-        // Layout level 1 nodes in circle around root
-        List<Map<String, Object>> level1 = nodesByLevel.getOrDefault(1, new ArrayList<>());
-        int numLevel1 = level1.size();
-        double angleStep = 2 * Math.PI / Math.max(numLevel1, 1);
-        int radius = 400;
-
-        for (int i = 0; i < level1.size(); i++) {
-            double angle = i * angleStep - Math.PI / 2; // Start from top
-            int x = (int) (500 + radius * Math.cos(angle));
-            int y = (int) (400 + radius * Math.sin(angle));
-            setPosition(level1.get(i), x, y);
-        }
-
-        // Layout deeper levels
-        for (int level = 2; level <= 5; level++) {
-            List<Map<String, Object>> levelNodes = nodesByLevel.getOrDefault(level, new ArrayList<>());
-            layoutChildrenAroundParents(levelNodes, nodes, edges, 300);
         }
     }
 

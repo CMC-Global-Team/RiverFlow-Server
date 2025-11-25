@@ -157,9 +157,20 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 data.put("color", color); // For frontend custom nodes
             }
 
+            // Client supported shapes
+            Set<String> supportedShapes = Set.of("rectangle", "circle", "diamond", "hexagon", "ellipse", "roundedRectangle");
+
+            // Determine final node type (shape)
+            String finalType = "rectangle"; // Default
+            if (StringUtils.hasText(shape) && supportedShapes.contains(shape)) {
+                finalType = shape;
+            } else if (StringUtils.hasText(nodeType) && supportedShapes.contains(nodeType)) {
+                finalType = nodeType;
+            }
+
             Map<String, Object> rfNode = new HashMap<>();
             rfNode.put("id", newId);
-            rfNode.put("type", StringUtils.hasText(nodeType) ? nodeType : "default");
+            rfNode.put("type", finalType);
             rfNode.put("data", data);
             if (!style.isEmpty()) {
                 rfNode.put("style", style);

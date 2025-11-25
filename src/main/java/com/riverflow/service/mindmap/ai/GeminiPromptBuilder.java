@@ -58,20 +58,20 @@ public class GeminiPromptBuilder {
                                         .filter(n -> !allTargets.contains(String.valueOf(n.get("id"))))
                                         .toList();
 
-                        // Build node ID to label map
-                        Map<String, String> idToLabel = new HashMap<>();
+                        // Build node ID to Node map for detailed context
+                        Map<String, Map<String, Object>> idToNode = new HashMap<>();
                         for (Map<String, Object> node : nodes) {
                                 String id = String.valueOf(node.get("id"));
-                                String label = extractNodeLabel(node);
-                                idToLabel.put(id, label);
+                                idToNode.put(id, node);
                         }
 
-                        // Display hierarchical structure
+                        // Display hierarchical structure with properties
                         for (Map<String, Object> rootNode : rootNodes) {
                                 String rootId = String.valueOf(rootNode.get("id"));
-                                String rootLabel = idToLabel.get(rootId);
-                                user.append("ROOT: ").append(rootLabel).append(" [ID: ").append(rootId).append("]\\n");
-                                buildNodeHierarchy(rootId, childrenMap, idToLabel, user, "  ", 0);
+                                String rootLabel = extractNodeLabel(rootNode);
+                                String props = extractNodeProperties(rootNode);
+                                user.append("ROOT: ").append(rootLabel).append(" [ID: ").append(rootId).append("] ").append(props).append("\\n");
+                                buildNodeHierarchy(rootId, childrenMap, idToNode, user, "  ", 0);
                         }
 
                         user.append("\\n");
@@ -122,7 +122,7 @@ public class GeminiPromptBuilder {
          * Build hierarchical display of nodes recursively
          */
         private void buildNodeHierarchy(String nodeId, Map<String, List<String>> childrenMap,
-                        Map<String, String> idToLabel, StringBuilder output,
+                        Map<String, Map<String, Object>> idToNode, StringBuilder output,
                         String indent, int depth) {
                 // Limit depth to prevent overwhelming output
                 if (depth > 5)
@@ -130,10 +130,16 @@ public class GeminiPromptBuilder {
 
                 List<String> children = childrenMap.getOrDefault(nodeId, new ArrayList<>());
                 for (String childId : children) {
-                        String childLabel = idToLabel.get(childId);
+                        Map<String, Object> childNode = idToNode.get(childId);
+                        if (childNode == null) continue;
+
+                        String childLabel = extractNodeLabel(childNode);
+                        String props = extractNodeProperties(childNode);
+
                         output.append(indent).append("└─ ").append(childLabel)
-                                        .append(" [ID: ").append(childId).append("]\\n");
-                        buildNodeHierarchy(childId, childrenMap, idToLabel, output, indent + "  ", depth + 1);
+                                        .append(" [ID: ").append(childId).append("] ")
+                                        .append(props).append("\\n");
+                        buildNodeHierarchy(childId, childrenMap, idToNode, output, indent + "  ", depth + 1);
                 }
         }
 
@@ -147,6 +153,32 @@ public class GeminiPromptBuilder {
                         return label != null ? String.valueOf(label) : String.valueOf(node.get("id"));
                 }
                 return String.valueOf(node.get("id"));
+        }
+
+        /**
+         * Extract visual properties for context
+         */
+        private String extractNodeProperties(Map<String, Object> node) {
+                StringBuilder props = new StringBuilder("{");
+                Object type = node.get("type");
+                if (type != null) props.append("type:").append(type).append(", ");
+                
+                Object data = node.get("data");
+                if (data instanceof Map<?, ?> m) {
+                        if (m.containsKey("shape")) props.append("shape:").append(m.get("shape")).append(", ");
+                        if (m.containsKey("color")) props.append("color:").append(m.get("color")).append(", ");
+                        if (m.containsKey("bgColor")) props.append("bg:").append(m.get("bgColor")).append(", ");
+                }
+                
+                Object style = node.get("style");
+                if (style instanceof Map<?, ?> m) {
+                         if (m.containsKey("background")) props.append("bg:").append(m.get("background")).append(", ");
+                         if (m.containsKey("color")) props.append("color:").append(m.get("color")).append(", ");
+                }
+                
+                if (props.length() > 1) props.setLength(props.length() - 2); // remove last comma
+                props.append("}");
+                return props.toString();
         }
 
         /**
