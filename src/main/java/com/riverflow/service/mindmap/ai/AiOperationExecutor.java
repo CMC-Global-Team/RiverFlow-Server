@@ -138,7 +138,10 @@ public class AiOperationExecutor {
         String parentLabel = String.valueOf(op.getOrDefault("parentLabel", ""));
         String label = String.valueOf(op.getOrDefault("label", ""));
 
+        log.info("[Add Node] Attempting to add node '{}' under parent '{}'", label, parentLabel);
+
         if (!StringUtils.hasText(label)) {
+            log.warn("[Add Node] Failed: empty label");
             return "Failed to add node: empty label";
         }
 
@@ -147,7 +150,10 @@ public class AiOperationExecutor {
                 : findRootNodeId(mindmap);
 
         if (!StringUtils.hasText(parentId)) {
+            log.warn("[Add Node] Parent '{}' not found, using root", parentLabel);
             parentId = findRootNodeId(mindmap);
+        } else {
+            log.info("[Add Node] Found parent: label='{}', id='{}'", parentLabel, parentId);
         }
 
         String newId = NEW_NODE_PREFIX + UUID.randomUUID();
@@ -166,6 +172,7 @@ public class AiOperationExecutor {
         newNode.put("position", position);
 
         mindmap.getNodes().add(newNode);
+        log.info("[Add Node] Created new node: id='{}', label='{}'", newId, label);
 
         if (StringUtils.hasText(parentId)) {
             Map<String, Object> edge = new HashMap<>();
@@ -175,9 +182,12 @@ public class AiOperationExecutor {
             edge.put("type", "smoothstep");
             edge.put("animated", true);
             mindmap.getEdges().add(edge);
+            log.info("[Add Node] Created edge from '{}' to '{}'", parentId, newId);
         }
 
-        return "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
+        String result = "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
+        log.info("[Add Node] Success: {}", result);
+        return result;
     }
 
     private String addEdge(Map<String, Object> op, Mindmap mindmap) {
@@ -211,10 +221,20 @@ public class AiOperationExecutor {
     }
 
     private String findNodeIdByLabel(Mindmap mindmap, String nodeLabel) {
-        if (!StringUtils.hasText(nodeLabel))
+        if (!StringUtils.hasText(nodeLabel)) {
+            log.warn("[Find Node] Empty node label provided");
             return null;
+        }
 
         String targetLower = nodeLabel.trim().toLowerCase();
+
+        // Log all available nodes for debugging
+        log.info("[Find Node] Searching for '{}' among {} nodes:", nodeLabel, mindmap.getNodes().size());
+        for (Map<String, Object> n : mindmap.getNodes()) {
+            String label = extractLabel(n);
+            String id = String.valueOf(n.get("id"));
+            log.info("  - Node: id='{}', label='{}'", id, label);
+        }
 
         // Exact match first
         Optional<Map<String, Object>> exact = mindmap.getNodes().stream()
@@ -225,7 +245,10 @@ public class AiOperationExecutor {
                 .findFirst();
 
         if (exact.isPresent()) {
-            return String.valueOf(exact.get().get("id"));
+            String foundId = String.valueOf(exact.get().get("id"));
+            String foundLabel = extractLabel(exact.get());
+            log.info("[Find Node] Exact match found: '{}' -> id='{}'", foundLabel, foundId);
+            return foundId;
         }
 
         // Contains match
@@ -236,7 +259,15 @@ public class AiOperationExecutor {
                 })
                 .findFirst();
 
-        return contains.map(n -> String.valueOf(n.get("id"))).orElse(null);
+        if (contains.isPresent()) {
+            String foundId = String.valueOf(contains.get().get("id"));
+            String foundLabel = extractLabel(contains.get());
+            log.info("[Find Node] Contains match found: '{}' contains '{}' -> id='{}'", foundLabel, nodeLabel, foundId);
+            return foundId;
+        }
+
+        log.warn("[Find Node] No match found for '{}'", nodeLabel);
+        return null;
     }
 
     private String findRootNodeId(Mindmap mindmap) {
