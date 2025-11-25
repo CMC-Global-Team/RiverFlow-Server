@@ -53,7 +53,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String title = StringUtils.hasText(request.getTitle()) ? request.getTitle().trim() : topic;
         int levels = request.getLevels() != null ? request.getLevels() : 2;
         String reqMode = request.getMode();
-        String mode = (reqMode == null || reqMode.isBlank() || "default".equalsIgnoreCase(reqMode)) ? "normal" : reqMode;
+        String mode = (reqMode == null || reqMode.isBlank() || "default".equalsIgnoreCase(reqMode)) ? "normal"
+                : reqMode;
         int defaultFirst = "normal".equalsIgnoreCase(mode) ? 4 : 5;
         int reqFirst = request.getFirstLevelCount() != null ? request.getFirstLevelCount() : defaultFirst;
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
@@ -73,7 +74,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             userRepository.save(user);
         }
 
-        Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
+        Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang,
+                request.getTags(), mode, minFirst, maxFirst);
 
         String json = callGemini(payload);
         JsonNode root = parseJson(json);
@@ -111,7 +113,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .filter(e -> e.getValue() == null || e.getValue().isBlank())
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
-        if (roots.isEmpty()) throw new InvalidMindmapDataException("root", "Không có root node");
+        if (roots.isEmpty())
+            throw new InvalidMindmapDataException("root", "Không có root node");
         String rootTempId = roots.get(0);
 
         // Validate first level count according to mode range
@@ -119,7 +122,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .filter(e -> rootTempId.equals(e.getValue()))
                 .count();
         if (level1Count < minFirst || level1Count > maxFirst) {
-            throw new InvalidMindmapDataException("level1", String.format("Số node cấp 1 phải %d–%d", minFirst, maxFirst));
+            throw new InvalidMindmapDataException("level1",
+                    String.format("Số node cấp 1 phải %d–%d", minFirst, maxFirst));
         }
 
         // Create ReactFlow nodes and edges
@@ -147,7 +151,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         for (Map.Entry<String, String> e : parentByTempId.entrySet()) {
             String childTemp = e.getKey();
             String parentTemp = e.getValue();
-            if (parentTemp == null || parentTemp.isBlank()) continue;
+            if (parentTemp == null || parentTemp.isBlank())
+                continue;
             Map<String, Object> edge = new HashMap<>();
             edge.put("id", newEdgeId());
             edge.put("source", idMap.get(parentTemp));
@@ -176,18 +181,23 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         boolean isOwner = mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId);
         boolean isEditor = mindmap.getCollaborators() != null && mindmap.getCollaborators().stream()
-                .anyMatch(c -> Objects.equals(c.getMysqlUserId(), userId) && "accepted".equals(c.getStatus()) && "EDITOR".equals(c.getRole()));
+                .anyMatch(c -> Objects.equals(c.getMysqlUserId(), userId) && "accepted".equals(c.getStatus())
+                        && "EDITOR".equals(c.getRole()));
         if (!isOwner && !isEditor) {
             throw new MindmapAccessDeniedException(request.getMindmapId(), userId);
         }
 
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
-        Map<String, Object> agentPlan = extractAgentPlanFromHints(request.getHints());
-        if (agentPlan != null) {
-            String planMsg = "Agent Plan: " + agentPlan.getOrDefault("summary", agentPlan);
-            agentLogs.add(planMsg);
-            broadcastAgentLog(mindmap.getId(), planMsg);
-        }
+        // Removed: extractAgentPlanFromHints - frontend no longer sends AGENT_PLAN
+        // Backend AI will analyze user request dynamically instead
+        // Map<String, Object> agentPlan =
+        // extractAgentPlanFromHints(request.getHints());
+        // if (agentPlan != null) {
+        // String planMsg = "Agent Plan: " + agentPlan.getOrDefault("summary",
+        // agentPlan);
+        // agentLogs.add(planMsg);
+        // broadcastAgentLog(mindmap.getId(), planMsg);
+        // }
         String title = mindmap.getTitle();
         String desc = mindmap.getDescription();
         List<String> labels = mindmap.getNodes().stream()
@@ -195,7 +205,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .filter(StringUtils::hasText)
                 .limit(50)
                 .collect(Collectors.toList());
-        Map<String, Object> agentPayload = buildGeminiPayloadForClassifyAction(title, desc, labels, lang, request.getHints());
+        Map<String, Object> agentPayload = buildGeminiPayloadForClassifyAction(title, desc, labels, lang,
+                request.getHints());
         String agentJson = callGemini(agentPayload);
         JsonNode agentRoot = parseJson(agentJson);
         String decidedTarget = textOrNull(agentRoot.get("targetType"));
@@ -210,7 +221,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 try {
                     Map<String, Object> m = objectMapper.convertValue(op, Map.class);
                     agentOps.add(m);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
         if (StringUtils.hasText(decidedTarget)) {
@@ -220,7 +232,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
         if (StringUtils.hasText(nodeLabel) && !StringUtils.hasText(request.getNodeId())) {
             String foundId = findNodeIdByLabel(mindmap, nodeLabel);
-            if (StringUtils.hasText(foundId)) request.setNodeId(foundId);
+            if (StringUtils.hasText(foundId))
+                request.setNodeId(foundId);
         }
         if (StringUtils.hasText(sType) && request.getStructureType() == null) {
             request.setStructureType(sType);
@@ -228,13 +241,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (StringUtils.hasText(outLang) && request.getLanguage() == null) {
             request.setLanguage(outLang);
         }
-        agentLogs.add("Agent Analyze: target=" + request.getTargetType() + (StringUtils.hasText(request.getNodeId()) ? ", nodeId=" + request.getNodeId() : "") + (StringUtils.hasText(request.getStructureType()) ? ", structureType=" + request.getStructureType() : ""));
+        agentLogs.add("Agent Analyze: target=" + request.getTargetType()
+                + (StringUtils.hasText(request.getNodeId()) ? ", nodeId=" + request.getNodeId() : "")
+                + (StringUtils.hasText(request.getStructureType()) ? ", structureType=" + request.getStructureType()
+                        : ""));
         broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
         String target = request.getTargetType();
         if (!agentOps.isEmpty()) {
             for (Map<String, Object> op : agentOps) {
                 String type = String.valueOf(op.getOrDefault("type", ""));
-                if (!StringUtils.hasText(type)) continue;
+                if (!StringUtils.hasText(type))
+                    continue;
                 if (type.equals("delete_node") || type.equals("delete_subtree")) {
                     String lbl = String.valueOf(op.getOrDefault("nodeLabel", ""));
                     String id = findNodeIdByLabel(mindmap, lbl);
@@ -253,10 +270,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                             while (!dq.isEmpty()) {
                                 String cur = dq.pollFirst();
                                 List<String> kids = children.getOrDefault(cur, Collections.emptyList());
-                                for (String c : kids) if (toRemove.add(c)) dq.addLast(c);
+                                for (String c : kids)
+                                    if (toRemove.add(c))
+                                        dq.addLast(c);
                             }
                         }
-                        mindmap.setNodes(mindmap.getNodes().stream().filter(n -> !toRemove.contains(String.valueOf(n.get("id")))).collect(Collectors.toList()));
+                        mindmap.setNodes(
+                                mindmap.getNodes().stream().filter(n -> !toRemove.contains(String.valueOf(n.get("id"))))
+                                        .collect(Collectors.toList()));
                         mindmap.setEdges(mindmap.getEdges().stream().filter(e -> {
                             String sId = String.valueOf(e.get("source"));
                             String tId = String.valueOf(e.get("target"));
@@ -273,7 +294,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     if (StringUtils.hasText(id) && StringUtils.hasText(newLabel)) {
                         for (Map<String, Object> n : mindmap.getNodes()) {
                             if (id.equals(String.valueOf(n.get("id")))) {
-                                Map<String, Object> data = (Map<String, Object>) n.getOrDefault("data", new HashMap<>());
+                                Map<String, Object> data = (Map<String, Object>) n.getOrDefault("data",
+                                        new HashMap<>());
                                 data.put("label", newLabel);
                                 n.put("data", data);
                                 opsChangedGraph = true;
@@ -287,12 +309,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     String parentLabel = String.valueOf(op.getOrDefault("parentLabel", ""));
                     String label = String.valueOf(op.getOrDefault("label", ""));
                     if (StringUtils.hasText(label)) {
-                        String parentId = StringUtils.hasText(parentLabel) ? findNodeIdByLabel(mindmap, parentLabel) : null;
+                        String parentId = StringUtils.hasText(parentLabel) ? findNodeIdByLabel(mindmap, parentLabel)
+                                : null;
                         if (!StringUtils.hasText(parentId)) {
-                            Set<String> targets = mindmap.getEdges().stream().map(e -> String.valueOf(e.get("target"))).collect(Collectors.toSet());
-                            Optional<Map<String, Object>> rootNodeOpt = mindmap.getNodes().stream().filter(n -> !targets.contains(String.valueOf(n.get("id")))).findFirst();
-                            if (rootNodeOpt.isPresent()) parentId = String.valueOf(rootNodeOpt.get().get("id"));
-                            else if (!mindmap.getNodes().isEmpty()) parentId = String.valueOf(mindmap.getNodes().get(0).get("id"));
+                            Set<String> targets = mindmap.getEdges().stream().map(e -> String.valueOf(e.get("target")))
+                                    .collect(Collectors.toSet());
+                            Optional<Map<String, Object>> rootNodeOpt = mindmap.getNodes().stream()
+                                    .filter(n -> !targets.contains(String.valueOf(n.get("id")))).findFirst();
+                            if (rootNodeOpt.isPresent())
+                                parentId = String.valueOf(rootNodeOpt.get().get("id"));
+                            else if (!mindmap.getNodes().isEmpty())
+                                parentId = String.valueOf(mindmap.getNodes().get(0).get("id"));
                         }
                         String newId = newNodeId();
                         Map<String, Object> data = new HashMap<>();
@@ -316,7 +343,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                             mindmap.getEdges().add(edge);
                         }
                         opsChangedGraph = true;
-                        agentLogs.add("Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : ""));
+                        agentLogs.add("Added node: " + label
+                                + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : ""));
                         broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
                     }
                 } else if (type.equals("add_edge")) {
@@ -325,7 +353,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     String sId = findNodeIdByLabel(mindmap, sourceLabel);
                     String tId = findNodeIdByLabel(mindmap, targetLabel);
                     if (StringUtils.hasText(sId) && StringUtils.hasText(tId)) {
-                        boolean exists = mindmap.getEdges().stream().anyMatch(e -> Objects.equals(String.valueOf(e.get("source")), sId) && Objects.equals(String.valueOf(e.get("target")), tId));
+                        boolean exists = mindmap.getEdges().stream()
+                                .anyMatch(e -> Objects.equals(String.valueOf(e.get("source")), sId)
+                                        && Objects.equals(String.valueOf(e.get("target")), tId));
                         if (!exists) {
                             Map<String, Object> edge = new HashMap<>();
                             edge.put("id", newEdgeId());
@@ -358,8 +388,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (request.getHints() != null) {
                 for (String h : request.getHints()) {
                     String t = h == null ? "" : h.toLowerCase();
-                    if (t.matches(".*(xóa|xoá|remove|delete|bỏ|loại bỏ|drop).*")) wantsDelete = true;
-                    if (t.matches(".*(nhánh|branch|subtree|con|hậu duệ).*")) wantsPruneSubtree = true;
+                    if (t.matches(".*(xóa|xoá|remove|delete|bỏ|loại bỏ|drop).*"))
+                        wantsDelete = true;
+                    if (t.matches(".*(nhánh|branch|subtree|con|hậu duệ).*"))
+                        wantsPruneSubtree = true;
                 }
             }
 
@@ -381,7 +413,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                         String cur = dq.pollFirst();
                         List<String> kids = children.getOrDefault(cur, Collections.emptyList());
                         for (String c : kids) {
-                            if (toRemove.add(c)) dq.addLast(c);
+                            if (toRemove.add(c))
+                                dq.addLast(c);
                         }
                     }
                 }
@@ -411,7 +444,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             // collect sibling labels to avoid duplicates
             List<String> siblingLabels = findSiblingLabels(mindmap, request.getNodeId());
 
-            Map<String, Object> payload = buildGeminiPayloadForOptimizeNode(currentLabel, siblingLabels, lang, request.getHints());
+            Map<String, Object> payload = buildGeminiPayloadForOptimizeNode(currentLabel, siblingLabels, lang,
+                    request.getHints());
             String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode labelNode = root.get("label");
@@ -426,8 +460,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             // apply update
             Object dataObj = node.get("data");
             Map<String, Object> dataMap;
-            if (dataObj instanceof Map<?,?> m) {
-                //noinspection unchecked
+            if (dataObj instanceof Map<?, ?> m) {
+                // noinspection unchecked
                 dataMap = (Map<String, Object>) m;
             } else {
                 dataMap = new HashMap<>();
@@ -447,7 +481,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         } else if ("description".equalsIgnoreCase(target)) {
             String currentDesc = mindmap.getDescription();
             String mapTitle = mindmap.getTitle();
-            Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(mapTitle, currentDesc, lang, request.getHints(), "normal");
+            Map<String, Object> payload = buildGeminiPayloadForOptimizeDescription(mapTitle, currentDesc, lang,
+                    request.getHints(), "normal");
             String json = callGemini(payload);
             JsonNode root = parseJson(json);
             JsonNode descNode = root.get("description");
@@ -456,7 +491,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 throw new InvalidMindmapDataException("description", "AI không trả description hợp lệ");
             }
 
-            UpdateMindmapRequest.UpdateMindmapRequestBuilder builder = UpdateMindmapRequest.builder().description(newDesc);
+            UpdateMindmapRequest.UpdateMindmapRequestBuilder builder = UpdateMindmapRequest.builder()
+                    .description(newDesc);
             if (opsChangedGraph) {
                 builder.nodes(mindmap.getNodes()).edges(mindmap.getEdges());
             }
@@ -467,13 +503,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             broadcastAgentLog(mindmap.getId(), agentLogs.get(agentLogs.size() - 1));
             return updated;
         } else if ("structure".equalsIgnoreCase(target)) {
-            boolean isReplace = agentPlan != null && "replace".equalsIgnoreCase(String.valueOf(agentPlan.get("action")));
-            List<String> pruneLabels = agentPlan != null && agentPlan.get("pruneLabels") instanceof List<?> pl ? pl.stream().map(String::valueOf).collect(Collectors.toList()) : Collections.emptyList();
+            boolean isReplace = agentPlan != null
+                    && "replace".equalsIgnoreCase(String.valueOf(agentPlan.get("action")));
+            List<String> pruneLabels = agentPlan != null && agentPlan.get("pruneLabels") instanceof List<?> pl
+                    ? pl.stream().map(String::valueOf).collect(Collectors.toList())
+                    : Collections.emptyList();
             if (!pruneLabels.isEmpty()) {
                 Set<String> toRemove = new HashSet<>();
                 for (String lbl : pruneLabels) {
                     String id = findNodeIdByLabel(mindmap, lbl);
-                    if (StringUtils.hasText(id)) toRemove.add(id);
+                    if (StringUtils.hasText(id))
+                        toRemove.add(id);
                 }
                 if (!toRemove.isEmpty()) {
                     List<Map<String, Object>> nextNodes0 = mindmap.getNodes().stream()
@@ -556,11 +596,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
 
             if (isReplace) {
-                String topic = (request.getHints() != null && !request.getHints().isEmpty()) ? request.getHints().get(0) : anchorLabel;
-                Map<String, Object> payloadGen = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, null, mode, minFirst, maxFirst);
+                String topic = (request.getHints() != null && !request.getHints().isEmpty()) ? request.getHints().get(0)
+                        : anchorLabel;
+                Map<String, Object> payloadGen = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang,
+                        null, mode, minFirst, maxFirst);
                 json = callGemini(payloadGen);
             } else {
-                Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang, request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, structureType);
+                Map<String, Object> payload = buildGeminiPayloadForExpandStructure(anchorLabel, existingChildren, lang,
+                        request.getHints(), mode, minFirst, maxFirst, firstLevelCount, levels, structureType);
                 json = callGemini(payload);
             }
             JsonNode root = parseJson(json);
@@ -585,24 +628,28 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             for (JsonNode n : nodesNode) {
                 String tempId = textOrNull(n.get("id"));
                 String parentTempId = parentByTempId.get(tempId);
-                int lvl = (parentTempId == null || parentTempId.isBlank()) ? 1 : (nodeLevel.getOrDefault(parentTempId, 1) + 1);
+                int lvl = (parentTempId == null || parentTempId.isBlank()) ? 1
+                        : (nodeLevel.getOrDefault(parentTempId, 1) + 1);
                 nodeLevel.put(tempId, lvl);
                 levelIndex.put(tempId, levelIndex.getOrDefault(parentTempId == null ? "__root__" : parentTempId, 0));
-                levelIndex.put(parentTempId == null ? "__root__" : parentTempId, levelIndex.getOrDefault(parentTempId == null ? "__root__" : parentTempId, 0) + 1);
+                levelIndex.put(parentTempId == null ? "__root__" : parentTempId,
+                        levelIndex.getOrDefault(parentTempId == null ? "__root__" : parentTempId, 0) + 1);
             }
 
             double anchorX = 0.0, anchorY = 0.0;
             Object posObj = anchorNode.get("position");
-            if (posObj instanceof Map<?,?> m) {
+            if (posObj instanceof Map<?, ?> m) {
                 Object px = m.get("x");
                 Object py = m.get("y");
                 try {
                     anchorX = px != null ? Double.parseDouble(String.valueOf(px)) : 0.0;
                     anchorY = py != null ? Double.parseDouble(String.valueOf(py)) : 0.0;
-                } catch (Exception ignored) { }
+                } catch (Exception ignored) {
+                }
             }
 
-            int topLevelCount = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).count();
+            int topLevelCount = (int) parentByTempId.entrySet().stream()
+                    .filter(e -> e.getValue() == null || e.getValue().isBlank()).count();
             double baseRadius = 900.0;
             double angleStep = topLevelCount > 0 ? (2 * Math.PI / topLevelCount) : (Math.PI / 3);
 
@@ -616,9 +663,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 Map<String, Object> data = new HashMap<>();
                 data.put("label", label);
                 // simple diversity
-                String[] shapes = new String[]{"rectangle", "circle", "diamond", "hexagon", "ellipse", "roundedRectangle"};
+                String[] shapes = new String[] { "rectangle", "circle", "diamond", "hexagon", "ellipse",
+                        "roundedRectangle" };
                 data.put("shape", shapes[rand.nextInt(shapes.length)]);
-                String[] colors = new String[]{"#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6"};
+                String[] colors = new String[] { "#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6" };
                 data.put("color", colors[rand.nextInt(colors.length)]);
                 Map<String, Object> position = new HashMap<>();
                 String parentTempId = parentByTempId.get(tempId);
@@ -626,8 +674,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 if (parentTempId == null || parentTempId.isBlank()) {
                     int idx = levelIndex.getOrDefault("__root__", 0);
                     // compute index among top-level by scanning up to tempId
-                    idx = (int) parentByTempId.entrySet().stream().filter(e -> e.getValue() == null || e.getValue().isBlank()).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
-                    if (idx < 0) idx = 0;
+                    idx = (int) parentByTempId.entrySet().stream()
+                            .filter(e -> e.getValue() == null || e.getValue().isBlank()).map(Map.Entry::getKey)
+                            .collect(Collectors.toList()).indexOf(tempId);
+                    if (idx < 0)
+                        idx = 0;
                     double angle = idx * angleStep;
                     if ("timeline".equalsIgnoreCase(structureType)) {
                         position.put("x", anchorX + (idx + 1) * 600);
@@ -644,20 +695,25 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     // default relative layout around parent
                     double px = anchorX, py = anchorY;
                     // try get parent rfNode we added
-                    Optional<Map<String, Object>> parentNodeOpt = rfNodes.stream().filter(nn -> String.valueOf(nn.get("id")).equals(parentNewId)).findFirst();
+                    Optional<Map<String, Object>> parentNodeOpt = rfNodes.stream()
+                            .filter(nn -> String.valueOf(nn.get("id")).equals(parentNewId)).findFirst();
                     if (parentNodeOpt.isPresent()) {
                         Object ppos = parentNodeOpt.get().get("position");
-                        if (ppos instanceof Map<?,?> pm) {
+                        if (ppos instanceof Map<?, ?> pm) {
                             Object pxo = pm.get("x");
                             Object pyo = pm.get("y");
                             try {
                                 px = pxo != null ? Double.parseDouble(String.valueOf(pxo)) : anchorX;
                                 py = pyo != null ? Double.parseDouble(String.valueOf(pyo)) : anchorY;
-                            } catch (Exception ignored) { }
+                            } catch (Exception ignored) {
+                            }
                         }
                     }
-                    int childIdx = (int) parentByTempId.entrySet().stream().filter(e -> Objects.equals(e.getValue(), parentTempId)).map(Map.Entry::getKey).collect(Collectors.toList()).indexOf(tempId);
-                    if (childIdx < 0) childIdx = 0;
+                    int childIdx = (int) parentByTempId.entrySet().stream()
+                            .filter(e -> Objects.equals(e.getValue(), parentTempId)).map(Map.Entry::getKey)
+                            .collect(Collectors.toList()).indexOf(tempId);
+                    if (childIdx < 0)
+                        childIdx = 0;
                     double dx = 360 + childIdx * 180;
                     double dy = ((childIdx % 2 == 0) ? 1 : -1) * (260 + (lvl - 2) * 120);
                     if ("timeline".equalsIgnoreCase(structureType)) {
@@ -723,7 +779,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .build();
             MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
             appendAgentLogs(updated, agentLogs);
-            for (String logMsg : agentLogs) broadcastAgentLog(mindmap.getId(), logMsg);
+            for (String logMsg : agentLogs)
+                broadcastAgentLog(mindmap.getId(), logMsg);
             return updated;
         } else {
             throw new InvalidMindmapDataException("targetType", "Giá trị không hợp lệ: node|description|structure");
@@ -731,15 +788,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     // private void ensureLabelLength(String label) {
-    //     int words = Arrays.stream(label.trim().split("\\s+")).filter(s -> !s.isBlank()).toArray().length;
-    //     if (words < 1 || words > 4) {
-    //         throw new InvalidMindmapDataException("label", "Độ dài label phải 1–4 từ");
-    //     }
+    // int words = Arrays.stream(label.trim().split("\\s+")).filter(s ->
+    // !s.isBlank()).toArray().length;
+    // if (words < 1 || words > 4) {
+    // throw new InvalidMindmapDataException("label", "Độ dài label phải 1–4 từ");
+    // }
     // }
 
     private String extractLabel(Map<String, Object> node) {
         Object data = node.get("data");
-        if (data instanceof Map<?,?> m) {
+        if (data instanceof Map<?, ?> m) {
             Object lbl = m.get("label");
             return lbl != null ? String.valueOf(lbl) : null;
         }
@@ -752,10 +810,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .map(e -> String.valueOf(e.get("target")))
                 .collect(Collectors.toSet());
         return map.getNodes().stream()
-            .filter(n -> childIds.contains(String.valueOf(n.get("id"))))
-            .map(this::extractLabel)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toList());
+                .filter(n -> childIds.contains(String.valueOf(n.get("id"))))
+                .map(this::extractLabel)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     private List<String> findSiblingLabels(Mindmap map, String nodeId) {
@@ -764,7 +822,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .filter(e -> Objects.equals(String.valueOf(e.get("target")), nodeId))
                 .map(e -> String.valueOf(e.get("source")))
                 .findFirst();
-        if (parentIdOpt.isEmpty()) return Collections.emptyList();
+        if (parentIdOpt.isEmpty())
+            return Collections.emptyList();
         String parentId = parentIdOpt.get();
         // children of same parent
         Set<String> childIds = map.getEdges().stream()
@@ -779,7 +838,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     private String textOrNull(JsonNode node) {
-        if (node == null || node.isNull()) return null;
+        if (node == null || node.isNull())
+            return null;
         return node.isTextual() ? node.asText() : node.toString();
     }
 
@@ -803,23 +863,29 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                             return clientResponse.bodyToMono(String.class).map(body -> {
                                 int code = clientResponse.statusCode().value();
                                 log.error("Gemini API error ({}): {}", code, body);
-                                throw new com.riverflow.exception.AiUpstreamException(code, parseOpenAiError(body, code));
+                                throw new com.riverflow.exception.AiUpstreamException(code,
+                                        parseOpenAiError(body, code));
                             });
                         }
                     })
                     .block();
-            if (resp == null) throw new IllegalStateException("Empty response from Gemini");
+            if (resp == null)
+                throw new IllegalStateException("Empty response from Gemini");
             // Gemini response: candidates[0].content.parts[].text
             List<?> candidates = (List<?>) resp.get("candidates");
-            if (candidates == null || candidates.isEmpty()) throw new IllegalStateException("No candidates from Gemini");
+            if (candidates == null || candidates.isEmpty())
+                throw new IllegalStateException("No candidates from Gemini");
             Map<?, ?> c0 = (Map<?, ?>) candidates.get(0);
             Map<?, ?> content = (Map<?, ?>) c0.get("content");
-            if (content == null) throw new IllegalStateException("No content in candidate");
+            if (content == null)
+                throw new IllegalStateException("No content in candidate");
             List<?> parts = (List<?>) content.get("parts");
-            if (parts == null || parts.isEmpty()) throw new IllegalStateException("No parts in content");
+            if (parts == null || parts.isEmpty())
+                throw new IllegalStateException("No parts in content");
             Map<?, ?> p0 = (Map<?, ?>) parts.get(0);
             Object text = p0.get("text");
-            if (!(text instanceof String s)) throw new IllegalStateException("Invalid Gemini content");
+            if (!(text instanceof String s))
+                throw new IllegalStateException("Invalid Gemini content");
             return ensureJson(s);
         } catch (com.riverflow.exception.AiUpstreamException e) {
             throw e;
@@ -829,9 +895,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-
     private String maskKey(String k) {
-        if (k == null || k.isBlank()) return "";
+        if (k == null || k.isBlank())
+            return "";
         int len = k.length();
         String start = k.substring(0, Math.min(4, len));
         String end = k.substring(Math.max(len - 4, 0));
@@ -848,7 +914,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     return "AI lỗi (" + status + "): " + msg.asText();
                 }
             }
-        } catch (Exception ignore) { }
+        } catch (Exception ignore) {
+        }
         return "AI lỗi (" + status + ")";
     }
 
@@ -861,12 +928,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-    private Map<String, Object> buildGeminiPayloadForGenerate(String topic, int levels, int firstLevelCount, String lang, List<String> tags, String mode, int minFirst, int maxFirst) {
+    private Map<String, Object> buildGeminiPayloadForGenerate(String topic, int levels, int firstLevelCount,
+            String lang, List<String> tags, String mode, int minFirst, int maxFirst) {
         String system = "Bạn là công cụ tạo mindmap. Trả về JSON hợp lệ, KHÔNG văn bản thừa. Quy tắc: label 1–4 từ; số node cấp 1 theo chỉ định; node con đúng ngữ nghĩa; không lặp; không giải thích.";
-        String user = String.format("Tạo mindmap về chủ đề: '%s' (ngôn ngữ: %s). Độ sâu: %d. Số node cấp 1: %d (giới hạn %d–%d theo MODE: %s).\n" +
-                "Trả về JSON dạng:\n" +
-                "{\n  \"nodes\": [\n    {\"id\": \"n1\", \"label\": \"%s\", \"parentId\": null},\n    {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\"}\n  ]\n}\n" +
-                "Yêu cầu:\n- label ngắn (1–4 từ).\n- %d–%d node cấp 1 (parentId = id của root).\n- Chỉ trả JSON, không kèm giải thích.",
+        String user = String.format(
+                "Tạo mindmap về chủ đề: '%s' (ngôn ngữ: %s). Độ sâu: %d. Số node cấp 1: %d (giới hạn %d–%d theo MODE: %s).\n"
+                        +
+                        "Trả về JSON dạng:\n" +
+                        "{\n  \"nodes\": [\n    {\"id\": \"n1\", \"label\": \"%s\", \"parentId\": null},\n    {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\"}\n  ]\n}\n"
+                        +
+                        "Yêu cầu:\n- label ngắn (1–4 từ).\n- %d–%d node cấp 1 (parentId = id của root).\n- Chỉ trả JSON, không kèm giải thích.",
                 topic, lang, levels, firstLevelCount, minFirst, maxFirst, mode, topic, minFirst, maxFirst);
         if (tags != null && !tags.isEmpty()) {
             user += "\nGợi ý bổ sung: " + String.join(", ", tags);
@@ -874,20 +945,19 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String prompt = system + "\n\n" + user;
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", prompt))
-        );
+                "parts", List.of(Map.of("text", prompt)));
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        
 
         Map<String, Object> payload = new HashMap<>();
         /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
-    private Map<String, Object> buildGeminiPayloadForOptimizeNode(String currentLabel, List<String> siblingLabels, String lang, List<String> hints) {
+    private Map<String, Object> buildGeminiPayloadForOptimizeNode(String currentLabel, List<String> siblingLabels,
+            String lang, List<String> hints) {
         String system = "Bạn là công cụ tối ưu label của node mindmap. Chỉ trả JSON, không giải thích. Quy tắc: label 1–4 từ, rõ ràng, không trùng với các nhánh anh em, không thêm ký tự thừa.";
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
@@ -901,81 +971,84 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         user.append("Trả JSON: { \"label\": \"...\" }");
 
         Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
+                "parts", List.of(Map.of("text", system)));
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
-        );
+                "parts", List.of(Map.of("text", user.toString())));
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        
 
         Map<String, Object> payload = new HashMap<>();
         /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
+
     private String ensureJson(String text) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         String s = text.trim();
         int start = s.indexOf('{');
         int end = s.lastIndexOf('}');
         if (start >= 0 && end > start) {
-        return s.substring(start, end + 1).trim();
+            return s.substring(start, end + 1).trim();
         }
         return s; // nếu không có { } thì vẫn trả về, parseJson sẽ báo lỗi phù hợp
-        }
-    
-    private Map<String, Object> buildGeminiPayloadForOptimizeDescription(String title, String currentDesc, String lang, List<String> hints, String mode) {
+    }
+
+    private Map<String, Object> buildGeminiPayloadForOptimizeDescription(String title, String currentDesc, String lang,
+            List<String> hints, String mode) {
         String system = "Bạn là công cụ tối ưu mô tả mindmap. Chỉ trả JSON, không giải thích. MODE normal: ưu tiên tốc độ, mô tả ngắn gọn 1–2 câu, rõ mục tiêu và phạm vi.";
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
-        if (StringUtils.hasText(title)) user.append("Tiêu đề: ").append(title).append("\n");
-        if (StringUtils.hasText(currentDesc)) user.append("Mô tả hiện tại: ").append(currentDesc).append("\n");
+        if (StringUtils.hasText(title))
+            user.append("Tiêu đề: ").append(title).append("\n");
+        if (StringUtils.hasText(currentDesc))
+            user.append("Mô tả hiện tại: ").append(currentDesc).append("\n");
         if (hints != null && !hints.isEmpty()) {
             user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
         }
         user.append("Trả JSON: { \"description\": \"...\" }");
 
         Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
+                "parts", List.of(Map.of("text", system)));
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
-        );
+                "parts", List.of(Map.of("text", user.toString())));
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
-        
 
         Map<String, Object> payload = new HashMap<>();
         /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
-    private Map<String, Object> buildGeminiPayloadForClassifyAction(String title, String currentDesc, List<String> nodeLabels, String lang, List<String> hints) {
+    private Map<String, Object> buildGeminiPayloadForClassifyAction(String title, String currentDesc,
+            List<String> nodeLabels, String lang, List<String> hints) {
         StringBuilder user = new StringBuilder();
         user.append("Bạn là hệ thống phân tích yêu cầu người dùng cho mindmap hiện tại.\n");
         user.append("Tiêu đề: ").append(title).append("\n");
-        if (StringUtils.hasText(currentDesc)) user.append("Mô tả: ").append(currentDesc).append("\n");
+        if (StringUtils.hasText(currentDesc))
+            user.append("Mô tả: ").append(currentDesc).append("\n");
         if (nodeLabels != null && !nodeLabels.isEmpty()) {
             user.append("Các node hiện có: ").append(String.join(", ", nodeLabels)).append("\n");
         }
-        user.append("Yêu cầu: Hãy xuất một kế hoạch (plan) chi tiết, dùng đúng ID/label node hiện có. Plan là JSON: {\n  \"targetType\": \"structure|description|node\",\n  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n  \"language\": \"vi|en\",\n  \"ops\": [\n    {\"type\": \"delete_node\", \"nodeLabel\": \"...\"},\n    {\"type\": \"delete_subtree\", \"nodeLabel\": \"...\"},\n    {\"type\": \"update_node\", \"nodeLabel\": \"...\", \"newLabel\": \"...\"},\n    {\"type\": \"add_node\", \"parentLabel\": \"...\", \"label\": \"...\"},\n    {\"type\": \"add_edge\", \"sourceLabel\": \"...\", \"targetLabel\": \"...\"}\n  ]\n}\n");
-        user.append("Nếu người dùng nói rõ Thêm/Sửa/Xóa/Cập nhật thì plan phải nêu chính xác node/edge liên quan theo label/ID hiện có. Nếu không chắc, hãy chọn nhánh gốc (ROOT) làm parentLabel.\n");
+        user.append(
+                "Yêu cầu: Hãy xuất một kế hoạch (plan) chi tiết, dùng đúng ID/label node hiện có. Plan là JSON: {\n  \"targetType\": \"structure|description|node\",\n  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n  \"language\": \"vi|en\",\n  \"ops\": [\n    {\"type\": \"delete_node\", \"nodeLabel\": \"...\"},\n    {\"type\": \"delete_subtree\", \"nodeLabel\": \"...\"},\n    {\"type\": \"update_node\", \"nodeLabel\": \"...\", \"newLabel\": \"...\"},\n    {\"type\": \"add_node\", \"parentLabel\": \"...\", \"label\": \"...\"},\n    {\"type\": \"add_edge\", \"sourceLabel\": \"...\", \"targetLabel\": \"...\"}\n  ]\n}\n");
+        user.append(
+                "Nếu người dùng nói rõ Thêm/Sửa/Xóa/Cập nhật thì plan phải nêu chính xác node/edge liên quan theo label/ID hiện có. Nếu không chắc, hãy chọn nhánh gốc (ROOT) làm parentLabel.\n");
         if (hints != null && !hints.isEmpty()) {
             user.append("Yêu cầu người dùng: ").append(String.join(" \n ", hints)).append("\n");
         }
         user.append("Nếu người dùng có ưu tiên về cấu trúc/ ngôn ngữ thì hãy ưu tiên theo lựa chọn đó.\n");
-        user.append("Hãy quyết định hành động chính (targetType) và xuất \"ops\" chi tiết như mẫu trên, chỉ trả JSON hợp lệ.\n");
+        user.append(
+                "Hãy quyết định hành động chính (targetType) và xuất \"ops\" chi tiết như mẫu trên, chỉ trả JSON hợp lệ.\n");
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
-        );
+                "parts", List.of(Map.of("text", user.toString())));
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.2);
         Map<String, Object> payload = new HashMap<>();
@@ -985,7 +1058,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     private String findNodeIdByLabel(Mindmap mindmap, String nodeLabel) {
-        if (!StringUtils.hasText(nodeLabel)) return null;
+        if (!StringUtils.hasText(nodeLabel))
+            return null;
         String targetLower = nodeLabel.trim().toLowerCase();
         Optional<Map<String, Object>> exact = mindmap.getNodes().stream()
                 .filter(n -> {
@@ -993,7 +1067,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     return StringUtils.hasText(l) && l.trim().equalsIgnoreCase(nodeLabel.trim());
                 })
                 .findFirst();
-        if (exact.isPresent()) return String.valueOf(exact.get().get("id"));
+        if (exact.isPresent())
+            return String.valueOf(exact.get().get("id"));
         Optional<Map<String, Object>> contains = mindmap.getNodes().stream()
                 .filter(n -> {
                     String l = extractLabel(n);
@@ -1003,12 +1078,15 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         return contains.map(n -> String.valueOf(n.get("id"))).orElse(null);
     }
 
-    private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren, String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels, String structureType) {
+    private Map<String, Object> buildGeminiPayloadForExpandStructure(String anchorLabel, List<String> existingChildren,
+            String lang, List<String> hints, String mode, int minFirst, int maxFirst, int firstLevelCount, int levels,
+            String structureType) {
         StringBuilder user = new StringBuilder();
         user.append("Mở rộng mindmap cho nhánh: ");
         user.append(anchorLabel != null ? anchorLabel : "ROOT");
         user.append(". Ngôn ngữ: ").append(lang).append(". ");
-        user.append("Độ sâu: ").append(levels).append(". Số node cấp 1: ").append(firstLevelCount).append(" (giới hạn ").append(minFirst).append("–").append(maxFirst).append(")").append(".\n");
+        user.append("Độ sâu: ").append(levels).append(". Số node cấp 1: ").append(firstLevelCount).append(" (giới hạn ")
+                .append(minFirst).append("–").append(maxFirst).append(")").append(".\n");
         if (existingChildren != null && !existingChildren.isEmpty()) {
             user.append("Tránh trùng các nhánh hiện có: ").append(String.join(", ", existingChildren)).append("\n");
         }
@@ -1016,11 +1094,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             user.append("Gợi ý: ").append(String.join(", ", hints)).append("\n");
         }
         user.append("Kiểu cấu trúc: ").append(structureType).append("\n");
-        user.append("Trả JSON: { \"nodes\": [ {\"id\": \"n1\", \"label\": \"...\", \"parentId\": null }, {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\" } ] }\n");
+        user.append(
+                "Trả JSON: { \"nodes\": [ {\"id\": \"n1\", \"label\": \"...\", \"parentId\": null }, {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\" } ] }\n");
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
-        );
+                "parts", List.of(Map.of("text", user.toString())));
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
         Map<String, Object> payload = new HashMap<>();
@@ -1039,14 +1117,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     private Map<String, Object> extractAgentPlanFromHints(List<String> hints) {
         try {
-            if (hints == null || hints.isEmpty()) return null;
+            if (hints == null || hints.isEmpty())
+                return null;
             // Look for embedded plan
             for (String h : hints) {
                 if (h != null && h.startsWith("AGENT_PLAN:")) {
                     String json = h.substring("AGENT_PLAN:".length()).trim();
                     Map<String, Object> plan = objectMapper.readValue(json, Map.class);
                     String action = String.valueOf(plan.getOrDefault("action", "expand"));
-                    List<String> pruneLabels = plan.get("pruneIds") instanceof List<?> pl ? null : (plan.get("pruneLabels") instanceof List<?> p2 ? (List<String>) (List<?>) p2 : Collections.emptyList());
+                    List<String> pruneLabels = plan.get("pruneIds") instanceof List<?> pl ? null
+                            : (plan.get("pruneLabels") instanceof List<?> p2 ? (List<String>) (List<?>) p2
+                                    : Collections.emptyList());
                     Map<String, Object> out = new HashMap<>();
                     out.put("action", action);
                     out.put("pruneLabels", pruneLabels != null ? pruneLabels : Collections.emptyList());
@@ -1056,9 +1137,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
             // Heuristic fallback
             String joined = String.join(" ", hints).toLowerCase();
-            String action = joined.matches(".*(sửa lại|đổi|thay|chuyển sang|thành|replace|change to|update to).*") ? "replace"
+            String action = joined.matches(".*(sửa lại|đổi|thay|chuyển sang|thành|replace|change to|update to).*")
+                    ? "replace"
                     : joined.matches(".*(xóa|xoá|remove|delete|loại bỏ|bỏ|drop).*") ? "prune"
-                    : joined.matches(".*(sửa|chỉnh|update|edit|điều chỉnh).*") ? "edit" : "expand";
+                            : joined.matches(".*(sửa|chỉnh|update|edit|điều chỉnh).*") ? "edit" : "expand";
             Map<String, Object> out = new HashMap<>();
             out.put("action", action);
             out.put("pruneLabels", Collections.emptyList());
@@ -1077,7 +1159,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     private void broadcastAgentLog(String mindmapId, String text) {
         try {
-            if (!StringUtils.hasText(realtimeServerUrl)) return;
+            if (!StringUtils.hasText(realtimeServerUrl))
+                return;
             Map<String, Object> body = new HashMap<>();
             body.put("mindmapId", mindmapId);
             body.put("event", "chat:message");
@@ -1092,6 +1175,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .retrieve()
                     .bodyToMono(String.class)
                     .subscribe();
-        } catch (Exception ignored) { }
+        } catch (Exception ignored) {
+        }
     }
 }
