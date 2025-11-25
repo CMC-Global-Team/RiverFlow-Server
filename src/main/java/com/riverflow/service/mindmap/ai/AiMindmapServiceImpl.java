@@ -36,26 +36,79 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final MindmapService mindmapService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Model and API key (not hardcoded, read from env/properties)
     @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
 
     @Value("${gemini.api-key:}")
     private String geminiApiKey;
 
+    // Generation config (externalized)
+    @Value("${ai.generation.temperature:0.3}")
+    private double temperature;
+
+    @Value("${ai.generation.max-output-tokens:2048}")
+    private int maxOutputTokens;
+
+    @Value("${ai.generation.top-k:40}")
+    private int topK;
+
+    @Value("${ai.generation.top-p:0.9}")
+    private double topP;
+
+    @Value("${ai.response-mime-type:application/json}")
+    private String responseMimeType;
+
+    // Defaults/config for logic (externalized)
+    @Value("${ai.lang.default:vi}")
+    private String defaultLang;
+
+    @Value("${mindmap.first-level.normal.min:3}")
+    private int level1NormalMin;
+
+    @Value("${mindmap.first-level.normal.max:5}")
+    private int level1NormalMax;
+
+    @Value("${mindmap.first-level.focus.min:4}")
+    private int level1FocusMin;
+
+    @Value("${mindmap.first-level.focus.max:6}")
+    private int level1FocusMax;
+
+    @Value("${mindmap.label.min-words:1}")
+    private int labelMinWords;
+
+    @Value("${mindmap.label.max-words:4}")
+    private int labelMaxWords;
+
+    // Prompts (externalized with safe defaults)
+    @Value("${mindmap.prompt.generate.system}")
+    private String generateSystemPrompt;
+
+    @Value("${mindmap.prompt.optimize-node.system}")
+    private String optimizeNodeSystemPrompt;
+
+    @Value("${mindmap.prompt.optimize-desc.system}")
+    private String optimizeDescSystemPrompt;
+
     @Override
     public MindmapResponse generateMindmap(GenerateMindmapRequest request, Long userId) {
+        assertConfigured();
+
         String topic = request.getTopic().trim();
         String title = StringUtils.hasText(request.getTitle()) ? request.getTitle().trim() : topic;
         int levels = request.getLevels() != null ? request.getLevels() : 2;
         String reqMode = request.getMode();
         String mode = (reqMode == null || reqMode.isBlank() || "default".equalsIgnoreCase(reqMode)) ? "normal" : reqMode;
-        int defaultFirst = "normal".equalsIgnoreCase(mode) ? 4 : 5;
-        int reqFirst = request.getFirstLevelCount() != null ? request.getFirstLevelCount() : defaultFirst;
-        String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
 
-        int minFirst = "normal".equalsIgnoreCase(mode) ? 3 : 4;
-        int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
-        int firstLevelCount = Math.max(minFirst, Math.min(maxFirst, reqFirst));
+        // configurable first-level range by mode
+        int minFirst = "normal".equalsIgnoreCase(mode) ? level1NormalMin : level1FocusMin;
+        int maxFirst = "normal".equalsIgnoreCase(mode) ? level1NormalMax : level1FocusMax;
+
+        int requestedFirst = request.getFirstLevelCount() != null ? request.getFirstLevelCount() : minFirst;
+        int firstLevelCount = Math.max(minFirst, Math.min(maxFirst, requestedFirst));
+
+        String lang = StringUtils.hasText(request.getLanguage()) ? request.getLanguage() : defaultLang;
 
         Map<String, Object> payload = buildGeminiPayloadForGenerate(topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
 
@@ -76,9 +129,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         Map<String, String> idMap = new HashMap<>();
         // parent relations by tempId
         Map<String, String> parentByTempId = new HashMap<>();
-        // sanitized labels by tempId
-        Map<String, String> labelByTempId = new HashMap<>();
+        // keep original ids set to check duplicates
+        Set<String> tempIds = new HashSet<>();
 
+        // collect nodes
         for (JsonNode n : nodesNode) {
             String tempId = textOrNull(n.get("id"));
             String label = textOrNull(n.get("label"));
@@ -86,17 +140,31 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
                 throw new InvalidMindmapDataException("node", "Thiếu id hoặc label");
             }
-            // ensureLabelLength(label);
-            parentByTempId.put(tempId, parentTempId);
+            if (!tempIds.add(tempId)) {
+                throw new InvalidMindmapDataException("id", "Trùng id: " + tempId);
+            }
+            ensureLabelLength(label);
+            parentByTempId.put(tempId, (parentTempId != null && parentTempId.isBlank()) ? null : parentTempId);
         }
 
-        // find root(s): parentId == null
+        // find roots: parentId == null
         List<String> roots = parentByTempId.entrySet().stream()
-                .filter(e -> e.getValue() == null || e.getValue().isBlank())
+                .filter(e -> e.getValue() == null)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
-        if (roots.isEmpty()) throw new InvalidMindmapDataException("root", "Không có root node");
+        if (roots.size() != 1) {
+            throw new InvalidMindmapDataException("root", "Mindmap phải có đúng 1 root, hiện có: " + roots.size());
+        }
         String rootTempId = roots.get(0);
+
+        // Validate parent references exist
+        for (Map.Entry<String, String> e : parentByTempId.entrySet()) {
+            String child = e.getKey();
+            String parent = e.getValue();
+            if (parent != null && !tempIds.contains(parent)) {
+                throw new InvalidMindmapDataException("parentId", "parentId không tồn tại cho node: " + child);
+            }
+        }
 
         // Validate first level count according to mode range
         long level1Count = parentByTempId.entrySet().stream()
@@ -106,10 +174,20 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             throw new InvalidMindmapDataException("level1", String.format("Số node cấp 1 phải %d–%d", minFirst, maxFirst));
         }
 
+        // Validate depth according to requested levels (root level 0)
+        Map<String, Integer> depthById = computeDepths(parentByTempId, rootTempId);
+        int maxDepthFound = depthById.values().stream().max(Integer::compareTo).orElse(0);
+        if (maxDepthFound > levels) {
+            throw new InvalidMindmapDataException("depth", "Độ sâu vượt quá yêu cầu: " + maxDepthFound + ">" + levels);
+        }
+
         // Create ReactFlow nodes and edges
+        // Also preserve labels
+        Map<String, String> labelByTempId = new HashMap<>();
         for (JsonNode n : nodesNode) {
             String tempId = textOrNull(n.get("id"));
             String label = textOrNull(n.get("label"));
+            labelByTempId.put(tempId, label);
             String newId = newNodeId();
             idMap.put(tempId, newId);
             Map<String, Object> data = new HashMap<>();
@@ -131,11 +209,16 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         for (Map.Entry<String, String> e : parentByTempId.entrySet()) {
             String childTemp = e.getKey();
             String parentTemp = e.getValue();
-            if (parentTemp == null || parentTemp.isBlank()) continue;
+            if (parentTemp == null) continue; // skip root
+            String sourceId = idMap.get(parentTemp);
+            String targetId = idMap.get(childTemp);
+            if (!StringUtils.hasText(sourceId) || !StringUtils.hasText(targetId)) {
+                throw new InvalidMindmapDataException("edge", "Không thể tạo cạnh cho node: " + childTemp);
+            }
             Map<String, Object> edge = new HashMap<>();
             edge.put("id", newEdgeId());
-            edge.put("source", idMap.get(parentTemp));
-            edge.put("target", idMap.get(childTemp));
+            edge.put("source", sourceId);
+            edge.put("target", targetId);
             rfEdges.add(edge);
         }
 
@@ -154,6 +237,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     @Override
     public MindmapResponse optimize(OptimizeRequest request, Long userId) {
+        assertConfigured();
+
         Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
 
@@ -164,7 +249,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             throw new MindmapAccessDeniedException(request.getMindmapId(), userId);
         }
 
-        String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
+        String lang = StringUtils.hasText(request.getLanguage()) ? request.getLanguage() : defaultLang;
         String target = request.getTargetType();
 
         if ("node".equalsIgnoreCase(target)) {
@@ -189,7 +274,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             if (!StringUtils.hasText(newLabel)) {
                 throw new InvalidMindmapDataException("label", "AI không trả label hợp lệ");
             }
-            // ensureLabelLength(newLabel);
+            ensureLabelLength(newLabel);
             if (siblingLabels.stream().anyMatch(s -> s.equalsIgnoreCase(newLabel))) {
                 throw new InvalidMindmapDataException("label", "Label trùng với nhánh khác");
             }
@@ -231,12 +316,18 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
-    // private void ensureLabelLength(String label) {
-    //     int words = Arrays.stream(label.trim().split("\\s+")).filter(s -> !s.isBlank()).toArray().length;
-    //     if (words < 1 || words > 4) {
-    //         throw new InvalidMindmapDataException("label", "Độ dài label phải 1–4 từ");
-    //     }
-    // }
+    private void ensureLabelLength(String label) {
+        int words = (int) Arrays.stream(label.trim().split("\\s+")).filter(s -> !s.isBlank()).count();
+        if (words < labelMinWords || words > labelMaxWords) {
+            throw new InvalidMindmapDataException("label", "Độ dài label phải " + labelMinWords + "–" + labelMaxWords + " từ");
+        }
+    }
+
+    private void assertConfigured() {
+        if (!StringUtils.hasText(geminiApiKey)) {
+            throw new IllegalStateException("GEMINI_API_KEY not set");
+        }
+    }
 
     private String extractLabel(Map<String, Object> node) {
         Object data = node.get("data");
@@ -289,8 +380,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             Map<?, ?> resp = geminiWebClient.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/v1/models/{model}:generateContent")
-                            .queryParam("key", geminiApiKey)
                             .build(model))
+                    .header("x-goog-api-key", geminiApiKey)
                     .body(BodyInserters.fromValue(payload))
                     .exchangeToMono(clientResponse -> {
                         if (clientResponse.statusCode().is2xxSuccessful()) {
@@ -348,15 +439,44 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
     }
 
+    private Map<String, Integer> computeDepths(Map<String, String> parentById, String rootId) {
+        Map<String, Integer> depth = new HashMap<>();
+        Deque<String> dq = new ArrayDeque<>();
+        depth.put(rootId, 0);
+        dq.add(rootId);
+        while (!dq.isEmpty()) {
+            String cur = dq.removeFirst();
+            int d = depth.get(cur);
+            for (Map.Entry<String, String> e : parentById.entrySet()) {
+                if (cur.equals(e.getValue())) {
+                    String child = e.getKey();
+                    if (depth.containsKey(child)) {
+                        // cycle detected
+                        throw new InvalidMindmapDataException("cycle", "Phát hiện chu kỳ giữa " + cur + " và " + child);
+                    }
+                    depth.put(child, d + 1);
+                    dq.addLast(child);
+                }
+            }
+        }
+        // ensure all nodes reached
+        if (depth.size() != parentById.size()) {
+            throw new InvalidMindmapDataException("disconnected", "Có node không nối với root");
+        }
+        return depth;
+    }
+
     private Map<String, Object> buildGeminiPayloadForGenerate(String topic, int levels, int firstLevelCount, String lang, List<String> tags, String mode, int minFirst, int maxFirst) {
-        String system = "Bạn là công cụ tạo mindmap. Trả về JSON hợp lệ, KHÔNG văn bản thừa. Quy tắc: label 1–4 từ; số node cấp 1 theo chỉ định; node con đúng ngữ nghĩa; không lặp; không giải thích.";
-        String user = String.format("Tạo mindmap về chủ đề: '%s' (ngôn ngữ: %s). Độ sâu: %d. Số node cấp 1: %d (giới hạn %d–%d theo MODE: %s).\n" +
-                "Trả về JSON dạng:\n" +
-                "{\n  \"nodes\": [\n    {\"id\": \"n1\", \"label\": \"%s\", \"parentId\": null},\n    {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\"}\n  ]\n}\n" +
-                "Yêu cầu:\n- label ngắn (1–4 từ).\n- %d–%d node cấp 1 (parentId = id của root).\n- Chỉ trả JSON, không kèm giải thích.",
-                topic, lang, levels, firstLevelCount, minFirst, maxFirst, mode, topic, minFirst, maxFirst);
+        String system = generateSystemPrompt;
+        StringBuilder user = new StringBuilder();
+        user.append("Tạo mindmap về chủ đề: '").append(topic).append("' (ngôn ngữ: ").append(lang).append("). ")
+            .append("Độ sâu tối đa: ").append(levels).append(". ")
+            .append("Số node cấp 1 mong muốn: ").append(firstLevelCount).append(" (giới hạn ")
+            .append(minFirst).append("–").append(maxFirst).append("). MODE: ").append(mode).append(".\n")
+            .append("Chỉ trả JSON dạng: {\n  \"nodes\": [\n    {\"id\": \"n1\", \"label\": \"").append(topic).append("\", \"parentId\": null},\n    {\"id\": \"n2\", \"label\": \"...\", \"parentId\": \"n1\"}\n  ]\n}\n")
+            .append("Ràng buộc: label 1–").append(labelMaxWords).append(" từ; không lặp; parentId hợp lệ; đúng 1 root; không chu kỳ.");
         if (tags != null && !tags.isEmpty()) {
-            user += "\nGợi ý bổ sung: " + String.join(", ", tags);
+            user.append("\nGợi ý bổ sung: ").append(String.join(", ", tags));
         }
         String prompt = system + "\n\n" + user;
         Map<String, Object> userContent = Map.of(
@@ -364,18 +484,20 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 "parts", List.of(Map.of("text", prompt))
         );
         Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.4);
-        
+        generationConfig.put("temperature", temperature);
+        generationConfig.put("maxOutputTokens", maxOutputTokens);
+        generationConfig.put("topK", topK);
+        generationConfig.put("topP", topP);
+        generationConfig.put("response_mime_type", responseMimeType);
 
         Map<String, Object> payload = new HashMap<>();
-        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
     private Map<String, Object> buildGeminiPayloadForOptimizeNode(String currentLabel, List<String> siblingLabels, String lang, List<String> hints) {
-        String system = "Bạn là công cụ tối ưu label của node mindmap. Chỉ trả JSON, không giải thích. Quy tắc: label 1–4 từ, rõ ràng, không trùng với các nhánh anh em, không thêm ký tự thừa.";
+        String system = optimizeNodeSystemPrompt;
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
         user.append("Label hiện tại: ").append(currentLabel).append("\n");
@@ -387,36 +509,36 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
         user.append("Trả JSON: { \"label\": \"...\" }");
 
-        Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
+                "parts", List.of(Map.of("text", system + "\n\n" + user))
         );
         Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.4);
-        
+        generationConfig.put("temperature", temperature);
+        generationConfig.put("maxOutputTokens", Math.max(512, Math.min(1024, maxOutputTokens)));
+        generationConfig.put("topK", topK);
+        generationConfig.put("topP", topP);
+        generationConfig.put("response_mime_type", responseMimeType);
 
         Map<String, Object> payload = new HashMap<>();
-        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
+
     private String ensureJson(String text) {
         if (text == null) return null;
         String s = text.trim();
         int start = s.indexOf('{');
         int end = s.lastIndexOf('}');
         if (start >= 0 && end > start) {
-        return s.substring(start, end + 1).trim();
+            return s.substring(start, end + 1).trim();
         }
         return s; // nếu không có { } thì vẫn trả về, parseJson sẽ báo lỗi phù hợp
-        }
-    
+    }
+
     private Map<String, Object> buildGeminiPayloadForOptimizeDescription(String title, String currentDesc, String lang, List<String> hints, String mode) {
-        String system = "Bạn là công cụ tối ưu mô tả mindmap. Chỉ trả JSON, không giải thích. MODE normal: ưu tiên tốc độ, mô tả ngắn gọn 1–2 câu, rõ mục tiêu và phạm vi.";
+        String system = optimizeDescSystemPrompt;
         StringBuilder user = new StringBuilder();
         user.append("Ngôn ngữ: ").append(lang).append("\n");
         if (StringUtils.hasText(title)) user.append("Tiêu đề: ").append(title).append("\n");
@@ -426,21 +548,20 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         }
         user.append("Trả JSON: { \"description\": \"...\" }");
 
-        Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system))
-        );
         Map<String, Object> userContent = Map.of(
                 "role", "user",
-                "parts", List.of(Map.of("text", user.toString()))
+                "parts", List.of(Map.of("text", system + "\n\n" + user))
         );
         Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.4);
-        
+        generationConfig.put("temperature", temperature);
+        generationConfig.put("maxOutputTokens", Math.max(512, Math.min(2048, maxOutputTokens)));
+        generationConfig.put("topK", topK);
+        generationConfig.put("topP", topP);
+        generationConfig.put("response_mime_type", responseMimeType);
 
         Map<String, Object> payload = new HashMap<>();
-        /* removed system instruction field per Gemini v1 */ // dùng snake_case!
         payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig); 
+        payload.put("generationConfig", generationConfig);
         return payload;
     }
 
