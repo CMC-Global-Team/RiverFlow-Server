@@ -321,9 +321,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
 
             Flux<Map<String, Object>> responseFlux = geminiWebClient.post()
-
-                    .bodyToFlux(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {
-                    });
+                    .uri(url)
+                    .body(BodyInserters.fromValue(payload))
+                    .retrieve()
+                    .bodyToFlux(Map.class);
 
             responseFlux.toIterable().forEach(chunk -> {
                 try {
