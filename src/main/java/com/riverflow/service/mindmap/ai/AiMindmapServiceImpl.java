@@ -31,7 +31,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * AI Mindmap Service - 100% Gemini AI-driven
@@ -53,6 +52,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final AiOperationExecutor operationExecutor;
     private final AiResponseParser responseParser;
     private final GeminiPromptBuilder promptBuilder;
+    private final LayoutEngine layoutEngine;
 
     @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
@@ -81,7 +81,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         // Ask Gemini to generate mindmap
         Map<String, Object> payload = promptBuilder.buildGeneratePrompt(
-                topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
+                topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst,
+                request.getStructureType() != null ? request.getStructureType() : "mindmap");
 
         String json = callGemini(payload);
         JsonNode root = parseJson(promptBuilder.ensureJson(json));
@@ -122,10 +123,37 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String newId = "node-" + UUID.randomUUID();
             idMap.put(tempId, newId);
 
+            // Parse node properties from AI
+            String nodeType = textOrNull(n.get("nodeType"));
+            String color = textOrNull(n.get("color"));
+            String background = textOrNull(n.get("background"));
+            String icon = textOrNull(n.get("icon"));
+            String description = textOrNull(n.get("description"));
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("label", label);
+            if (StringUtils.hasText(description)) {
+                data.put("description", description);
+            }
+            if (StringUtils.hasText(icon)) {
+                data.put("icon", icon);
+            }
+
+            Map<String, Object> style = new HashMap<>();
+            if (StringUtils.hasText(background)) {
+                style.put("background", background);
+            }
+            if (StringUtils.hasText(color)) {
+                style.put("color", color);
+            }
+
             Map<String, Object> rfNode = new HashMap<>();
             rfNode.put("id", newId);
-            rfNode.put("type", "default");
-            rfNode.put("data", Map.of("label", label));
+            rfNode.put("type", StringUtils.hasText(nodeType) ? nodeType : "default");
+            rfNode.put("data", data);
+            if (!style.isEmpty()) {
+                rfNode.put("style", style);
+            }
             rfNode.put("position", Map.of("x", 0, "y", 0));
             rfNodes.add(rfNode);
         }
@@ -143,8 +171,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             edge.put("id", "edge-" + UUID.randomUUID());
             edge.put("source", idMap.get(parentTemp));
             edge.put("target", idMap.get(childTemp));
+            edge.put("type", "smoothstep");
+            edge.put("animated", true);
             rfEdges.add(edge);
         }
+
+        // Apply layout based on structure type
+        String structureType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
+        layoutEngine.applyLayout(structureType, rfNodes, rfEdges);
 
         // Create mindmap
         CreateMindmapRequest createReq = CreateMindmapRequest.builder()

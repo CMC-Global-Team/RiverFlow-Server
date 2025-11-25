@@ -25,11 +25,13 @@ public class GenerateMindmapRequest {
     private String title; // optional; if not provided, use topic
 
     @Builder.Default
-    @Min(1) @Max(3)
+    @Min(1)
+    @Max(3)
     private Integer levels = 2; // depth (root + n levels)
 
     @Builder.Default
-    @Min(3) @Max(6)
+    @Min(3)
+    @Max(6)
     private Integer firstLevelCount = 5; // number of level-1 nodes (range depends on mode)
 
     @Builder.Default
@@ -41,7 +43,8 @@ public class GenerateMindmapRequest {
 
     // Optional tags to bias generation
     private List<String> tags;
+
+    // Structure type: mindmap | logic | brace | org | tree | timeline | fishbone
+    @Builder.Default
+    private String structureType = "mindmap";
 }
-
-
-

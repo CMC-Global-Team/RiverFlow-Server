@@ -158,27 +158,46 @@ public class GeminiPromptBuilder {
                         List<String> tags,
                         String mode,
                         int minFirst,
-                        int maxFirst) {
+                        int maxFirst,
+                        String structureType) {
                 StringBuilder system = new StringBuilder();
                 system.append("Bạn là công cụ tạo mindmap. JSON ONLY, không text thừa. Quy tắc:\\n");
+                system.append("- Structure type: ").append(structureType).append("\\n");
                 system.append("- Tiêu đề node rõ ràng, 1-4 từ\\n");
-                system.append("- FirstLevel:  ").append(firstLevelCount)
+                system.append("- FirstLevel: ").append(firstLevelCount)
                                 .append(" nhánh, PHẢI có parentId=null hoặc rỗng\\n");
                 system.append("- Tổng phụ node/nhánh tối đa ").append(levels).append(" cấp, không quá sâu.\\n");
                 system.append("- Đa dạng nội dung, tránh lặp\\n");
+                system.append("- Node properties: Thêm nodeType, style (colors, background), description, metadata\\n");
+                system.append(buildStructureGuidance(structureType));
                 system.append("- JSON chuẩn, không markdown```");
 
                 StringBuilder user = new StringBuilder();
                 user.append("Chủ đề: ").append(topic).append("\\n");
                 user.append("Ngôn ngữ: ").append(language).append("\\n");
+                user.append("Structure: ").append(structureType).append("\\n");
                 user.append("Số cấp: ").append(levels).append("\\n");
                 user.append("Số nhánh chính: ").append(firstLevelCount).append("\\n");
                 if (tags != null && !tags.isEmpty()) {
                         user.append("Tags: ").append(String.join(", ", tags)).append("\\n");
                 }
-                user.append("Mode: ").append(mode).append("\\n");
-                user.append(
-                                "Tạo mindmap chi tiết, trả JSON: { \\\"nodes\\\": [ { \\\"id\\\": \\\"...\\\", \\\"label\\\": \\\"...\\\", \\\"parentId\\\": \\\"...\\\" } ] }");
+                user.append("Mode: ").append(mode).append("\\n\\n");
+                user.append("Tạo mindmap chi tiết với properties phong phú:\\n");
+                user.append("JSON format: {\\n");
+                user.append("  \\\"nodes\\\": [\\n");
+                user.append("    {\\n");
+                user.append("      \\\"id\\\": \\\"unique-id\\\",\\n");
+                user.append("      \\\"label\\\": \\\"Node title (ngắn gọn)\\\",\\n");
+                user.append("      \\\"description\\\": \\\"Chi tiết mô tả node (1-2 câu)\\\",\\n");
+                user.append("      \\\"parentId\\\": \\\"parent-id or null\\\",\\n");
+                user.append("      \\\"nodeType\\\": \\\"default|input|output|decision|process\\\",\\n");
+                user.append("      \\\"color\\\": \\\"#hex-color (optional)\\\",\\n");
+                user.append("      \\\"background\\\": \\\"#hex-color (optional)\\\",\\n");
+                user.append("      \\\"icon\\\": \\\"emoji or icon name (optional)\\\"\\n");
+                user.append("    }\\n");
+                user.append("  ]\\n");
+                user.append("}\\n");
+                user.append("\\nLƯU Ý: MỌI node đều PHẢI có description chi tiết và phù hợp!");
 
                 Map<String, Object> systemInstruction = Map.of(
                                 "parts", List.of(Map.of("text", system.toString())));
@@ -230,5 +249,24 @@ public class GeminiPromptBuilder {
                 }
 
                 return s;
+        }
+
+        /**
+         * Build structure-specific guidance for AI
+         */
+        private String buildStructureGuidance(String structureType) {
+                if (structureType == null)
+                        structureType = "mindmap";
+
+                return switch (structureType.toLowerCase()) {
+                        case "mindmap" -> "- Style: Colorful nodes, different sizes, radial layout\\n";
+                        case "logic" -> "- Style: Rectangular boxes, use decision/process types\\n";
+                        case "brace" -> "- Style: Grouped items, hierarchical structure\\n";
+                        case "org" -> "- Style: Org chart roles, hierarchical positions\\n";
+                        case "tree" -> "- Style: Tree branches, parent-child relationships\\n";
+                        case "timeline" -> "- Style: Sequential events, chronological order\\n";
+                        case "fishbone" -> "- Style: Cause-effect branches, problem analysis\\n";
+                        default -> "- Style: Clear hierarchy and structure\\n";
+                };
         }
 }

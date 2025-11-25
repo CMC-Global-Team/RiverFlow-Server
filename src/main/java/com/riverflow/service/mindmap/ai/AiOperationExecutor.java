@@ -184,23 +184,62 @@ public class AiOperationExecutor {
 
         String newId = NEW_NODE_PREFIX + UUID.randomUUID();
 
+        // Parse rich properties from AI operation
+        String nodeType = String.valueOf(op.getOrDefault("nodeType", "default"));
+        String color = String.valueOf(op.getOrDefault("color", ""));
+        String background = String.valueOf(op.getOrDefault("background", ""));
+        String icon = String.valueOf(op.getOrDefault("icon", ""));
+        String description = String.valueOf(op.getOrDefault("description", ""));
+
         Map<String, Object> data = new HashMap<>();
         data.put("label", label);
+        if (StringUtils.hasText(description) && !"null".equals(description)) {
+            data.put("description", description);
+        }
+        if (StringUtils.hasText(icon) && !"null".equals(icon)) {
+            data.put("icon", icon);
+        }
+
+        Map<String, Object> style = new HashMap<>();
+        if (StringUtils.hasText(background) && !"null".equals(background)) {
+            style.put("background", background);
+        }
+        if (StringUtils.hasText(color) && !"null".equals(color)) {
+            style.put("color", color);
+        }
 
         Map<String, Object> position = new HashMap<>();
-        position.put("x", 0);
-        position.put("y", 0);
+        // Calculate position near parent
+        if (StringUtils.hasText(parentId)) {
+            Map<String, Object> parent = findNodeById(mindmap, parentId);
+            if (parent != null && parent.get("position") instanceof Map<?, ?> parentPos) {
+                int parentX = ((Number) parentPos.get("x")).intValue();
+                int parentY = ((Number) parentPos.get("y")).intValue();
+                // Offset new node from parent
+                position.put("x", parentX + 200);
+                position.put("y", parentY + 100);
+            } else {
+                position.put("x", 0);
+                position.put("y", 0);
+            }
+        } else {
+            position.put("x", 0);
+            position.put("y", 0);
+        }
 
         Map<String, Object> newNode = new HashMap<>();
         newNode.put("id", newId);
-        newNode.put("type", "default");
+        newNode.put("type", StringUtils.hasText(nodeType) && !"null".equals(nodeType) ? nodeType : "default");
         newNode.put("data", data);
+        if (!style.isEmpty()) {
+            newNode.put("style", style);
+        }
         newNode.put("position", position);
 
         mindmap.getNodes().add(newNode);
         // Force MongoDB change detection by creating new ArrayList
         mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
-        log.info("[Add Node] Created new node: id='{}', label='{}'", newId, label);
+        log.info("[Add Node] Created new node: id='{}', label='{}', type='{}'", newId, label, nodeType);
 
         if (StringUtils.hasText(parentId)) {
             Map<String, Object> edge = new HashMap<>();
@@ -219,6 +258,15 @@ public class AiOperationExecutor {
         String result = "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
         log.info("[Add Node] Success: {}", result);
         return result;
+    }
+
+    private Map<String, Object> findNodeById(Mindmap mindmap, String id) {
+        if (id == null)
+            return null;
+        return mindmap.getNodes().stream()
+                .filter(n -> id.equals(String.valueOf(n.get("id"))))
+                .findFirst()
+                .orElse(null);
     }
 
     private String addEdge(Map<String, Object> op, Mindmap mindmap) {
