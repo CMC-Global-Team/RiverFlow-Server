@@ -191,6 +191,7 @@ public class GeminiPromptBuilder {
                 user.append("Create detailed mindmap with rich properties:\\n");
                 user.append("JSON format:\\n");
                 user.append("{\\n");
+                user.append("  \\\"title\\\": \\\"Mindmap Title (engaging, in ").append(language).append(")\\\",\\n");
                 user.append("  \\\"nodes\\\": [\\n");
                 user.append("    {\\n");
                 user.append("      \\\"id\\\": \\\"unique-id\\\",\\n");

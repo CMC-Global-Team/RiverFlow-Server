@@ -64,7 +64,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     public MindmapResponse generateMindmap(GenerateMindmapRequest request, Long userId) {
         // Use Gemini to generate new mindmap from scratch
         String topic = request.getTopic().trim();
-        String title = StringUtils.hasText(request.getTitle()) ? request.getTitle().trim() : topic;
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         int levels = request.getLevels() != null ? request.getLevels() : 2;
         String mode = determineMode(request.getMode());
@@ -86,6 +85,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         String json = callGemini(payload);
         JsonNode root = parseJson(promptBuilder.ensureJson(json));
+
+        // Parse title from AI response, fallback to request title or topic
+        String aiTitle = textOrNull(root.get("title"));
+        String finalTitle = StringUtils.hasText(aiTitle) ? aiTitle
+                : (StringUtils.hasText(request.getTitle()) ? request.getTitle().trim() : topic);
 
         // Parse and validate nodes
         JsonNode nodesNode = root.get("nodes");
@@ -129,6 +133,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String background = textOrNull(n.get("background"));
             String icon = textOrNull(n.get("icon"));
             String description = textOrNull(n.get("description"));
+            String shape = textOrNull(n.get("shape"));
 
             Map<String, Object> data = new HashMap<>();
             data.put("label", label);
@@ -137,6 +142,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
             if (StringUtils.hasText(icon)) {
                 data.put("icon", icon);
+            }
+            if (StringUtils.hasText(shape)) {
+                data.put("shape", shape);
             }
 
             Map<String, Object> style = new HashMap<>();
@@ -245,7 +253,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         // Create mindmap
         CreateMindmapRequest createReq = CreateMindmapRequest.builder()
-                .title(title)
+                .title(finalTitle)
                 .nodes(rfNodes)
                 .edges(rfEdges)
                 .aiGenerated(true)
