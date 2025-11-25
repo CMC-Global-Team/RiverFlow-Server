@@ -42,7 +42,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final MindmapService mindmapService;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
-    
+
     // AI helpers - modular and clean
     private final AiOperationExecutor operationExecutor;
     private final AiResponseParser responseParser;
@@ -66,7 +66,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         int minFirst = "normal".equalsIgnoreCase(mode) ? 3 : 4;
         int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
         int defaultFirst = "normal".equalsIgnoreCase(mode) ? 4 : 5;
-        int firstLevelCount = request.getFirstLevelCount() != null 
+        int firstLevelCount = request.getFirstLevelCount() != null
                 ? Math.max(minFirst, Math.min(maxFirst, request.getFirstLevelCount()))
                 : defaultFirst;
 
@@ -75,8 +75,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         // Ask Gemini to generate mindmap
         Map<String, Object> payload = promptBuilder.buildGeneratePrompt(
-                topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst
-        );
+                topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst);
 
         String json = callGemini(payload);
         JsonNode root = parseJson(promptBuilder.ensureJson(json));
@@ -98,7 +97,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             String tempId = textOrNull(n.get("id"));
             String label = textOrNull(n.get("label"));
             String parentTempId = textOrNull(n.get("parentId"));
-            
+
             if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
                 continue; // skip invalid nodes
             }
@@ -109,7 +108,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         for (JsonNode n : nodesNode) {
             String tempId = textOrNull(n.get("id"));
             String label = textOrNull(n.get("label"));
-            
+
             if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
                 continue;
             }
@@ -129,7 +128,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         for (Map.Entry<String, String> entry : parentByTempId.entrySet()) {
             String childTemp = entry.getKey();
             String parentTemp = entry.getValue();
-            
+
             if (!StringUtils.hasText(parentTemp) || !idMap.containsKey(parentTemp) || !idMap.containsKey(childTemp)) {
                 continue;
             }
@@ -156,11 +155,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     @Override
     public MindmapResponse optimize(OptimizeRequest request, Long userId) {
         // 100% AI-driven optimization - Gemini decides everything
-        
+
         // 1. Load mindmap and validate permissions
         Mindmap mindmap = mindmapRepository.findById(request.getMindmapId())
                 .orElseThrow(() -> new MindmapNotFoundException(request.getMindmapId(), userId));
-        
+
         validatePermissions(mindmap, userId);
 
         // 2. Ask Gemini AI to analyze and plan operations
@@ -180,10 +179,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .build();
 
         MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
-        
+
         // Log what AI did
-        for (String log : logs) {
-            log.info("[AI Action] {}", log);
+        for (String logMsg : logs) {
+            log.info("[AI Action] {}", logMsg);
         }
 
         return updated;
@@ -203,8 +202,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 mindmap.getDescription(),
                 labels,
                 lang,
-                request.getHints()
-        );
+                request.getHints());
 
         String json = callGemini(payload);
         return responseParser.parseClassifyResponse(promptBuilder.ensureJson(json));
@@ -223,14 +221,15 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     private void deductCredits(Long userId, String mode) {
-        if (userId == null) return;
+        if (userId == null)
+            return;
 
-        long cost = "max".equalsIgnoreCase(mode) ? 5L 
+        long cost = "max".equalsIgnoreCase(mode) ? 5L
                 : ("thinking".equalsIgnoreCase(mode) ? 3L : 1L);
 
         com.riverflow.model.User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        
+
         long current = user.getCredit() != null ? user.getCredit() : 0L;
         if (current < cost) {
             throw new InvalidMindmapDataException("credit", "Không đủ credit");
@@ -278,7 +277,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     }
 
     private String textOrNull(JsonNode node) {
-        if (node == null || node.isNull()) return null;
+        if (node == null || node.isNull())
+            return null;
         return node.isTextual() ? node.asText() : node.toString();
     }
 
