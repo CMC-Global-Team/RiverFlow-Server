@@ -241,7 +241,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     private String callGemini(Map<String, Object> payload) {
         try {
-            String url = "/models/" + model + ":generateContent";
+            String url = "/v1beta/models/" + model + ":generateContent";
             Map<?, ?> response = geminiWebClient.post()
                     .uri(url)
                     .body(BodyInserters.fromValue(payload))
