@@ -1,4 +1,32 @@
-@Transactional
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CollaborationService {
+
+    private final MindmapRepository mindmapRepository;
+    private final CollaborationInvitationRepository invitationRepository;
+    private final UserRepository userRepository;
+    private final SmtpEmailService smtpEmailService;
+    private final RestTemplate restTemplate;
+
+    @Value("${realtime.server.url}")
+    private String realtimeServerUrl;
+
+    /**
+     * Mời cộng tác viên mới
+     */
+    @Transactional
     public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request,
             Long ownerId) {
         log.info("User {} đang mời {} vào mindmap {}", ownerId, request.getEmail(), mindmapId);
