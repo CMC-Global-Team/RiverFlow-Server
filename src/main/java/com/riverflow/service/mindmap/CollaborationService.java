@@ -1,18 +1,4 @@
-public class CollaborationService {
-
-    private final MindmapRepository mindmapRepository;
-    private final CollaborationInvitationRepository invitationRepository;
-    private final UserRepository userRepository;
-    private final SmtpEmailService smtpEmailService;
-    private final RestTemplate restTemplate;
-
-    @Value("${realtime.server.url}")
-    private String realtimeServerUrl;
-
-    /**
-     * Mời cộng tác viên mới
-     */
-    @Transactional
+@Transactional
     public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request,
             Long ownerId) {
         log.info("User {} đang mời {} vào mindmap {}", ownerId, request.getEmail(), mindmapId);
