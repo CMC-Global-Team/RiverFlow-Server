@@ -1,24 +1,12 @@
-package com.riverflow.service.mindmap;
-
-import com.riverflow.dto.collaboration.InviteCollaboratorRequest;
-import com.riverflow.exception.mindmap.MindmapAccessDeniedException;
-import com.riverflow.exception.mindmap.MindmapNotFoundException;
-import com.riverflow.model.User;
-import com.riverflow.model.mindmap.CollaborationInvitation;
-import com.riverflow.model.mindmap.Mindmap;
-import com.riverflow.model.mindmap.subdocuments.Collaborator;
-import com.riverflow.repository.UserRepository;
-import com.riverflow.repository.mindmap.CollaborationInvitationRepository;
-import com.riverflow.repository.mindmap.MindmapRepository;
-import com.riverflow.service.SmtpEmailService;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -30,19 +18,25 @@ public class CollaborationService {
     private final CollaborationInvitationRepository invitationRepository;
     private final UserRepository userRepository;
     private final SmtpEmailService smtpEmailService;
+    private final RestTemplate restTemplate;
+
+    @Value("${realtime.server.url}")
+    private String realtimeServerUrl;
 
     /**
      * Mời cộng tác viên mới
      */
     @Transactional
-    public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request, Long ownerId) {
+    public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request,
+            Long ownerId) {
         log.info("User {} đang mời {} vào mindmap {}", ownerId, request.getEmail(), mindmapId);
 
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, ownerId));
 
         if (!mindmap.getMysqlUserId().equals(ownerId)) {
-            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền mời cộng tác viên.", mindmapId, ownerId);
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền mời cộng tác viên.", mindmapId,
+                    ownerId);
         }
 
         String emailToInvite = request.getEmail().trim().toLowerCase();
@@ -59,7 +53,8 @@ public class CollaborationService {
             }
         }
 
-        if (invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(mindmapId, emailToInvite, "pending").isPresent()) {
+        if (invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(mindmapId, emailToInvite, "pending")
+                .isPresent()) {
             throw new IllegalArgumentException("Đã có lời mời đang chờ xác nhận gửi tới email này.");
         }
 
@@ -90,7 +85,7 @@ public class CollaborationService {
                     .invitedAt(LocalDateTime.now())
                     .status("pending")
                     .build();
-            
+
             mindmap.getCollaborators().add(collaborator);
             mindmapRepository.save(mindmap);
             log.info("Collaborator {} added to mindmap {} with pending status", emailToInvite, mindmapId);
@@ -100,13 +95,12 @@ public class CollaborationService {
         try {
             User ownerUser = userRepository.findById(ownerId).orElse(null);
             String inviterName = (ownerUser != null) ? ownerUser.getFullName() : "Someone";
-            
+
             smtpEmailService.sendInvitationEmail(
                     emailToInvite,
                     token,
                     inviterName,
-                    mindmap.getTitle()
-            );
+                    mindmap.getTitle());
             log.info("Invitation email sent successfully to {}", emailToInvite);
         } catch (Exception e) {
             log.error("Failed to send invitation email to {}: {}", emailToInvite, e.getMessage());
@@ -156,8 +150,16 @@ public class CollaborationService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Collaborator không tìm thấy"));
 
+        String oldRole = collaborator.getRole();
         collaborator.setRole(role);
         mindmapRepository.save(mindmap);
+
+        // Send real-time notification
+        notifyPermissionChange(mindmapId, "collaborator_role_changed", Map.of(
+                "email", email,
+                "userId", collaborator.getMysqlUserId(),
+                "oldRole", oldRole,
+                "newRole", role));
 
         return collaborator;
     }
@@ -184,24 +186,23 @@ public class CollaborationService {
 
         // Case 1: Collaborator exists in mindmap - remove regardless of status
         if (collaborator != null) {
-            mindmap.getCollaborators().removeIf(c -> 
-                    c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
-            );
+            mindmap.getCollaborators().removeIf(c -> c.getEmail() != null && c.getEmail().equalsIgnoreCase(email));
             mindmapRepository.save(mindmap);
-            log.info("Collaborator {} removed from mindmap {} (status: {})", email, mindmapId, collaborator.getStatus());
+            log.info("Collaborator {} removed from mindmap {} (status: {})", email, mindmapId,
+                    collaborator.getStatus());
         } else {
-            // Case 2: Collaborator doesn't exist in mindmap but might have pending invitation
+            // Case 2: Collaborator doesn't exist in mindmap but might have pending
+            // invitation
             // This happens when user was invited but hasn't registered yet
             log.debug("Collaborator {} not found in mindmap {}, checking pending invitations", email, mindmapId);
         }
 
         // Remove pending invitation(s) for this email regardless
         var pendingInvitations = invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(
-                mindmapId, 
-                email.toLowerCase(), 
-                "pending"
-        );
-        
+                mindmapId,
+                email.toLowerCase(),
+                "pending");
+
         if (pendingInvitations.isPresent()) {
             CollaborationInvitation invitation = pendingInvitations.get();
             invitation.setStatus("cancelled");
@@ -212,7 +213,15 @@ public class CollaborationService {
 
         // If neither collaborator nor invitation exists, throw error
         if (collaborator == null && pendingInvitations.isEmpty()) {
-            throw new IllegalArgumentException("Người dùng này không phải là collaborator hoặc không có lời mời đang chờ xác nhận.");
+            throw new IllegalArgumentException(
+                    "Người dùng này không phải là collaborator hoặc không có lời mời đang chờ xác nhận.");
+        }
+
+        // Send real-time notification if collaborator was removed
+        if (collaborator != null) {
+            notifyPermissionChange(mindmapId, "collaborator_removed", Map.of(
+                    "email", email,
+                    "userId", collaborator.getMysqlUserId() != null ? collaborator.getMysqlUserId() : 0));
         }
     }
 
@@ -252,7 +261,7 @@ public class CollaborationService {
             log.info("Creating new collaborator entry for user {} in mindmap {}", userId, mindmap.getId());
             User acceptingUser = userRepository.findById(userId).orElse(null);
             String userEmail = (acceptingUser != null) ? acceptingUser.getEmail() : invitation.getInvitedEmail();
-            
+
             collaborator = Collaborator.builder()
                     .mysqlUserId(userId)
                     .email(userEmail)
@@ -261,7 +270,7 @@ public class CollaborationService {
                     .invitedAt(invitation.getCreatedAt())
                     .status("pending")
                     .build();
-            
+
             mindmap.getCollaborators().add(collaborator);
             log.info("Collaborator {} added to mindmap {} with pending status", userEmail, mindmap.getId());
         }
@@ -269,9 +278,10 @@ public class CollaborationService {
         log.info("Updating collaborator status for user {} in mindmap {} to accepted", userId, mindmap.getId());
         collaborator.setStatus("accepted");
         collaborator.setAcceptedAt(LocalDateTime.now());
-        
+
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
-        log.info("Mindmap saved after accepting invitation. Updated collaborator status in mindmap {}", updatedMindmap.getId());
+        log.info("Mindmap saved after accepting invitation. Updated collaborator status in mindmap {}",
+                updatedMindmap.getId());
 
         // Cập nhật status của lời mời
         invitation.setStatus("accepted");
@@ -306,9 +316,8 @@ public class CollaborationService {
             Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
                     .orElse(null);
             if (mindmap != null) {
-                mindmap.getCollaborators().removeIf(c -> 
-                        c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId) && "pending".equals(c.getStatus())
-                );
+                mindmap.getCollaborators().removeIf(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId)
+                        && "pending".equals(c.getStatus()));
                 mindmapRepository.save(mindmap);
             }
         }
@@ -339,7 +348,8 @@ public class CollaborationService {
         }
 
         // Return all pending invitations (including those for unregistered users)
-        // This will show all pending invites regardless of whether user has registered or been added as collaborator
+        // This will show all pending invites regardless of whether user has registered
+        // or been added as collaborator
         return invitationRepository.findByMindmapIdAndStatus(mindmapId, "pending");
     }
 
@@ -354,9 +364,8 @@ public class CollaborationService {
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
         // Find and remove the collaborator
-        boolean removed = mindmap.getCollaborators().removeIf(c -> 
-                c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId)
-        );
+        boolean removed = mindmap.getCollaborators()
+                .removeIf(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId));
 
         if (!removed) {
             throw new IllegalArgumentException("Người dùng này không phải là collaborator của mindmap này.");
@@ -364,5 +373,30 @@ public class CollaborationService {
 
         mindmapRepository.save(mindmap);
         log.info("User {} successfully left mindmap {}", userId, mindmapId);
+    }
+
+    /**
+     * Send notification to real-time server about permission changes
+     */
+    private void notifyPermissionChange(String mindmapId, String eventType, Map<String, Object> data) {
+        try {
+            String url = realtimeServerUrl + "/notify/permission-change";
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("mindmapId", mindmapId);
+            payload.put("eventType", eventType);
+            payload.put("data", data);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
+
+            restTemplate.postForEntity(url, request, String.class);
+            log.info("Sent permission change notification: {} for mindmap: {}", eventType, mindmapId);
+        } catch (Exception e) {
+            log.error("Failed to send permission change notification: {}", e.getMessage());
+            // Don't throw exception, notification failure shouldn't break the operation
+        }
     }
 }
