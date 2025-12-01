@@ -38,6 +38,8 @@ class EmailVerificationRepositoryTest {
                 .fullName("Test User")
                 .emailVerified(false)
                 .role(User.Role.user)
+                .oauthProvider(User.OAuthProvider.email)
+                .status(User.UserStatus.active) // Set explicitly
                 .credit(0L)
                 .createdAt(LocalDateTime.now())
                 .build();
