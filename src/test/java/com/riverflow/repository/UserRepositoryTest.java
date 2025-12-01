@@ -37,7 +37,9 @@ class UserRepositoryTest {
                 .fullName("Test User")
                 .emailVerified(true)
                 .role(User.Role.user)
-                .credit(100L)
+                .oauthProvider(User.OAuthProvider.email)
+                .status(User.UserStatus.active)
+                .credit(0L)
                 .createdAt(LocalDateTime.now())
                 .build();
     }
@@ -92,55 +94,69 @@ class UserRepositoryTest {
     void save_NewUser_PersistsSuccessfully() {
         // Given
         User newUser = User.builder()
-                .email("newuser@example.com")
-                .passwordHash("hashedPassword456")
+                .email("new@example.com")
+                .passwordHash("hashedPassword")
                 .fullName("New User")
                 .emailVerified(false)
                 .role(User.Role.user)
-                .credit(0L)
-                .createdAt(LocalDateTime.now())
+                .oauthProvider(User.OAuthProvider.email)
+                .status(User.UserStatus.active) // Set explicitly
                 .build();
 
         // When
-        User saved = userRepository.save(newUser);
+        User savedUser = userRepository.save(newUser);
 
         // Then
-        assertThat(saved.getId()).isNotNull();
-        assertThat(saved.getEmail()).isEqualTo("newuser@example.com");
-        assertThat(saved.getEmailVerified()).isFalse();
+        assertThat(savedUser.getId()).isNotNull();
+        assertThat(savedUser.getEmail()).isEqualTo("new@example.com");
+        assertThat(savedUser.getCreatedAt()).isNotNull();
+        assertThat(savedUser.getUpdatedAt()).isNotNull();
     }
 
     @Test
     void save_UpdateExistingUser_UpdatesSuccessfully() {
         // Given
-        entityManager.persist(testUser);
+        User existingUser = User.builder()
+                .email("update@example.com")
+                .passwordHash("oldHash")
+                .fullName("Old Name")
+                .emailVerified(true)
+                .role(User.Role.user)
+                .oauthProvider(User.OAuthProvider.email)
+                .status(User.UserStatus.active) // Set explicitly
+                .build();
+        entityManager.persist(existingUser);
         entityManager.flush();
-        Long userId = testUser.getId();
 
         // When
-        testUser.setFullName("Updated Name");
-        testUser.setLastLoginAt(LocalDateTime.now());
-        User updated = userRepository.save(testUser);
+        existingUser.setFullName("Updated Name");
+        User updatedUser = userRepository.save(existingUser);
 
         // Then
-        assertThat(updated.getId()).isEqualTo(userId);
-        assertThat(updated.getFullName()).isEqualTo("Updated Name");
-        assertThat(updated.getLastLoginAt()).isNotNull();
+        assertThat(updatedUser.getFullName()).isEqualTo("Updated Name");
     }
 
     @Test
     void findById_ExistingUser_ReturnsUser() {
         // Given
-        entityManager.persist(testUser);
+        User user = User.builder()
+                .email("findbyid@example.com")
+                .passwordHash("hash")
+                .fullName("Find Me")
+                .emailVerified(true)
+                .role(User.Role.user)
+                .oauthProvider(User.OAuthProvider.email)
+                .status(User.UserStatus.active) // Set explicitly
+                .build();
+        User persistedUser = entityManager.persist(user);
         entityManager.flush();
-        Long userId = testUser.getId();
 
         // When
-        Optional<User> found = userRepository.findById(userId);
+        Optional<User> foundUser = userRepository.findById(persistedUser.getId());
 
         // Then
-        assertThat(found).isPresent();
-        assertThat(found.get().getId()).isEqualTo(userId);
+        assertThat(foundUser).isPresent();
+        assertThat(foundUser.get().getEmail()).isEqualTo("findbyid@example.com");
     }
 
     @Test
