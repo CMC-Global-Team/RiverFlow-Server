@@ -7,7 +7,6 @@ import com.riverflow.repository.PasswordResetRepository;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.service.SmtpEmailService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +19,6 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class ForgotPasswordService {
 
     private final UserRepository userRepository;
@@ -40,10 +38,7 @@ public class ForgotPasswordService {
     public void sendPasswordResetEmail(ForgotPasswordRequest request) {
         // Find user
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> {
-                    log.warn("Password reset requested for non-existent email: {}", request.getEmail());
-                    return new IllegalArgumentException("Tài khoản với email này chưa được đăng ký");
-                });
+                .orElseThrow(() -> new IllegalArgumentException("Tài khoản với email này chưa được đăng ký"));
 
         // Generate reset token
         String token = UUID.randomUUID().toString();
@@ -57,7 +52,6 @@ public class ForgotPasswordService {
 
         // Send reset email via SMTP Server
         smtpEmailService.sendResetPasswordEmail(user.getEmail(), token);
-        log.info("Password reset email sent to {} via SMTP server", user.getEmail());
     }
 }
 

@@ -9,7 +9,6 @@ import com.riverflow.repository.EmailVerificationRepository;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.service.SmtpEmailService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,7 +22,6 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RegisterService {
 
     private final UserRepository userRepository;
@@ -47,7 +45,6 @@ public class RegisterService {
     public RegisterResponse register(RegisterRequest request) {
         // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
-            log.warn("Registration attempt with existing email: {}", request.getEmail());
             throw new EmailAlreadyExistsException("Email " + request.getEmail() + " đã được sử dụng.");
         }
 
@@ -64,7 +61,6 @@ public class RegisterService {
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("New user registered: {}", savedUser.getEmail());
 
         // Generate verification token
         String token = UUID.randomUUID().toString();
@@ -77,7 +73,6 @@ public class RegisterService {
 
         // Send verification email via SMTP Server
         smtpEmailService.sendVerificationEmail(savedUser.getEmail(), token);
-        log.info("Verification email sent to {} via SMTP server", savedUser.getEmail());
 
         // Build response
         return RegisterResponse.builder()

@@ -4,7 +4,6 @@ import com.riverflow.config.jwt.JwtConfig;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +19,6 @@ import java.util.function.Function;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class JwtUtil {
 
     private final JwtConfig jwtConfig;
@@ -66,7 +64,6 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (JwtException e) {
-            log.error("JWT parsing error: {}", e.getMessage());
             throw e;
         }
     }
@@ -123,7 +120,6 @@ public class JwtUtil {
             final String username = extractUsername(token);
             return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
         } catch (JwtException e) {
-            log.error("JWT validation error: {}", e.getMessage());
             return false;
         }
     }
@@ -136,7 +132,6 @@ public class JwtUtil {
             extractAllClaims(token);
             return !isTokenExpired(token);
         } catch (JwtException e) {
-            log.error("JWT validation error: {}", e.getMessage());
             return false;
         }
     }

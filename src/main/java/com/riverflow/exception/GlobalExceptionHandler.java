@@ -4,7 +4,6 @@ import com.riverflow.dto.MessageResponse;
 import com.riverflow.exception.mindmap.InvalidMindmapDataException;
 import com.riverflow.exception.mindmap.MindmapAccessDeniedException;
 import com.riverflow.exception.mindmap.MindmapNotFoundException;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -22,7 +21,6 @@ import java.util.Map;
  * Global Exception Handler để xử lý các exception trong ứng dụng
  */
 @RestControllerAdvice
-@Slf4j
 public class GlobalExceptionHandler {
 
     /**
@@ -31,7 +29,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<MessageResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
-        log.error("IllegalArgumentException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new MessageResponse(ex.getMessage()));
@@ -42,7 +39,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<MessageResponse> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
-        log.error("EmailAlreadyExistsException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(new MessageResponse(ex.getMessage()));
@@ -53,7 +49,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<MessageResponse> handleInvalidTokenException(InvalidTokenException ex) {
-        log.error("InvalidTokenException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new MessageResponse(ex.getMessage()));
@@ -65,7 +60,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(EmailNotVerifiedException.class)
     public ResponseEntity<MessageResponse> handleEmailNotVerifiedException(EmailNotVerifiedException ex) {
-        log.error("EmailNotVerifiedException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(new MessageResponse(ex.getMessage()));
@@ -77,7 +71,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<MessageResponse> handleBadCredentialsException(BadCredentialsException ex) {
-        log.error("BadCredentialsException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(new MessageResponse(ex.getMessage()));
@@ -100,7 +93,6 @@ public class GlobalExceptionHandler {
         response.put("message", "Dữ liệu không hợp lệ");
         response.put("errors", errors);
         
-        log.error("Validation failed: {}", errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(response);
@@ -111,7 +103,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MindmapNotFoundException.class)
     public ResponseEntity<MessageResponse> handleMindmapNotFoundException(MindmapNotFoundException ex) {
-        log.error("MindmapNotFoundException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(new MessageResponse(ex.getMessage()));
@@ -122,7 +113,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MindmapAccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleMindmapAccessDeniedException(MindmapAccessDeniedException ex) {
-        log.error("MindmapAccessDeniedException: {}", ex.getMessage());
         Map<String, Object> response = new HashMap<>();
         response.put("message", ex.getMessage());
         // Include shareToken if available (for public mindmaps)
@@ -139,7 +129,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(InvalidMindmapDataException.class)
     public ResponseEntity<MessageResponse> handleInvalidMindmapDataException(InvalidMindmapDataException ex) {
-        log.error("InvalidMindmapDataException: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new MessageResponse(ex.getMessage()));
@@ -150,7 +139,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(AiUpstreamException.class)
     public ResponseEntity<MessageResponse> handleAiUpstream(AiUpstreamException ex) {
-        log.error("AiUpstreamException: status={} message={}", ex.getStatus(), ex.getMessage());
         HttpStatus status;
         try {
             status = HttpStatus.valueOf(ex.getStatus());
@@ -165,7 +153,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<MessageResponse> handleGenericException(Exception ex) {
-        log.error("Unexpected error: ", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new MessageResponse("Đã xảy ra lỗi không mong muốn. Vui lòng thử lại sau."));
@@ -184,7 +171,6 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ClientAbortException.class)
     public ResponseEntity<Void> handleClientAbort(ClientAbortException ex) {
-        log.warn("Client aborted connection: {}", ex.getMessage());
         return ResponseEntity.noContent().build();
     }
 }

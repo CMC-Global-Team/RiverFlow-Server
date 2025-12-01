@@ -5,7 +5,6 @@ import com.riverflow.dto.authentication.UserResponse;
 import com.riverflow.model.User;
 import com.riverflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
@@ -73,8 +71,6 @@ public class UserService {
         }
 
         userRepository.save(user);
-
-        log.info("User {} profile updated", user.getEmail());
 
         // Generate avatar URL if avatar data exists
         // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
