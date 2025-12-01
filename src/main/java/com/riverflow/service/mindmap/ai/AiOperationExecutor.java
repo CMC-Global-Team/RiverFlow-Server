@@ -36,9 +36,11 @@ public class AiOperationExecutor {
                     case "update_node" -> logs.add(updateNode(op, mindmap));
                     case "add_node" -> logs.add(addNode(op, mindmap));
                     case "add_edge" -> logs.add(addEdge(op, mindmap));
-                    default -> }
-            } catch (Exception e) {
+                    default -> { /* unknown operation type */ }
                 }
+            } catch (Exception e) {
+                // Ignore operation errors
+            }
         }
 
         return logs;
@@ -216,8 +218,7 @@ public class AiOperationExecutor {
 
         if (!StringUtils.hasText(parentId)) {
             parentId = findRootNodeId(mindmap);
-        } else {
-            }
+        }
 
         String newId = NEW_NODE_PREFIX + UUID.randomUUID();
 
@@ -288,7 +289,7 @@ public class AiOperationExecutor {
             mindmap.getEdges().add(edge);
             // Force MongoDB change detection by creating new ArrayList
             mindmap.setEdges(new ArrayList<>(mindmap.getEdges()));
-            }
+        }
 
         String result = "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
         return result;
@@ -342,10 +343,7 @@ public class AiOperationExecutor {
         String targetLower = nodeLabel.trim().toLowerCase();
 
         // Log all available nodes for debugging
-        for (Map<String, Object> n : mindmap.getNodes()) {
-            String label = extractLabel(n);
-            String id = String.valueOf(n.get("id"));
-            }
+        // Note: All available nodes are checked for matching
 
         // Exact match first
         Optional<Map<String, Object>> exact = mindmap.getNodes().stream()
