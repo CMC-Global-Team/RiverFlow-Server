@@ -11,13 +11,16 @@ WORKDIR /app
 COPY pom.xml .
 
 # Download dependencies (this layer will be cached)
-RUN mvn dependency:go-offline -B
+RUN mvn dependency:go-offline -B || true
 
-# Copy source code
+# Copy ALL source code including tests
 COPY src ./src
+
+# Verify test files exist
+RUN ls -la src/test/java/com/riverflow/ || echo "Test directory not found!"
 
 # Run tests
 # -B: Batch mode (non-interactive)
 # -DskipTests=false: Ensure tests are run
 # test: Run test phase
-CMD ["mvn", "-B", "-DskipTests=false", "test"]
+CMD ["mvn", "-B", "clean", "test"]
