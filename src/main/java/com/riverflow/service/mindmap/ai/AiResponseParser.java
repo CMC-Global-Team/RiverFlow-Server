@@ -3,7 +3,6 @@ package com.riverflow.service.mindmap.ai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -13,7 +12,6 @@ import java.util.*;
  * Parses Gemini AI JSON responses into clean Java objects
  */
 @Component
-@Slf4j
 @RequiredArgsConstructor
 public class AiResponseParser {
 
@@ -39,14 +37,12 @@ public class AiResponseParser {
                         Map<String, Object> opMap = objectMapper.convertValue(op, Map.class);
                         ops.add(opMap);
                     } catch (Exception e) {
-                        log.warn("Failed to parse op: {}", e.getMessage());
-                    }
+                        }
                 }
             }
 
             return new AiDecision(targetType, language, structureType, nodeLabel, ops);
         } catch (Exception e) {
-            log.error("Failed to parse AI classify response: {}", e.getMessage());
             return new AiDecision(null, null, null, null, List.of());
         }
     }

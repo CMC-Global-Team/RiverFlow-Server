@@ -12,7 +12,6 @@ import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.util.mindmap.MindmapMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -33,7 +32,6 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class MindmapServiceImpl implements MindmapService {
 
     private final MindmapRepository mindmapRepository;
@@ -45,8 +43,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse createMindmap(CreateMindmapRequest request, Long userId) {
-        log.info("Creating new mindmap for user: {}", userId);
-
         Mindmap mindmap = Mindmap.builder()
                 .mysqlUserId(userId)
                 .title(request.getTitle())
@@ -70,8 +66,6 @@ public class MindmapServiceImpl implements MindmapService {
                 .build();
 
         Mindmap savedMindmap = mindmapRepository.save(mindmap);
-        log.info("Mindmap created successfully with id: {}", savedMindmap.getId());
-
         historyService.recordChange(
                 savedMindmap.getId(),
                 userId,
@@ -89,19 +83,11 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public MindmapResponse getMindmapById(String mindmapId, Long userId) {
-        log.info("Getting mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
         // Check if user has access
         if (!hasAccess(mindmap, userId)) {
-            log.error("Access Denied - User: {}, Mindmap: {}, Owner: {}, IsPublic: {}, Collaborators: {}", 
-                userId, mindmapId, mindmap.getMysqlUserId(), mindmap.getIsPublic(),
-                mindmap.getCollaborators().stream()
-                    .map(c -> "userId=" + c.getMysqlUserId() + ",status=" + c.getStatus())
-                    .toList()
-            );
             // If mindmap is public, include shareToken in exception so client can load via public API
             String shareToken = null;
             if (Boolean.TRUE.equals(mindmap.getIsPublic()) && mindmap.getShareToken() != null) {
@@ -120,8 +106,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse updateMindmap(String mindmapId, UpdateMindmapRequest request, Long userId) {
-        log.info("Updating mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -139,7 +123,6 @@ public class MindmapServiceImpl implements MindmapService {
                 );
         
         if (!isOwner && !isEditorCollaborator) {
-            log.warn("User {} does not have permission to update mindmap {}", userId, mindmapId);
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
 
@@ -192,8 +175,6 @@ public class MindmapServiceImpl implements MindmapService {
         mindmap.setUpdatedAt(LocalDateTime.now());
 
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
-        log.info("Mindmap updated successfully: {}", mindmapId);
-
         historyService.recordChange(
                 mindmapId,
                 userId,
@@ -212,8 +193,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public void deleteMindmap(String mindmapId, Long userId) {
-        log.info("Soft deleting mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -230,14 +209,11 @@ public class MindmapServiceImpl implements MindmapService {
 
         historyService.recordChange(mindmapId, userId, "delete_mindmap", oldStatus, "deleted");
 
-        log.info("Mindmap soft deleted successfully: {}", mindmapId);
-    }
+        }
 
     @Override
     @Transactional
     public void permanentlyDeleteMindmap(String mindmapId, Long userId) {
-        log.info("Permanently deleting mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -247,13 +223,10 @@ public class MindmapServiceImpl implements MindmapService {
         }
 
         mindmapRepository.delete(mindmap);
-        log.info("Mindmap permanently deleted: {}", mindmapId);
-    }
+        }
 
     @Override
     public List<MindmapSummaryResponse> getAllMindmapsByUser(Long userId) {
-        log.info("Getting all active mindmaps for user: {}", userId);
-
         // Get mindmaps owned by user
         List<Mindmap> ownedMindmaps = mindmapRepository
                 .findByMysqlUserIdAndStatusOrderByUpdatedAtDesc(userId, "active");
@@ -293,8 +266,6 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public List<MindmapSummaryResponse> getMindmapsByCategory(Long userId, String category) {
-        log.info("Getting mindmaps by category: {} for user: {}", category, userId);
-
         List<Mindmap> mindmaps = mindmapRepository
                 .findByMysqlUserIdAndCategoryAndStatus(userId, category, "active");
 
@@ -311,8 +282,6 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public List<MindmapSummaryResponse> getFavoriteMindmaps(Long userId) {
-        log.info("Getting favorite mindmaps for user: {}", userId);
-
         Query query = new Query();
         query.addCriteria(Criteria.where("mysqlUserId").is(userId)
                 .and("isFavorite").is(true)
@@ -333,8 +302,6 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public List<MindmapSummaryResponse> getArchivedMindmaps(Long userId) {
-        log.info("Getting archived mindmaps for user: {}", userId);
-
         List<Mindmap> mindmaps = mindmapRepository
                 .findByMysqlUserIdAndStatus(userId, "archived");
 
@@ -352,8 +319,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse toggleFavorite(String mindmapId, Long userId) {
-        log.info("Toggling favorite status for mindmap: {} user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -370,8 +335,6 @@ public class MindmapServiceImpl implements MindmapService {
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
 
         historyService.recordChange(mindmapId, userId, "toggle_favorite", oldState, newState);
-        log.info("Favorite status toggled for mindmap: {}", mindmapId);
-
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
         response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
@@ -382,8 +345,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse archiveMindmap(String mindmapId, Long userId) {
-        log.info("Archiving mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -399,8 +360,6 @@ public class MindmapServiceImpl implements MindmapService {
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
 
         historyService.recordChange(mindmapId, userId, "archive_mindmap", oldState, "archived");
-        log.info("Mindmap archived: {}", mindmapId);
-
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
         response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
@@ -411,8 +370,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse unarchiveMindmap(String mindmapId, Long userId) {
-        log.info("Unarchiving mindmap: {} for user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -428,8 +385,6 @@ public class MindmapServiceImpl implements MindmapService {
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
 
         historyService.recordChange(mindmapId, userId, "unarchive_mindmap", oldState, "active");
-        log.info("Mindmap unarchived: {}", mindmapId);
-
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
         response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
@@ -439,8 +394,6 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public List<MindmapSummaryResponse> searchMindmaps(Long userId, String keyword) {
-        log.info("Searching mindmaps for user: {} with keyword: {}", userId, keyword);
-
         Query query = new Query();
 
         Criteria criteria = new Criteria().andOperator(
@@ -470,8 +423,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse duplicateMindmap(String originalMapId, Long userId) {
-        log.info("Nhân bản mindmap: {} cho user: {}", originalMapId, userId);
-
         Mindmap originalMindmap = mindmapRepository.findById(originalMapId)
                 .orElseThrow(() -> new MindmapNotFoundException(originalMapId, userId));
 
@@ -526,8 +477,6 @@ public class MindmapServiceImpl implements MindmapService {
         );
 
         Mindmap savedMindmap = mindmapRepository.save(newMindmap);
-        log.info("Nhân bản thành công. Mindmap mới ID: {}", savedMindmap.getId());
-
         historyService.recordChange(
                 savedMindmap.getId(),
                 userId,
@@ -549,8 +498,6 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId) {
-        log.info("Updating public access for mindmap: {} by user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -565,12 +512,9 @@ public class MindmapServiceImpl implements MindmapService {
         // Generate shareToken if making public and it doesn't have one
         if (Boolean.TRUE.equals(isPublic) && mindmap.getShareToken() == null) {
             mindmap.setShareToken(java.util.UUID.randomUUID().toString());
-            log.info("Generated shareToken for mindmap: {} token: {}", mindmapId, mindmap.getShareToken());
-        }
+            }
 
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
-        log.info("Public access updated for mindmap: {} isPublic: {} accessLevel: {}", mindmapId, isPublic, accessLevel);
-
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
         response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
@@ -584,19 +528,16 @@ public class MindmapServiceImpl implements MindmapService {
     private boolean hasAccess(Mindmap mindmap, Long userId) {
         // Public mindmaps are accessible to everyone (including unauthenticated users)
         if (Boolean.TRUE.equals(mindmap.getIsPublic())) {
-            log.debug("Mindmap {} is public, user {} has access", mindmap.getId(), userId != null ? userId : "unauthenticated");
             return true;
         }
 
         // If user is not authenticated, only public mindmaps are accessible
         if (userId == null) {
-            log.debug("User is unauthenticated and mindmap {} is not public, no access", mindmap.getId());
             return false;
         }
 
         // Owner has access
         if (mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId)) {
-            log.debug("User {} has access to mindmap {} as owner", userId, mindmap.getId());
             return true;
         }
 
@@ -609,18 +550,14 @@ public class MindmapServiceImpl implements MindmapService {
                         ("accepted".equals(collaborator.getStatus()) || "pending".equals(collaborator.getStatus()))
                     );
             if (hasAccess) {
-                log.debug("User {} has access to mindmap {} as collaborator", userId, mindmap.getId());
                 return true;
             }
             
             // Log all collaborators for debugging
-            log.debug("Checking collaborators for user {} in mindmap {}", userId, mindmap.getId());
             mindmap.getCollaborators().forEach(c -> {
-                log.debug("Collaborator: email={}, mysqlUserId={}, status={}", c.getEmail(), c.getMysqlUserId(), c.getStatus());
-            });
+                });
         } else {
-            log.debug("Mindmap {} has no collaborators", mindmap.getId());
-        }
+            }
 
         return false;
     }
@@ -628,13 +565,10 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     @Transactional
     public MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request) {
-        log.info("Updating mindmap with shareToken: {}", shareToken);
-
         Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
                 .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
 
         if (!Boolean.TRUE.equals(mindmap.getIsPublic()) || !"edit".equals(mindmap.getPublicAccessLevel())) {
-            log.error("Attempted to update non-editable public mindmap with shareToken: {}", shareToken);
             throw new MindmapAccessDeniedException("This mindmap is not editable publicly", mindmap.getId(), null);
         }
 
@@ -661,14 +595,11 @@ public class MindmapServiceImpl implements MindmapService {
 
     @Override
     public MindmapResponse getMindmapByShareToken(String shareToken) {
-        log.info("Getting mindmap with shareToken: {}", shareToken);
-
         Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
                 .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
 
         // Verify mindmap is public
         if (!Boolean.TRUE.equals(mindmap.getIsPublic())) {
-            log.error("Attempted to access non-public mindmap with shareToken: {}", shareToken);
             throw new MindmapNotFoundException("This mindmap is not public", null);
         }
 

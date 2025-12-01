@@ -1,6 +1,5 @@
 package com.riverflow.config;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -12,7 +11,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * Instead, FileController handles file serving with graceful 404 responses.
  */
 @Configuration
-@Slf4j
 public class FileStorageConfig implements WebMvcConfigurer {
 
     /**

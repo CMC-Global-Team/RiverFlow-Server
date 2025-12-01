@@ -7,7 +7,6 @@ import com.riverflow.model.mindmap.MindmapHistory;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.mindmap.MindmapHistoryService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -19,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/mindmaps")
 @RequiredArgsConstructor
-@Slf4j
 public class MindmapHistoryController {
 
     private final MindmapHistoryService historyService;
@@ -68,7 +66,6 @@ public class MindmapHistoryController {
                 request.getStatus()
         );
         if (saved != null) {
-            log.info("Log history mindmapId={} userId={} action={}", id, userId, request.getAction());
             return ResponseEntity.ok(new MessageResponse("Logged"));
         }
         return ResponseEntity.ok(new MessageResponse("Skipped"));

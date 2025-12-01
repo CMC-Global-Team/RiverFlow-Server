@@ -8,7 +8,6 @@ import com.riverflow.model.User;
 import com.riverflow.service.mindmap.ai.AiMindmapService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -20,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/mindmaps/ai")
 @RequiredArgsConstructor
-@Slf4j
 public class AiMindmapController {
 
     private final AiMindmapService aiMindmapService;
@@ -32,7 +30,6 @@ public class AiMindmapController {
             Authentication authentication
     ) {
         Long userId = getUserIdFromAuth(authentication);
-        log.info("AI generate mindmap for user: {} topic: {}", userId, request.getTopic());
         MindmapResponse response = aiMindmapService.generateMindmap(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -44,7 +41,6 @@ public class AiMindmapController {
             Authentication authentication
     ) {
         Long userId = getUserIdFromAuth(authentication);
-        log.info("AI optimize {} for map {} by user {}", request.getTargetType(), request.getMindmapId(), userId);
         MindmapResponse response = aiMindmapService.optimize(request, userId);
         return ResponseEntity.ok(response);
     }
@@ -56,6 +52,4 @@ public class AiMindmapController {
         return user.getId();
     }
 }
-
-
 

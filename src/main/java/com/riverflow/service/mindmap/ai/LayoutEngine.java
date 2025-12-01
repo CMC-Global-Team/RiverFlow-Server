@@ -1,6 +1,5 @@
 package com.riverflow.service.mindmap.ai;
 
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -10,7 +9,6 @@ import java.util.stream.Collectors;
  * Layout engine for auto-positioning mindmap nodes based on structure type
  */
 @Component
-@Slf4j
 public class LayoutEngine {
 
     private static final int NODE_WIDTH = 200;
@@ -24,11 +22,8 @@ public class LayoutEngine {
      */
     public void applyLayout(String structureType, List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
         if (nodes == null || nodes.isEmpty()) {
-            log.warn("[Layout] No nodes to layout");
             return;
         }
-
-        log.info("[Layout] Applying {} layout to {} nodes", structureType, nodes.size());
 
         switch (structureType.toLowerCase()) {
             case "mindmap" -> layoutMindmapStyle(nodes, edges);
@@ -41,8 +36,7 @@ public class LayoutEngine {
             default -> layoutMindmapStyle(nodes, edges);
         }
 
-        log.info("[Layout] Layout applied successfully");
-    }
+        }
 
     /**
      * Mindmap style: Weighted Radial Layout (Collision-free)

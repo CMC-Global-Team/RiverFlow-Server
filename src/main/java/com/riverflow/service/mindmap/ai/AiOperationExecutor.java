@@ -1,7 +1,6 @@
 package com.riverflow.service.mindmap.ai;
 
 import com.riverflow.model.mindmap.Mindmap;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -14,7 +13,6 @@ import java.util.stream.Collectors;
  * decisions.
  */
 @Component
-@Slf4j
 public class AiOperationExecutor {
 
     private static final String NEW_NODE_PREFIX = "node-";
@@ -38,11 +36,9 @@ public class AiOperationExecutor {
                     case "update_node" -> logs.add(updateNode(op, mindmap));
                     case "add_node" -> logs.add(addNode(op, mindmap));
                     case "add_edge" -> logs.add(addEdge(op, mindmap));
-                    default -> log.warn("Unknown operation type: {}", type);
-                }
+                    default -> }
             } catch (Exception e) {
-                log.error("Error executing operation {}: {}", type, e.getMessage());
-            }
+                }
         }
 
         return logs;
@@ -52,18 +48,12 @@ public class AiOperationExecutor {
         String nodeLabel = String.valueOf(op.getOrDefault("nodeLabel", ""));
         String nodeId = findNodeIdByLabel(mindmap, nodeLabel);
 
-        log.info("[Delete Node] Attempting to delete node '{}'", nodeLabel);
-
         if (!StringUtils.hasText(nodeId)) {
-            log.warn("[Delete Node] Node not found: {}", nodeLabel);
             return "Node not found: " + nodeLabel;
         }
 
         int beforeNodes = mindmap.getNodes().size();
         int beforeEdges = mindmap.getEdges().size();
-
-        log.info("[Delete Node] Found node to delete: id='{}', label='{}'", nodeId, nodeLabel);
-        log.info("[Delete Node] Before deletion: nodes={}, edges={}", beforeNodes, beforeEdges);
 
         mindmap.setNodes(mindmap.getNodes().stream()
                 .filter(n -> !nodeId.equals(String.valueOf(n.get("id"))))
@@ -77,11 +67,7 @@ public class AiOperationExecutor {
         int afterNodes = mindmap.getNodes().size();
         int afterEdges = mindmap.getEdges().size();
 
-        log.info("[Delete Node] After deletion: nodes={}, edges={}", afterNodes, afterEdges);
-        log.info("[Delete Node] Deleted {} nodes and {} edges", beforeNodes - afterNodes, beforeEdges - afterEdges);
-
         String result = "Deleted node: " + nodeLabel;
-        log.info("[Delete Node] Success: {}", result);
         return result;
     }
 
@@ -196,8 +182,6 @@ public class AiOperationExecutor {
         if (updated) {
             // Force MongoDB change detection by creating new ArrayList
             mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
-            log.info("[Update Node] Forced change detection for mindmap nodes");
-
             List<String> changes = new ArrayList<>();
             if (StringUtils.hasText(newLabel) && !"null".equals(newLabel))
                 changes.add("label→" + newLabel);
@@ -222,10 +206,7 @@ public class AiOperationExecutor {
         String parentLabel = String.valueOf(op.getOrDefault("parentLabel", ""));
         String label = String.valueOf(op.getOrDefault("label", ""));
 
-        log.info("[Add Node] Attempting to add node '{}' under parent '{}'", label, parentLabel);
-
         if (!StringUtils.hasText(label)) {
-            log.warn("[Add Node] Failed: empty label");
             return "Failed to add node: empty label";
         }
 
@@ -234,11 +215,9 @@ public class AiOperationExecutor {
                 : findRootNodeId(mindmap);
 
         if (!StringUtils.hasText(parentId)) {
-            log.warn("[Add Node] Parent '{}' not found, using root", parentLabel);
             parentId = findRootNodeId(mindmap);
         } else {
-            log.info("[Add Node] Found parent: label='{}', id='{}'", parentLabel, parentId);
-        }
+            }
 
         String newId = NEW_NODE_PREFIX + UUID.randomUUID();
 
@@ -299,8 +278,6 @@ public class AiOperationExecutor {
         mindmap.getNodes().add(newNode);
         // Force MongoDB change detection by creating new ArrayList
         mindmap.setNodes(new ArrayList<>(mindmap.getNodes()));
-        log.info("[Add Node] Created new node: id='{}', label='{}', type='{}'", newId, label, nodeType);
-
         if (StringUtils.hasText(parentId)) {
             Map<String, Object> edge = new HashMap<>();
             edge.put("id", NEW_EDGE_PREFIX + UUID.randomUUID());
@@ -311,12 +288,9 @@ public class AiOperationExecutor {
             mindmap.getEdges().add(edge);
             // Force MongoDB change detection by creating new ArrayList
             mindmap.setEdges(new ArrayList<>(mindmap.getEdges()));
-            log.info("[Add Node] Created edge from '{}' to '{}'", parentId, newId);
-        }
+            }
 
-        log.info("[Add Node] Forced change detection for mindmap nodes and edges");
         String result = "Added node: " + label + (StringUtils.hasText(parentLabel) ? " under " + parentLabel : "");
-        log.info("[Add Node] Success: {}", result);
         return result;
     }
 
@@ -357,26 +331,21 @@ public class AiOperationExecutor {
         mindmap.getEdges().add(edge);
         // Force MongoDB change detection by creating new ArrayList
         mindmap.setEdges(new ArrayList<>(mindmap.getEdges()));
-        log.info("[Add Edge] Forced change detection for mindmap edges");
-
         return "Added edge: " + sourceLabel + " → " + targetLabel;
     }
 
     private String findNodeIdByLabel(Mindmap mindmap, String nodeLabel) {
         if (!StringUtils.hasText(nodeLabel)) {
-            log.warn("[Find Node] Empty node label provided");
             return null;
         }
 
         String targetLower = nodeLabel.trim().toLowerCase();
 
         // Log all available nodes for debugging
-        log.info("[Find Node] Searching for '{}' among {} nodes:", nodeLabel, mindmap.getNodes().size());
         for (Map<String, Object> n : mindmap.getNodes()) {
             String label = extractLabel(n);
             String id = String.valueOf(n.get("id"));
-            log.info("  - Node: id='{}', label='{}'", id, label);
-        }
+            }
 
         // Exact match first
         Optional<Map<String, Object>> exact = mindmap.getNodes().stream()
@@ -389,7 +358,6 @@ public class AiOperationExecutor {
         if (exact.isPresent()) {
             String foundId = String.valueOf(exact.get().get("id"));
             String foundLabel = extractLabel(exact.get());
-            log.info("[Find Node] Exact match found: '{}' -> id='{}'", foundLabel, foundId);
             return foundId;
         }
 
@@ -404,11 +372,9 @@ public class AiOperationExecutor {
         if (contains.isPresent()) {
             String foundId = String.valueOf(contains.get().get("id"));
             String foundLabel = extractLabel(contains.get());
-            log.info("[Find Node] Contains match found: '{}' contains '{}' -> id='{}'", foundLabel, nodeLabel, foundId);
             return foundId;
         }
 
-        log.warn("[Find Node] No match found for '{}'", nodeLabel);
         return null;
     }
 

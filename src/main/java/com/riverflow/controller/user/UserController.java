@@ -8,7 +8,6 @@ import com.riverflow.service.user.AvatarService;
 import com.riverflow.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +22,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
-@Slf4j
 public class UserController {
 
     private final UserService userService;
@@ -38,18 +36,13 @@ public class UserController {
     public ResponseEntity<UserResponse> getUserProfile(Authentication authentication) {
         try {
             Long userId = getUserIdFromAuth(authentication);
-            log.info("Getting profile for user: {}", userId);
-            
             UserResponse response = userService.getUserById(userId);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid request for user profile: {}", e.getMessage());
             return ResponseEntity.badRequest().build();
         } catch (RuntimeException e) {
-            log.error("Error getting user profile", e);
             throw e; // Let GlobalExceptionHandler handle it
         } catch (Exception e) {
-            log.error("Unexpected error getting user profile", e);
             throw e; // Let GlobalExceptionHandler handle it
         }
     }
@@ -63,8 +56,6 @@ public class UserController {
             @Valid @RequestBody UpdateUserRequest request,
             Authentication authentication) {
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Updating profile for user: {}", userId);
-        
         UserResponse response = userService.updateUser(userId, request);
         return ResponseEntity.ok(response);
     }
@@ -84,8 +75,6 @@ public class UserController {
             // Upload avatar to database
             avatarService.uploadAvatar(file, userId);
             
-            log.info("Avatar uploaded for user: {}", userId);
-            
             Map<String, String> response = new HashMap<>();
             // Return /user/avatar/{userId} (context-path /api will be added automatically)
             response.put("url", "/user/avatar/" + userId);
@@ -93,10 +82,8 @@ public class UserController {
             
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid avatar upload: {}", e.getMessage());
             return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            log.error("Error uploading avatar", e);
             return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createErrorResponse("Failed to upload avatar: " + e.getMessage()));
         }
@@ -110,23 +97,17 @@ public class UserController {
     @GetMapping("/avatar/{userId}")
     public ResponseEntity<?> getAvatar(@PathVariable Long userId) {
         try {
-            log.info("Fetching avatar for user: {}", userId);
             var avatarOpt = avatarService.getAvatar(userId);
             
             if (avatarOpt.isEmpty()) {
-                log.warn("Avatar not found for user: {}", userId);
                 return ResponseEntity.notFound().build();
             }
             
             var avatar = avatarOpt.get();
-            log.info("Returning avatar for user: {} with mimeType: {}, size: {}", 
-                    userId, avatar.getMimeType(), avatar.getData().length);
-            
             return ResponseEntity.ok()
                     .contentType(org.springframework.http.MediaType.parseMediaType(avatar.getMimeType()))
                     .body(avatar.getData());
         } catch (Exception e) {
-            log.error("Error retrieving avatar for user: {}", userId, e);
             return ResponseEntity.notFound().build();
         }
     }

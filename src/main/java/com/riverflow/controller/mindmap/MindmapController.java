@@ -17,7 +17,6 @@ import com.riverflow.service.mindmap.MindmapService;
 import com.riverflow.service.mindmap.UndoRedoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,7 +30,6 @@ import java.util.*;
 @RestController
 @RequestMapping("/mindmaps")
 @RequiredArgsConstructor
-@Slf4j
 public class MindmapController {
     
     private final MindmapService mindmapService;
@@ -50,8 +48,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Creating mindmap for user: {}", userId);
-        
         MindmapResponse response = mindmapService.createMindmap(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -65,8 +61,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting all mindmaps for user: {}", userId);
-        
         List<MindmapSummaryResponse> response = mindmapService.getAllMindmapsByUser(userId);
         return ResponseEntity.ok(response);
     }
@@ -86,12 +80,9 @@ public class MindmapController {
             try {
                 userId = getUserIdFromAuth(authentication);
             } catch (Exception e) {
-                log.warn("Failed to get userId from authentication, treating as unauthenticated: {}", e.getMessage());
                 userId = null;
             }
         }
-        
-        log.info("Getting mindmap: {} for user: {}", id, userId != null ? userId : "unauthenticated");
         
         MindmapResponse response = mindmapService.getMindmapById(id, userId);
         return ResponseEntity.ok(response);
@@ -108,8 +99,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Updating mindmap: {} for user: {}", id, userId);
-        
         MindmapResponse response = mindmapService.updateMindmap(id, request, userId);
         return ResponseEntity.ok(response);
     }
@@ -124,8 +113,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Deleting mindmap: {} for user: {}", id, userId);
-        
         mindmapService.deleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap deleted successfully"));
     }
@@ -140,8 +127,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Permanently deleting mindmap: {} for user: {}", id, userId);
-        
         mindmapService.permanentlyDeleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap permanently deleted"));
     }
@@ -156,8 +141,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Duplicating mindmap: {} for user: {}", id, userId);
-
         MindmapResponse response = mindmapService.duplicateMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -172,8 +155,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting mindmaps by category: {} for user: {}", category, userId);
-        
         List<MindmapSummaryResponse> response = mindmapService.getMindmapsByCategory(userId, category);
         return ResponseEntity.ok(response);
     }
@@ -187,8 +168,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting favorite mindmaps for user: {}", userId);
-        
         List<MindmapSummaryResponse> response = mindmapService.getFavoriteMindmaps(userId);
         return ResponseEntity.ok(response);
     }
@@ -202,8 +181,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting archived mindmaps for user: {}", userId);
-        
         List<MindmapSummaryResponse> response = mindmapService.getArchivedMindmaps(userId);
         return ResponseEntity.ok(response);
     }
@@ -218,8 +195,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Toggling favorite for mindmap: {} user: {}", id, userId);
-        
         MindmapResponse response = mindmapService.toggleFavorite(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -234,8 +209,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Archiving mindmap: {} for user: {}", id, userId);
-        
         MindmapResponse response = mindmapService.archiveMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -250,8 +223,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Unarchiving mindmap: {} for user: {}", id, userId);
-        
         MindmapResponse response = mindmapService.unarchiveMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -266,8 +237,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Searching mindmaps for user: {} with keyword: {}", userId, keyword);
-        
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
         return ResponseEntity.ok(response);
     }
@@ -278,8 +247,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Undoing mindmap: {} for user: {}", id, userId);
-
         MindmapResponse response = undoRedoService.undo(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -290,8 +257,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Redoing mindmap: {} for user: {}", id, userId);
-
         MindmapResponse response = undoRedoService.redo(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -303,8 +268,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Request invite collaborator to map: {} by user: {}", id, userId);
-
         CollaborationInvitation invitation = collaborationService.inviteCollaborator(id, request, userId);
 
         return ResponseEntity.ok(invitation);
@@ -320,8 +283,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting collaborators for mindmap: {} by user: {}", id, userId);
-
         var response = collaborationService.getCollaborators(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -336,8 +297,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Getting pending invitations for mindmap: {} by user: {}", id, userId);
-
         var response = collaborationService.getPendingInvitations(id, userId);
         return ResponseEntity.ok(response);
     }
@@ -354,8 +313,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Updating collaborator role for mindmap: {} by user: {}", id, userId);
-
         String role = request.get("role");
         var response = collaborationService.updateCollaboratorRole(id, email, role, userId);
         return ResponseEntity.ok(response);
@@ -372,8 +329,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("Removing collaborator from mindmap: {} by user: {}", id, userId);
-
         collaborationService.removeCollaborator(id, email, userId);
         return ResponseEntity.ok(new MessageResponse("Collaborator removed successfully"));
     }
@@ -392,8 +347,6 @@ public class MindmapController {
         Boolean isPublic = (Boolean) request.get("isPublic");
         String accessLevel = (String) request.get("accessLevel");
         
-        log.info("Updating public access for mindmap: {} by user: {}", id, userId);
-
         MindmapResponse response = mindmapService.updatePublicAccess(id, isPublic, accessLevel, userId);
         return ResponseEntity.ok(response);
     }
@@ -408,8 +361,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("User {} accepting invitation with token: {}", userId, token);
-
         try {
             collaborationService.acceptInvitation(token, userId);
             
@@ -443,8 +394,6 @@ public class MindmapController {
             Authentication authentication) {
 
         Long userId = getUserIdFromAuth(authentication);
-        log.info("User {} rejecting invitation with token: {}", userId, token);
-
         collaborationService.rejectInvitation(token, userId);
         return ResponseEntity.ok(new MessageResponse("Invitation rejected successfully."));
     }
@@ -455,8 +404,6 @@ public class MindmapController {
      */
     @GetMapping("/verify-invitation/{token}")
     public ResponseEntity<?> verifyInvitation(@PathVariable String token) {
-        log.info("Verifying invitation with token: {}", token);
-
         try {
             CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
             
@@ -484,7 +431,6 @@ public class MindmapController {
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Failed to verify invitation: {}", e.getMessage());
             return ResponseEntity.status(400).body(new MessageResponse("Invalid or expired invitation."));
         }
     }
@@ -499,8 +445,6 @@ public class MindmapController {
             Authentication authentication) {
         
         Long userId = getUserIdFromAuth(authentication);
-        log.info("User {} leaving collaboration on mindmap {}", userId, id);
-        
         collaborationService.leaveCollaboration(id, userId);
         return ResponseEntity.ok(new MessageResponse("Bạn đã rời khỏi project thành công."));
     }
@@ -513,7 +457,6 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> updatePublicMindmap(
             @PathVariable String shareToken,
             @Valid @RequestBody UpdateMindmapRequest request) {
-        log.info("Updating public mindmap with shareToken: {}", shareToken);
         MindmapResponse response = mindmapService.updateMindmapByShareToken(shareToken, request);
         return ResponseEntity.ok(response);
     }
@@ -521,8 +464,6 @@ public class MindmapController {
     @GetMapping("/public/{shareToken}")
     public ResponseEntity<MindmapResponse> getPublicMindmap(
             @PathVariable String shareToken) {
-        
-        log.info("Getting public mindmap with shareToken: {}", shareToken);
         
         MindmapResponse response = mindmapService.getMindmapByShareToken(shareToken);
         return ResponseEntity.ok(response);

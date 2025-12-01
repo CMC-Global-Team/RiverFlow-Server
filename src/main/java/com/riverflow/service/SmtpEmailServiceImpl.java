@@ -2,7 +2,6 @@ package com.riverflow.service;
 
 import com.riverflow.dto.smtp.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -16,7 +15,6 @@ import org.springframework.web.client.RestTemplate;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class SmtpEmailServiceImpl implements SmtpEmailService {
 
     private final RestTemplate restTemplate;
@@ -48,8 +46,6 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
                 ? frontendUrl.trim().replaceAll("/+$", "") 
                 : frontendUrl;
             
-            log.debug("Sending verification email - frontendUrl: {}", normalizedFrontendUrl);
-            
             SmtpVerificationEmailRequest request = SmtpVerificationEmailRequest.builder()
                     .to(to)
                     .token(token)
@@ -62,14 +58,10 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             SmtpEmailResponse response = restTemplate.postForObject(url, entity, SmtpEmailResponse.class);
             
             if (response != null && response.getSuccess()) {
-                log.info("Verification email sent successfully to {} via SMTP server", to);
-            } else {
-                log.error("Failed to send verification email to {}: {}", to, 
-                    response != null ? response.getMessage() : "No response");
+                } else {
                 throw new RuntimeException("Failed to send verification email");
             }
         } catch (Exception e) {
-            log.error("Error sending verification email to {} via SMTP server: {}", to, e.getMessage());
             throw new RuntimeException("Failed to send verification email: " + e.getMessage(), e);
         }
     }
@@ -81,8 +73,6 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             String normalizedFrontendUrl = frontendUrl != null 
                 ? frontendUrl.trim().replaceAll("/+$", "") 
                 : frontendUrl;
-            
-            log.debug("Sending reset password email - frontendUrl: {}", normalizedFrontendUrl);
             
             SmtpResetPasswordEmailRequest request = SmtpResetPasswordEmailRequest.builder()
                     .to(to)
@@ -96,14 +86,10 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             SmtpEmailResponse response = restTemplate.postForObject(url, entity, SmtpEmailResponse.class);
             
             if (response != null && response.getSuccess()) {
-                log.info("Reset password email sent successfully to {} via SMTP server", to);
-            } else {
-                log.error("Failed to send reset password email to {}: {}", to, 
-                    response != null ? response.getMessage() : "No response");
+                } else {
                 throw new RuntimeException("Failed to send reset password email");
             }
         } catch (Exception e) {
-            log.error("Error sending reset password email to {} via SMTP server: {}", to, e.getMessage());
             throw new RuntimeException("Failed to send reset password email: " + e.getMessage(), e);
         }
     }
@@ -114,8 +100,6 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             String normalizedFrontendUrl = frontendUrl != null
                     ? frontendUrl.trim().replaceAll("/+$", "")
                     : frontendUrl;
-
-            log.debug("Sending invitation email via SMTP Proxy...");
 
             SmtpInvitationEmailRequest request = SmtpInvitationEmailRequest.builder()
                     .to(to)
@@ -131,14 +115,10 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             SmtpEmailResponse response = restTemplate.postForObject(url, entity, SmtpEmailResponse.class);
 
             if (response != null && response.getSuccess()) {
-                log.info("Invitation email sent successfully to {} via SMTP server", to);
-            } else {
-                log.error("Failed to send invitation email to {}: {}", to,
-                        response != null ? response.getMessage() : "No response");
-            }
+                } else {
+                }
         } catch (Exception e) {
-            log.error("Error sending invitation email to {} via SMTP server: {}", to, e.getMessage());
-        }
+            }
     }
 
     @Override
@@ -157,14 +137,10 @@ public class SmtpEmailServiceImpl implements SmtpEmailService {
             SmtpEmailResponse response = restTemplate.postForObject(url, entity, SmtpEmailResponse.class);
             
             if (response != null && response.getSuccess()) {
-                log.info("Email sent successfully to {} via SMTP server", to);
-            } else {
-                log.error("Failed to send email to {}: {}", to, 
-                    response != null ? response.getMessage() : "No response");
+                } else {
                 throw new RuntimeException("Failed to send email");
             }
         } catch (Exception e) {
-            log.error("Error sending email to {} via SMTP server: {}", to, e.getMessage());
             throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
         }
     }

@@ -8,7 +8,6 @@ import com.riverflow.model.User;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.util.authentication.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,7 +23,6 @@ import java.time.LocalDateTime;
  */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class SignInService {
 
     private final AuthenticationManager authenticationManager;
@@ -63,8 +61,6 @@ public class SignInService {
             user.setLastLoginAt(LocalDateTime.now());
             userRepository.save(user);
 
-            log.info("User {} signed in successfully", user.getEmail());
-
             // Generate avatar URL if avatar data exists in database
             // Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
             String avatarUrl = null;
@@ -91,10 +87,8 @@ public class SignInService {
 
         } catch (EmailNotVerifiedException e) {
             // Re-throw EmailNotVerifiedException để GlobalExceptionHandler xử lý
-            log.error("Sign in failed for user {}: Email not verified", request.getEmail());
             throw e;
         } catch (BadCredentialsException e) {
-            log.error("Sign in failed for user {}: {}", request.getEmail(), e.getMessage());
             throw new BadCredentialsException("Email hoặc mật khẩu không chính xác");
         }
     }

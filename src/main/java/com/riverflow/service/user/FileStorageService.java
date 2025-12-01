@@ -1,7 +1,6 @@
 package com.riverflow.service.user;
 
 import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,7 +20,6 @@ import java.util.UUID;
  * The AvatarService handles all avatar operations now.
  */
 // @Service  // DISABLED: Avatar storage moved to database (AvatarService)
-@Slf4j
 public class FileStorageService {
 
     @Value("${app.upload.dir:uploads/avatars}")
@@ -38,8 +36,7 @@ public class FileStorageService {
     @PostConstruct
     void init() {
         this.resolvedUploadPath = initialiseUploadPath();
-        log.info("Avatar uploads directory set to {}", resolvedUploadPath);
-    }
+        }
 
     /**
      * Store uploaded file and return the URL
@@ -57,8 +54,6 @@ public class FileStorageService {
         Path filePath = resolvedUploadPath.resolve(filename);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        log.info("File saved: {}", filePath);
-
         // Return URL - matches the FileController mapping
         return backendUrl + "/api/files/avatars/" + filename;
     }
@@ -70,8 +65,7 @@ public class FileStorageService {
         Path filePath = resolvedUploadPath.resolve(filename);
         if (Files.exists(filePath)) {
             Files.delete(filePath);
-            log.info("File deleted: {}", filePath);
-        }
+            }
     }
 
     private Path initialiseUploadPath() {
@@ -80,21 +74,15 @@ public class FileStorageService {
         try {
             // Try to create production directory if it doesn't exist
             if (!Files.exists(productionPath)) {
-                log.info("Creating production upload directory: {}", productionPath);
                 Files.createDirectories(productionPath);
             }
             
             if (Files.isDirectory(productionPath)) {
-                log.info("Using production upload directory: {}", productionPath);
                 return productionPath;
             }
         } catch (AccessDeniedException ex) {
-            log.warn("Access denied to production directory '{}': {}. Will use fallback.", 
-                    productionPath, ex.getMessage());
-        } catch (IOException ex) {
-            log.warn("Cannot initialize production directory '{}': {}. Will use fallback.", 
-                    productionPath, ex.getMessage());
-        }
+            } catch (IOException ex) {
+            }
 
         // Use configured path
         Path configuredPath = Paths.get(uploadDir);
@@ -108,7 +96,6 @@ public class FileStorageService {
 
         try {
             Files.createDirectories(configuredPath);
-            log.info("Using configured upload directory: {}", configuredPath);
             return configuredPath;
         } catch (AccessDeniedException ex) {
             Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"))
@@ -120,8 +107,6 @@ public class FileStorageService {
 
             try {
                 Files.createDirectories(fallbackPath);
-                log.warn("Access denied for avatar upload dir '{}'. Falling back to '{}'.",
-                        configuredPath, fallbackPath);
                 return fallbackPath;
             } catch (IOException fallbackError) {
                 throw new IllegalStateException(
