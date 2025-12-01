@@ -1,0 +1,23 @@
+# Dockerfile for running tests
+# Uses Java 17 to match project requirements
+
+# Use Maven with Java 17 for building and testing
+FROM maven:3.9.5-eclipse-temurin-17
+
+# Set working directory
+WORKDIR /app
+
+# Copy pom.xml first for better caching
+COPY pom.xml .
+
+# Download dependencies (this layer will be cached)
+RUN mvn dependency:go-offline -B
+
+# Copy source code
+COPY src ./src
+
+# Run tests
+# -B: Batch mode (non-interactive)
+# -DskipTests=false: Ensure tests are run
+# test: Run test phase
+CMD ["mvn", "-B", "-DskipTests=false", "test"]
