@@ -8,6 +8,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
+import org.mockito.Mockito;
+import com.riverflow.util.authentication.JwtUtil;
+import com.riverflow.config.jwt.CustomUserDetailsService;
 
 /**
  * Test Security Configuration
@@ -25,6 +28,18 @@ public class TestSecurityConfig {
                 .password("password")
                 .authorities("ROLE_USER")
                 .build();
+    }
+
+    @Bean
+    @Primary
+    public JwtUtil jwtUtil() {
+        return Mockito.mock(JwtUtil.class);
+    }
+
+    @Bean
+    @Primary
+    public CustomUserDetailsService customUserDetailsService() {
+        return Mockito.mock(CustomUserDetailsService.class);
     }
 
     @Bean

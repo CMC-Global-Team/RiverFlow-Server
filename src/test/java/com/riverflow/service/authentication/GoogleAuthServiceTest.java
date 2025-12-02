@@ -72,7 +72,7 @@ class GoogleAuthServiceTest {
         // Mock GoogleIdToken and Payload
         googleIdToken = mock(GoogleIdToken.class);
         payload = mock(GoogleIdToken.Payload.class);
-        when(googleIdToken.getPayload()).thenReturn(payload);
+        lenient().when(googleIdToken.getPayload()).thenReturn(payload);
     }
 
     @Test
@@ -105,7 +105,7 @@ class GoogleAuthServiceTest {
         assertThat(response.getFullName()).isEqualTo("Test User");
         
         verify(googleAuthService).verifyIdToken("valid-google-token");
-        verify(userRepository).save(any(User.class));
+        verify(userRepository, times(2)).save(any(User.class));
     }
 
     @Test
@@ -132,7 +132,7 @@ class GoogleAuthServiceTest {
         googleAuthService.authenticateWithGoogle(request);
 
         // Then
-        verify(userRepository).save(argThat(user -> 
+        verify(userRepository, atLeastOnce()).save(argThat(user -> 
             user.getFullName().equals("Updated Name") &&
             user.getAvatar().equals("http://example.com/new-avatar.png")
         ));

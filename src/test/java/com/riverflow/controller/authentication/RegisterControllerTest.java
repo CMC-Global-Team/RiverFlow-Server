@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 
 import org.junit.jupiter.api.Test;
@@ -32,8 +33,10 @@ import org.junit.jupiter.api.Test;
 @WebMvcTest(controllers = RegisterController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,
+                SecurityFilterAutoConfiguration.class,
                 UserDetailsServiceAutoConfiguration.class
         })
+@Import(TestSecurityConfig.class)
 class RegisterControllerTest {
 
     @Autowired
