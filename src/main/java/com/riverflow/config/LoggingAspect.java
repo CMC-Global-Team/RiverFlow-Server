@@ -1,5 +1,5 @@
 
-package com.example.aspect;
+package com.riverflow.config;
 
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.ProceedingJoinPoint;
