@@ -20,12 +20,10 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.junit.jupiter.api.Disabled;
 
 /**
  * Controller tests for ChangePassController using MockMvc
  */
-@Disabled("Temporarily disabled to fix build issues")
 @WebMvcTest(controllers = ChangePassController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,

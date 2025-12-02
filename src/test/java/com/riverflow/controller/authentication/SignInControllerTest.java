@@ -25,13 +25,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /**
  * Controller tests for SignInController using MockMvc
  */
-@Disabled("Temporarily disabled to fix build issues")
 @WebMvcTest(controllers = SignInController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,
