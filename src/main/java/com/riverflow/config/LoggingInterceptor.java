@@ -34,7 +34,53 @@ public class LoggingInterceptor implements HandlerInterceptor {
     @Override
     public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) {
         // Optional: can be used for additional processing
+        try{
+            string method = requests.getMethod();
+            string uri = requests.getRequestURI();
+            log.info("Post Handle: {} {}", method, uri);
+        }catch(Exception e){
+            log.info("Post Handle Exception: {}", e.getMessage());
+        }
     }
+
+    @Override
+    public void getHandler(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // Optional: can be used for additional processing
+        try{
+            string method = requests.getMethod();
+            string uri = requests.getRequestURI();
+            log.info("Get Handler: {} {}", method, uri);
+        }catch(Exception e){
+            log.info("Get Handler Exception: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void putHandler(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // Optional: can be used for additional processing
+        try{
+            string method = requests.getMethod();
+            string uri = requests.getRequestURI();
+            log.info("Put Handler: {} {}", method, uri);
+        }catch(Exception e){
+            log.info("Put Handler Exception: {}", e.getMessage());
+        }
+    }
+    
+    @Override
+    public void deleteHandler(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        // Optional: can be used for additional processing
+        try{
+            string method = requests.getMethod();
+            string uri = requests.getRequestURI();
+            log.info("Delete Handler: {} {}", method, uri);
+        }catch(Exception e){
+            log.info("Delete Handler Exception: {}", e.getMessage());
+        }
+    }
+
+
+    
 
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
@@ -58,3 +104,6 @@ public class LoggingInterceptor implements HandlerInterceptor {
         }
     }
 }
+
+
+
