@@ -3,7 +3,6 @@ package com.riverflow.service.user;
 import com.riverflow.model.User;
 import com.riverflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,7 +14,6 @@ import java.util.Optional;
  * Avatars are stored as BLOB in MySQL instead of on disk
  */
 @Service
-@Slf4j
 @RequiredArgsConstructor
 public class AvatarService {
 
@@ -61,8 +59,7 @@ public class AvatarService {
         user.setAvatar(null); // Clear old URL-based avatar
         
         userRepository.save(user);
-        log.info("Avatar uploaded for user: {}, size: {} bytes", userId, avatarData.length);
-    }
+        }
 
     /**
      * Get avatar data for user
@@ -73,25 +70,17 @@ public class AvatarService {
         var userOpt = userRepository.findById(userId);
         
         if (userOpt.isEmpty()) {
-            log.warn("User not found: {}", userId);
             return Optional.empty();
         }
         
         var user = userOpt.get();
-        log.debug("Avatar data for user {}: data size = {}, mimeType = {}", 
-                userId, 
-                user.getAvatarData() != null ? user.getAvatarData().length : 0,
-                user.getAvatarMimeType());
-        
         if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
-            log.info("Returning avatar for user: {}, size: {} bytes", userId, user.getAvatarData().length);
             return Optional.of(new AvatarData(
                 user.getAvatarData(),
                 user.getAvatarMimeType()
             ));
         }
         
-        log.warn("No avatar data found for user: {}", userId);
         return Optional.empty();
     }
 
@@ -108,8 +97,7 @@ public class AvatarService {
         user.setAvatar(null);
         
         userRepository.save(user);
-        log.info("Avatar deleted for user: {}", userId);
-    }
+        }
 
     /**
      * Check if MIME type is allowed

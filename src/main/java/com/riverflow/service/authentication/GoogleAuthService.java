@@ -12,7 +12,6 @@ import com.riverflow.model.User;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.util.authentication.JwtUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +23,6 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class GoogleAuthService {
 
 	private final GoogleAuthConfig googleAuthConfig;
@@ -79,7 +77,6 @@ public class GoogleAuthService {
 				.avatar(avatarUrl)
 				.build();
 		} catch (Exception ex) {
-			log.error("Google authentication failed: {}", ex.getMessage());
 			throw new RuntimeException("Google authentication failed");
 		}
 	}	private GoogleIdToken verifyIdToken(String idTokenString) throws GeneralSecurityException {

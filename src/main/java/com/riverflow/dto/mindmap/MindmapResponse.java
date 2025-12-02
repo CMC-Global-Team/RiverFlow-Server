@@ -67,6 +67,7 @@ public class MindmapResponse {
     private Long aiWorkflowId;
     
     private Map<String, Object> aiMetadata;
+    private List<String> aiAgentLogs;
     
     // Metadata
     private MindmapMetadata metadata;

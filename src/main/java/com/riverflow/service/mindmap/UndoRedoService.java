@@ -9,7 +9,6 @@ import com.riverflow.repository.mindmap.MindmapHistoryRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.util.mindmap.MindmapMapper;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class UndoRedoService {
 
     private final MindmapRepository mindmapRepository;
@@ -26,8 +24,6 @@ public class UndoRedoService {
 
     @Transactional
     public MindmapResponse undo(String mindmapId, Long userId) {
-        log.info("Undo cho mindmap: {} bởi user: {}", mindmapId, userId);
-
         MindmapHistory lastAction = historyRepository
                 .findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, "active")
                 .orElseThrow(() -> new RuntimeException("Không có gì để hoàn tác"));
@@ -38,8 +34,6 @@ public class UndoRedoService {
         lastAction.setCreatedAt(LocalDateTime.now());
         historyRepository.save(lastAction);
 
-        log.info("Undo thành công hành động: {}", lastAction.getAction());
-
         MindmapResponse response = MindmapMapper.toResponse(mindmap);
         response.setCanUndo(checkCanUndo(mindmapId, userId));
         response.setCanRedo(checkCanRedo(mindmapId, userId));
@@ -49,8 +43,6 @@ public class UndoRedoService {
 
     @Transactional
     public MindmapResponse redo(String mindmapId, Long userId) {
-        log.info("Redo cho mindmap: {} bởi user: {}", mindmapId, userId);
-
         MindmapHistory lastUndoneAction = historyRepository
                 .findTopByMindmapIdAndMysqlUserIdAndStatusOrderByCreatedAtDesc(mindmapId, userId, "undone")
                 .orElseThrow(() -> new RuntimeException("Không có gì để làm lại"));
@@ -60,8 +52,6 @@ public class UndoRedoService {
         lastUndoneAction.setStatus("active");
         lastUndoneAction.setCreatedAt(LocalDateTime.now());
         historyRepository.save(lastUndoneAction);
-
-        log.info("Redo thành công hành động: {}", lastUndoneAction.getAction());
 
         MindmapResponse response = MindmapMapper.toResponse(mindmap);
         response.setCanUndo(checkCanUndo(mindmapId, userId)); // (Cờ này giờ sẽ là true)
@@ -79,18 +69,15 @@ public class UndoRedoService {
         switch (action.getAction()) {
             case "create_mindmap":
                 if (state.equals("before")) { // Undo "create"
-                    log.debug("Hoàn tác [create_mindmap]: Xóa mindmap {}", mindmapId);
                     if (mindmap != null) mindmapRepository.delete(mindmap);
                     return null;
                 } else { // Redo "create"
-                    log.debug("Làm lại [create_mindmap]: Tạo lại mindmap {}", mindmapId);
                     Object afterState = action.getChanges().get("after");
                     Mindmap restoredMindmap = objectMapper.convertValue(afterState, Mindmap.class);
                     return mindmapRepository.save(restoredMindmap);
                 }
 
             case "update_mindmap":
-                log.debug("Áp dụng [update_mindmap] - khôi phục state '{}'", state);
                 if (mindmap == null) throw new MindmapNotFoundException(mindmapId, userId);
 
                 Object snapshot = action.getChanges().get(state);
@@ -103,14 +90,12 @@ public class UndoRedoService {
             case "archive_mindmap":
             case "unarchive_mindmap":
             case "delete_mindmap":
-                log.debug("Áp dụng [{}] - khôi phục state '{}'", action.getAction(), state);
                 if (mindmap == null) throw new MindmapNotFoundException(mindmapId, userId);
 
                 Object simpleState = action.getChanges().get(state);
                 return mindmapRepository.save(applySimpleChange(mindmap, action.getAction(), simpleState));
 
             default:
-                log.warn("Hành động không được hỗ trợ: {}", action.getAction());
                 throw new UnsupportedOperationException("Hành động không được hỗ trợ: " + action.getAction());
         }
     }

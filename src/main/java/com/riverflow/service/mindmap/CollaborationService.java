@@ -13,7 +13,6 @@ import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.SmtpEmailService;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +22,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class CollaborationService {
 
     private final MindmapRepository mindmapRepository;
@@ -36,8 +34,6 @@ public class CollaborationService {
      */
     @Transactional
     public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request, Long ownerId) {
-        log.info("User {} đang mời {} vào mindmap {}", ownerId, request.getEmail(), mindmapId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, ownerId));
 
@@ -93,8 +89,7 @@ public class CollaborationService {
             
             mindmap.getCollaborators().add(collaborator);
             mindmapRepository.save(mindmap);
-            log.info("Collaborator {} added to mindmap {} with pending status", emailToInvite, mindmapId);
-        }
+            }
 
         // Gửi email mời
         try {
@@ -107,9 +102,7 @@ public class CollaborationService {
                     inviterName,
                     mindmap.getTitle()
             );
-            log.info("Invitation email sent successfully to {}", emailToInvite);
-        } catch (Exception e) {
-            log.error("Failed to send invitation email to {}: {}", emailToInvite, e.getMessage());
+            } catch (Exception e) {
             // Không throw exception, vì lời mời đã được tạo
         }
 
@@ -120,8 +113,6 @@ public class CollaborationService {
      * Lấy danh sách collaborators của một mindmap
      */
     public List<Collaborator> getCollaborators(String mindmapId, Long userId) {
-        log.info("Getting collaborators for mindmap: {} by user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -142,8 +133,6 @@ public class CollaborationService {
      */
     @Transactional
     public Collaborator updateCollaboratorRole(String mindmapId, String email, String role, Long userId) {
-        log.info("Updating collaborator role for mindmap: {} email: {} by user: {}", mindmapId, email, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -167,8 +156,6 @@ public class CollaborationService {
      */
     @Transactional
     public void removeCollaborator(String mindmapId, String email, Long userId) {
-        log.info("Removing collaborator from mindmap: {} email: {} by user: {}", mindmapId, email, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -188,12 +175,10 @@ public class CollaborationService {
                     c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
             );
             mindmapRepository.save(mindmap);
-            log.info("Collaborator {} removed from mindmap {} (status: {})", email, mindmapId, collaborator.getStatus());
-        } else {
+            } else {
             // Case 2: Collaborator doesn't exist in mindmap but might have pending invitation
             // This happens when user was invited but hasn't registered yet
-            log.debug("Collaborator {} not found in mindmap {}, checking pending invitations", email, mindmapId);
-        }
+            }
 
         // Remove pending invitation(s) for this email regardless
         var pendingInvitations = invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(
@@ -207,8 +192,7 @@ public class CollaborationService {
             invitation.setStatus("cancelled");
             invitation.setUpdatedAt(LocalDateTime.now());
             invitationRepository.save(invitation);
-            log.info("Pending invitation for {} in mindmap {} cancelled", email, mindmapId);
-        }
+            }
 
         // If neither collaborator nor invitation exists, throw error
         if (collaborator == null && pendingInvitations.isEmpty()) {
@@ -221,8 +205,6 @@ public class CollaborationService {
      */
     @Transactional
     public void acceptInvitation(String token, Long userId) {
-        log.info("User {} accepting invitation with token: {}", userId, token);
-
         CollaborationInvitation invitation = invitationRepository.findByToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Lời mời không tồn tại hoặc đã hết hạn."));
 
@@ -249,7 +231,6 @@ public class CollaborationService {
 
         if (collaborator == null) {
             // Collaborator doesn't exist (user signed up after being invited)
-            log.info("Creating new collaborator entry for user {} in mindmap {}", userId, mindmap.getId());
             User acceptingUser = userRepository.findById(userId).orElse(null);
             String userEmail = (acceptingUser != null) ? acceptingUser.getEmail() : invitation.getInvitedEmail();
             
@@ -263,32 +244,25 @@ public class CollaborationService {
                     .build();
             
             mindmap.getCollaborators().add(collaborator);
-            log.info("Collaborator {} added to mindmap {} with pending status", userEmail, mindmap.getId());
-        }
+            }
 
-        log.info("Updating collaborator status for user {} in mindmap {} to accepted", userId, mindmap.getId());
         collaborator.setStatus("accepted");
         collaborator.setAcceptedAt(LocalDateTime.now());
         
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
-        log.info("Mindmap saved after accepting invitation. Updated collaborator status in mindmap {}", updatedMindmap.getId());
-
         // Cập nhật status của lời mời
         invitation.setStatus("accepted");
         invitation.setAcceptedAt(LocalDateTime.now());
         invitation.setAcceptedByUserId(userId);
         invitationRepository.save(invitation);
 
-        log.info("Invitation {} accepted by user {}", token, userId);
-    }
+        }
 
     /**
      * Từ chối lời mời cộng tác viên
      */
     @Transactional
     public void rejectInvitation(String token, Long userId) {
-        log.info("User {} rejecting invitation with token: {}", userId, token);
-
         CollaborationInvitation invitation = invitationRepository.findByToken(token)
                 .orElseThrow(() -> new IllegalArgumentException("Lời mời không tồn tại hoặc đã hết hạn."));
 
@@ -313,14 +287,12 @@ public class CollaborationService {
             }
         }
 
-        log.info("Invitation {} rejected by user {}", token, userId);
-    }
+        }
 
     /**
      * Lấy lời mời bằng token
      */
     public CollaborationInvitation getInvitationByToken(String token) {
-        log.info("Getting invitation with token: {}", token);
         return invitationRepository.findByToken(token).orElse(null);
     }
 
@@ -328,8 +300,6 @@ public class CollaborationService {
      * Lấy danh sách lời mời đang chờ xác nhận cho một mindmap
      */
     public List<CollaborationInvitation> getPendingInvitations(String mindmapId, Long userId) {
-        log.info("Getting pending invitations for mindmap: {} by user: {}", mindmapId, userId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -348,8 +318,6 @@ public class CollaborationService {
      */
     @Transactional
     public void leaveCollaboration(String mindmapId, Long userId) {
-        log.info("User {} leaving collaboration on mindmap {}", userId, mindmapId);
-
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
@@ -363,6 +331,5 @@ public class CollaborationService {
         }
 
         mindmapRepository.save(mindmap);
-        log.info("User {} successfully left mindmap {}", userId, mindmapId);
-    }
+        }
 }

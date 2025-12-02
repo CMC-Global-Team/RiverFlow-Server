@@ -2,7 +2,6 @@ package com.riverflow.controller.file;
 
 import com.riverflow.service.user.AvatarService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
-@Slf4j
 public class FileController {
 
     private final AvatarService avatarService;
@@ -34,7 +32,6 @@ public class FileController {
             var avatarOpt = avatarService.getAvatar(userId);
             
             if (avatarOpt.isEmpty()) {
-                log.debug("Avatar not found for user: {}", userId);
                 return ResponseEntity.notFound().build();
             }
             
@@ -43,10 +40,8 @@ public class FileController {
                     .contentType(MediaType.parseMediaType(avatar.getMimeType()))
                     .body(avatar.getData());
         } catch (Exception e) {
-            log.error("Error serving avatar for user: {}", userId, e);
             return ResponseEntity.notFound().build();
         }
     }
 }
-
 
