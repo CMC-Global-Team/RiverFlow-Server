@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 
 import org.junit.jupiter.api.Test;
@@ -32,8 +33,10 @@ import org.junit.jupiter.api.Test;
 @WebMvcTest(controllers = RegisterController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,
+                SecurityFilterAutoConfiguration.class,
                 UserDetailsServiceAutoConfiguration.class
         })
+@Import(TestSecurityConfig.class)
 class RegisterControllerTest {
 
     @Autowired
@@ -48,7 +51,7 @@ class RegisterControllerTest {
     @Test
     void register_ValidRequest_ReturnsCreatedWithResponse() throws Exception {
         // Given
-        RegisterRequest request = new RegisterRequest("test@example.com", "password123", "Test User");
+        RegisterRequest request = new RegisterRequest("Test User", "test@example.com", "password123");
         
         RegisterResponse response = RegisterResponse.builder()
                 .message("Đăng ký thành công. Vui lòng kiểm tra email để xác thực.")
@@ -71,7 +74,7 @@ class RegisterControllerTest {
     @Test
     void register_EmailAlreadyExists_ReturnsConflict() throws Exception {
         // Given
-        RegisterRequest request = new RegisterRequest("existing@example.com", "password123", "Test User");
+        RegisterRequest request = new RegisterRequest("Test User", "existing@example.com", "password123");
         
         when(registerService.register(any(RegisterRequest.class)))
                 .thenThrow(new EmailAlreadyExistsException("Email đã được sử dụng"));

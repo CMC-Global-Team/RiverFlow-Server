@@ -1,10 +1,12 @@
 package com.riverflow.controller.authentication;
 
 import com.riverflow.dto.authentication.ChangePasswordRequest;
+import com.riverflow.dto.MessageResponse;
 import com.riverflow.service.authentication.ChangePassService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.Principal;
 import java.util.Map;
@@ -21,7 +23,14 @@ public class ChangePassController {
             @RequestBody ChangePasswordRequest request,
             Principal principal
     ) {
-        changePasswordService.changePassword(principal.getName(), request);
-        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+        try {
+            changePasswordService.changePassword(principal.getName(), request);
+            return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+        } catch (ResponseStatusException ex) {
+            return ResponseEntity
+                    .status(ex.getStatusCode())
+                    .body(new MessageResponse(ex.getReason()))
+                    ;
+        }
     }
 }

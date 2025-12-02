@@ -56,7 +56,7 @@ class CustomUserDetailsServiceTest {
         assertThat(userDetails.getUsername()).isEqualTo("test@example.com");
         assertThat(userDetails.getPassword()).isEqualTo("hashedPassword");
         assertThat(userDetails.getAuthorities()).hasSize(1);
-        assertThat(userDetails.getAuthorities().iterator().next().getAuthority()).isEqualTo("ROLE_user");
+        assertThat(userDetails.getAuthorities().iterator().next().getAuthority()).isEqualTo("ROLE_USER");
 
         verify(userRepository).findByEmail("test@example.com");
     }

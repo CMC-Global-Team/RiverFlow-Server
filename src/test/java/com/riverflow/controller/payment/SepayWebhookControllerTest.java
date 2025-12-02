@@ -6,11 +6,13 @@ import com.riverflow.service.payment.PaymentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.context.annotation.Import;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,8 +29,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = SepayWebhookController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,
+                SecurityFilterAutoConfiguration.class,
                 UserDetailsServiceAutoConfiguration.class
         })
+@Import(com.riverflow.config.TestSecurityConfig.class)
 class SepayWebhookControllerTest {
 
     @Autowired

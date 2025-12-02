@@ -6,13 +6,16 @@ import com.riverflow.service.authentication.ChangePassService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,8 +30,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = ChangePassController.class,
         excludeAutoConfiguration = {
                 SecurityAutoConfiguration.class,
+                SecurityFilterAutoConfiguration.class,
                 UserDetailsServiceAutoConfiguration.class
         })
+@Import(com.riverflow.config.TestSecurityConfig.class)
 class ChangePassControllerTest {
 
     @Autowired
@@ -41,6 +46,7 @@ class ChangePassControllerTest {
     private ChangePassService changePassService;
 
     @Test
+    @WithMockUser(username = "test@example.com")
     void changePassword_ValidRequest_ReturnsSuccess() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -52,7 +58,6 @@ class ChangePassControllerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> "test@example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -62,6 +67,7 @@ class ChangePassControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "nonexistent@example.com")
     void changePassword_UserNotFound_ReturnsNotFound() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -74,7 +80,6 @@ class ChangePassControllerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> "nonexistent@example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
@@ -83,6 +88,7 @@ class ChangePassControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "oauth@example.com")
     void changePassword_OAuthUser_ReturnsBadRequest() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -95,7 +101,6 @@ class ChangePassControllerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> "oauth@example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -104,6 +109,7 @@ class ChangePassControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "test@example.com")
     void changePassword_IncorrectCurrentPassword_ReturnsBadRequest() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -116,7 +122,6 @@ class ChangePassControllerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> "test@example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -125,6 +130,7 @@ class ChangePassControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "test@example.com")
     void changePassword_PasswordMismatch_ReturnsBadRequest() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -137,7 +143,6 @@ class ChangePassControllerTest {
 
         // When & Then
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> "test@example.com")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());
@@ -164,6 +169,7 @@ class ChangePassControllerTest {
     }
 
     @Test
+    @WithMockUser(username = "user@example.com")
     void changePassword_ValidatesEmailFromPrincipal() throws Exception {
         // Given
         ChangePasswordRequest request = new ChangePasswordRequest();
@@ -176,7 +182,6 @@ class ChangePassControllerTest {
 
         // When
         mockMvc.perform(post("/auth/change-password")
-                        .principal(() -> userEmail)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
