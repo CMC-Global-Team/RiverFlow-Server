@@ -323,13 +323,13 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 -- Insert AI Workflow Categories
 INSERT IGNORE INTO ai_workflow_categories (name, slug, description, icon, color, display_order, is_active, created_at, updated_at) VALUES
-('Phát triển kỹ năng', 'skill-development', 'Workflows về phát triển kỹ năng cá nhân', 'goal', '#4A90E2', 1),
-('Quản lý thời gian', 'time-management', 'Workflows về quản lý thời gian hiệu quả', 'Clock', '#F5A623', 2),
-('Lãnh đạo & Quản lý', 'leadership-management', 'Workflows về kỹ năng lãnh đạo', 'Vest', '#7B61FF', 3),
-('Giao tiếp & Hợp tác', 'communication-collaboration', 'Workflows về giao tiếp và làm việc nhóm', 'Chat', '#50E3C2', 4),
-('Sáng tạo & Đổi mới', 'creativity-innovation', 'Workflows về tư duy sáng tạo', 'Idea', '#F8E71C', 5),
-('Sức khỏe & Cân bằng', 'health-balance', 'Workflows về sức khỏe và work-life balance', 'Health', '#BD10E0', 6),
-('Nghề nghiệp & Phát triển', 'career-growth', 'Workflows về phát triển sự nghiệp', 'Developer', '#B8E986', 7),
+('Phát triển kỹ năng', 'skill-development', 'Workflows về phát triển kỹ năng cá nhân', 'goal', '#4A90E2', 1, TRUE, NOW(), NOW()),
+('Quản lý thời gian', 'time-management', 'Workflows về quản lý thời gian hiệu quả', 'Clock', '#F5A623', 2, TRUE, NOW(), NOW()),
+('Lãnh đạo & Quản lý', 'leadership-management', 'Workflows về kỹ năng lãnh đạo', 'Vest', '#7B61FF', 3, TRUE, NOW(), NOW()),
+('Giao tiếp & Hợp tác', 'communication-collaboration', 'Workflows về giao tiếp và làm việc nhóm', 'Chat', '#50E3C2', 4, TRUE, NOW(), NOW()),
+('Sáng tạo & Đổi mới', 'creativity-innovation', 'Workflows về tư duy sáng tạo', 'Idea', '#F8E71C', 5, TRUE, NOW(), NOW()),
+('Sức khỏe & Cân bằng', 'health-balance', 'Workflows về sức khỏe và work-life balance', 'Health', '#BD10E0', 6, TRUE, NOW(), NOW()),
+('Nghề nghiệp & Phát triển', 'career-growth', 'Workflows về phát triển sự nghiệp', 'Developer', '#B8E986', 7, TRUE, NOW(), NOW()),
 ('Học tập & Tư duy', 'learning-thinking', 'Workflows về phương pháp học tập', 'Learn Method', '#FF6B6B', 8, TRUE, NOW(), NOW());
 
 -- Insert Sample AI Workflows (một số ví dụ, bạn có thể thêm 50 workflows)
