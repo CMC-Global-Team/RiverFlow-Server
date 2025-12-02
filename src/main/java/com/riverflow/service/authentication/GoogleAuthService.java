@@ -79,7 +79,7 @@ public class GoogleAuthService {
 		} catch (Exception ex) {
 			throw new RuntimeException("Google authentication failed");
 		}
-	}	private GoogleIdToken verifyIdToken(String idTokenString) throws GeneralSecurityException {
+	}	GoogleIdToken verifyIdToken(String idTokenString) throws GeneralSecurityException {
 		try {
 			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
 					GoogleNetHttpTransport.newTrustedTransport(),
