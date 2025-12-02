@@ -46,9 +46,8 @@ docker-compose*.yml
 logs/
 
 # Test files
-src/test/
+# src/test/
 
 # Environment files
 .env
-.env.local
 

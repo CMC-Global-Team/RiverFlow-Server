@@ -37,14 +37,12 @@ public class PaymentController {
      */
     @GetMapping("/history")
     public ResponseEntity<Page<PaymentHistoryResponse>> getPaymentHistory(
-            @AuthenticationPrincipal UserPrincipal currentUser,
+            Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        Long userId = currentUser.getId();
-
+        Long userId = userDetailsService.loadUserEntityByEmail(authentication.getName()).getId();
         Page<PaymentHistoryResponse> history = paymentService.getUserTransactions(userId, page, size);
-
         return ResponseEntity.ok(history);
     }
 }
