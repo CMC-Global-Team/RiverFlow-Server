@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  riverflow-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: riverflow-server
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/riverflow
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/riverflow
+    depends_on:
+      - mysql
+      - mongo
+    networks:
+      - riverflow-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: riverflow-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=riverflow
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - riverflow-network
+
+  mongo:
+    image: mongo:6.0
+    container_name: riverflow-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - riverflow-network
+
+networks:
+  riverflow-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  mongo-data:

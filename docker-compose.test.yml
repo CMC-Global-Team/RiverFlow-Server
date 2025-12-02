@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  riverflow-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: riverflow-test-runner
+    environment:
+      # Spring profile for tests
+      - SPRING_PROFILES_ACTIVE=test
+      # Java options for test execution
+      - MAVEN_OPTS=-Xmx1024m
+    volumes:
+      # Mount source code for live updates during development
+      - ./src:/app/src:ro
+      # Mount pom.xml
+      - ./pom.xml:/app/pom.xml:ro
+      # Cache Maven dependencies
+      - maven-repo:/root/.m2
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  maven-repo:
+    driver: local
