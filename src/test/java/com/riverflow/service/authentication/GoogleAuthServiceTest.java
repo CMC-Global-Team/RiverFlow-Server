@@ -78,7 +78,8 @@ class GoogleAuthServiceTest {
     @Test
     void authenticateWithGoogle_ValidToken_ReturnsSignInResponse() throws Exception {
         // Given
-        GoogleSignInRequest request = new GoogleSignInRequest("valid-google-token");
+        GoogleSignInRequest request = new GoogleSignInRequest();
+        request.setCredential("valid-google-token");
         
         // Mock payload data
         when(payload.getEmail()).thenReturn("test@example.com");
@@ -110,7 +111,8 @@ class GoogleAuthServiceTest {
     @Test
     void authenticateWithGoogle_ExistingUser_UpdatesInfo() throws Exception {
         // Given
-        GoogleSignInRequest request = new GoogleSignInRequest("valid-google-token");
+        GoogleSignInRequest request = new GoogleSignInRequest();
+        request.setCredential("valid-google-token");
         
         // Mock payload data with updated info
         when(payload.getEmail()).thenReturn("test@example.com");
@@ -139,7 +141,8 @@ class GoogleAuthServiceTest {
     @Test
     void authenticateWithGoogle_InvalidToken_ThrowsException() throws Exception {
         // Given
-        GoogleSignInRequest request = new GoogleSignInRequest("invalid-token");
+        GoogleSignInRequest request = new GoogleSignInRequest();
+        request.setCredential("invalid-token");
         
         doReturn(null).when(googleAuthService).verifyIdToken("invalid-token");
 
@@ -152,7 +155,8 @@ class GoogleAuthServiceTest {
     @Test
     void authenticateWithGoogle_VerificationException_ThrowsException() throws Exception {
         // Given
-        GoogleSignInRequest request = new GoogleSignInRequest("error-token");
+        GoogleSignInRequest request = new GoogleSignInRequest();
+        request.setCredential("error-token");
         
         doThrow(new RuntimeException("Verification error")).when(googleAuthService).verifyIdToken("error-token");
 

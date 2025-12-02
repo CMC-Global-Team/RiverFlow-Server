@@ -37,12 +37,12 @@ class FileControllerTest {
     @Test
     void serveAvatar_ExistingUser_ReturnsImage() throws Exception {
         // Given
-        AvatarService.AvatarDto avatarDto = new AvatarService.AvatarDto(
-                "image/jpeg",
-                "test-image-content".getBytes()
+        AvatarService.AvatarData avatarData = new AvatarService.AvatarData(
+                "test-image-content".getBytes(),
+                "image/jpeg"
         );
 
-        when(avatarService.getAvatar(1L)).thenReturn(Optional.of(avatarDto));
+        when(avatarService.getAvatar(1L)).thenReturn(Optional.of(avatarData));
 
         // When & Then
         mockMvc.perform(get("/api/files/avatars/1"))

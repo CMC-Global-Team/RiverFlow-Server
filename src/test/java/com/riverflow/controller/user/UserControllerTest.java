@@ -64,7 +64,7 @@ class UserControllerTest {
                 .build();
 
         userResponse = new UserResponse();
-        userResponse.setId(1L);
+        userResponse.setUserId(1L);
         userResponse.setEmail("test@example.com");
         userResponse.setFullName("Test User");
     }
@@ -95,7 +95,7 @@ class UserControllerTest {
         request.setFullName("Updated Name");
 
         UserResponse updatedResponse = new UserResponse();
-        updatedResponse.setId(1L);
+        updatedResponse.setUserId(1L);
         updatedResponse.setEmail("test@example.com");
         updatedResponse.setFullName("Updated Name");
 
@@ -161,12 +161,12 @@ class UserControllerTest {
     @Test
     void getAvatar_ExistingUser_ReturnsImage() throws Exception {
         // Given
-        AvatarService.AvatarDto avatarDto = new AvatarService.AvatarDto(
-                "image/png",
-                "test-image-content".getBytes()
+        AvatarService.AvatarData avatarData = new AvatarService.AvatarData(
+                "test-image-content".getBytes(),
+                "image/png"
         );
 
-        when(avatarService.getAvatar(1L)).thenReturn(Optional.of(avatarDto));
+        when(avatarService.getAvatar(1L)).thenReturn(Optional.of(avatarData));
 
         // When & Then
         mockMvc.perform(get("/user/avatar/1"))

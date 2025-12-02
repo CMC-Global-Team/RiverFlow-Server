@@ -53,7 +53,7 @@ class SepayWebhookControllerTest {
         // Given
         SepayWebhookPayload payload = new SepayWebhookPayload();
         payload.setContent("TOPUP-123");
-        payload.setAmount(100000L);
+        payload.setTransferAmount(100000L);
 
         String apiKey = "test-api-key";
         doNothing().when(paymentService).handleSepayWebhook(any(SepayWebhookPayload.class), eq(apiKey));
