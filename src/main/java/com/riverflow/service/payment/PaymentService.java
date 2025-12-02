@@ -109,11 +109,13 @@ public class PaymentService {
         if (sepayRequireAuth && !keyOk) {
             Integer expLen = expectedKey == null ? null : expectedKey.length();
             Integer hdrLen = apiKeyHeader == null ? null : apiKeyHeader.length();
+            System.out.println("[PAYMENT DEBUG] Auth validation failed - requireAuth: " + sepayRequireAuth + ", keyOk: " + keyOk + ", expLen: " + expLen + ", hdrLen: " + hdrLen);
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
         }
         if (payload.getAccountNumber() == null || !payload.getAccountNumber().equals(accountNumber)) {
+            System.out.println("[PAYMENT DEBUG] Account number mismatch - payload: " + payload.getAccountNumber() + ", expected: " + accountNumber);
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
@@ -125,12 +127,14 @@ public class PaymentService {
         }
         String code = codeCandidate;
         if (code == null || code.isEmpty()) {
+            System.out.println("[PAYMENT DEBUG] Code extraction failed - codeCandidate: " + codeCandidate + ", content: " + payload.getContent());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
         }
         Optional<CreditTopupRequest> opt = topupRequestRepository.findByCode(code);
         if (opt.isEmpty()) {
+            System.out.println("[PAYMENT DEBUG] Topup request not found - code: " + code);
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
@@ -144,6 +148,7 @@ public class PaymentService {
             return;
         }
         if (!req.getAmount().equals(payload.getTransferAmount())) {
+            System.out.println("[PAYMENT DEBUG] Amount mismatch - request amount: " + req.getAmount() + ", transfer amount: " + payload.getTransferAmount());
             tx.setMatchedRequest(req);
             tx.setUser(req.getUser());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
@@ -153,6 +158,7 @@ public class PaymentService {
         User user = req.getUser();
         long current = user.getCredit() == null ? 0L : user.getCredit();
         long addCredits = vndPerCredit > 0 ? (payload.getTransferAmount() / vndPerCredit) : 0L;
+        System.out.println("[PAYMENT DEBUG] SUCCESS - Processing payment for user " + user.getId() + ", adding " + addCredits + " credits (current: " + current + ")");
         user.setCredit(current + addCredits);
         req.setStatus(CreditTopupRequest.TopupStatus.paid);
         req.setPaidAt(LocalDateTime.now());
