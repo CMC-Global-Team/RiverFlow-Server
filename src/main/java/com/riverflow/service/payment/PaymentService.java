@@ -179,15 +179,38 @@ public class PaymentService {
     }
 
     private java.util.List<String> extractCodesFromContent(String content) {
-        String cleaned = content == null ? "" : content.toUpperCase();
-        // Remove hyphens to handle payment references like "ZALOPAY-CHUYENTIEN-O5CH7BV0HDOQ-19F676386473"
-        cleaned = cleaned.replace("-", "");
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Z0-9]{10,16}").matcher(cleaned);
-        java.util.List<String> list = new java.util.ArrayList<>();
-        while (m.find()) {
-            list.add(m.group(0));
+        java.util.List<String> candidates = new java.util.ArrayList<>();
+        if (content == null || content.isEmpty()) {
+            return candidates;
         }
-        return list;
+        
+        String cleaned = content.toUpperCase();
+        
+        // Split by common delimiters: hyphen, space, underscore, etc.
+        String[] tokens = cleaned.split("[\\s\\-_,;:|/\\\\]+");
+        
+        // Extract all alphanumeric tokens that match our code length (10-16 characters)
+        for (String token : tokens) {
+            // Remove any non-alphanumeric characters from token
+            String alphanumeric = token.replaceAll("[^A-Z0-9]", "");
+            
+            if (alphanumeric.length() >= 10 && alphanumeric.length() <= 16) {
+                candidates.add(alphanumeric);
+            }
+        }
+        
+        // Also try removing ALL non-alphanumeric and extracting patterns
+        // This handles cases where code might be embedded without clear delimiters
+        String fullyClean = cleaned.replaceAll("[^A-Z0-9]", "");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Z0-9]{10,16}").matcher(fullyClean);
+        while (m.find()) {
+            String candidate = m.group(0);
+            if (!candidates.contains(candidate)) {
+                candidates.add(candidate);
+            }
+        }
+        
+        return candidates;
     }
 
     private LocalDateTime parseDate(String s) {
