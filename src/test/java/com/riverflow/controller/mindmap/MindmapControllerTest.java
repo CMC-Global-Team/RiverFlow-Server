@@ -76,7 +76,7 @@ class MindmapControllerTest {
         mindmapResponse = new MindmapResponse();
         mindmapResponse.setId("mindmap-123");
         mindmapResponse.setTitle("Test Mindmap");
-        mindmapResponse.setOwnerId(1L);
+        mindmapResponse.setMysqlUserId(1L);
     }
 
     @Test

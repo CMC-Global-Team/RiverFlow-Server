@@ -43,7 +43,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_ValidToken_ReturnsSuccess() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("valid-google-token");
+        request.setCredential("valid-google-token");
         
         SignInResponse response = new SignInResponse();
         response.setAccessToken("jwt-access-token");
@@ -71,7 +71,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_InvalidToken_ThrowsException() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("invalid-google-token");
+        request.setCredential("invalid-google-token");
         
         when(googleAuthService.authenticateWithGoogle(any(GoogleSignInRequest.class)))
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Google token không hợp lệ"));
@@ -89,7 +89,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_EmptyToken_ReturnsBadRequest() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("");
+        request.setCredential("");
 
         // When & Then
         mockMvc.perform(post("/auth/google")
@@ -104,7 +104,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_NullToken_ReturnsBadRequest() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken(null);
+        request.setCredential(null);
 
         // When & Then
         mockMvc.perform(post("/auth/google")
@@ -119,7 +119,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_NewUser_CreatesAccountAndReturnsTokens() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("new-user-google-token");
+        request.setCredential("new-user-google-token");
         
         SignInResponse response = new SignInResponse();
         response.setAccessToken("new-jwt-access-token");
@@ -145,7 +145,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_ExistingUser_ReturnsTokens() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("existing-user-token");
+        request.setCredential("existing-user-token");
         
         SignInResponse response = new SignInResponse();
         response.setAccessToken("existing-jwt-access");
@@ -171,7 +171,7 @@ class GoogleAuthControllerTest {
     void signInWithGoogle_ServiceCalledWithCorrectRequest() throws Exception {
         // Given
         GoogleSignInRequest request = new GoogleSignInRequest();
-        request.setIdToken("test-token-abc123");
+        request.setCredential("test-token-abc123");
         
         SignInResponse response = new SignInResponse();
         response.setAccessToken("access");
@@ -188,7 +188,7 @@ class GoogleAuthControllerTest {
 
         // Then
         verify(googleAuthService).authenticateWithGoogle(argThat(req -> 
-            req.getIdToken().equals("test-token-abc123")
+            req.getCredential().equals("test-token-abc123")
         ));
     }
 }

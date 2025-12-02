@@ -70,7 +70,7 @@ class PaymentControllerTest {
         topupRequest = CreditTopupRequest.builder()
                 .code("TOPUP-123")
                 .amount(100000L)
-                .userId(1L)
+                .user(testUser)
                 .build();
     }
 
@@ -103,7 +103,7 @@ class PaymentControllerTest {
     void getPaymentHistory_AuthenticatedUser_ReturnsHistory() throws Exception {
         // Given
         PaymentHistoryResponse historyItem = new PaymentHistoryResponse();
-        historyItem.setCode("TOPUP-123");
+        historyItem.setTransactionCode("TOPUP-123");
         historyItem.setAmount(100000L);
 
         Page<PaymentHistoryResponse> page = new PageImpl<>(Collections.singletonList(historyItem));
@@ -115,7 +115,7 @@ class PaymentControllerTest {
                         .param("page", "0")
                         .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].code").value("TOPUP-123"))
+                .andExpect(jsonPath("$.content[0].transactionCode").value("TOPUP-123"))
                 .andExpect(jsonPath("$.content[0].amount").value(100000));
 
         verify(paymentService).getUserTransactions(1L, 0, 10);
