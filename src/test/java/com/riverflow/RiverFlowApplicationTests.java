@@ -1,11 +1,9 @@
 package com.riverflow;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
-@Disabled("Context load fails in Docker build environment due to missing external services")
 @SpringBootTest
 class RiverFlowApplicationTests {
 
