@@ -394,13 +394,13 @@ INSERT IGNORE INTO ai_workflows (category_id, name, slug, description, prompt_te
 
 -- Insert system settings
 INSERT IGNORE INTO system_settings (setting_key, setting_value, setting_type, description, is_public, created_at, updated_at) VALUES
-('site_name', 'RiverFlow Mindmap', 'STRING', 'Website name', TRUE),
-('max_upload_size_mb', '10', 'NUMBER', 'Maximum file upload size in MB', FALSE),
-('email_verification_required', 'true', 'BOOLEAN', 'Require email verification for new users', FALSE),
-('maintenance_mode', 'false', 'BOOLEAN', 'Enable maintenance mode', TRUE),
-('max_mindmaps_per_user', '100', 'NUMBER', 'Maximum mindmaps per user (0 = unlimited)', FALSE),
-('max_collaborators_per_mindmap', '10', 'NUMBER', 'Maximum collaborators per mindmap', FALSE),
-('enable_ai_features', 'true', 'BOOLEAN', 'Enable AI workflow features', TRUE),
+('site_name', 'RiverFlow Mindmap', 'STRING', 'Website name', TRUE, NOW(), NOW()),
+('max_upload_size_mb', '10', 'NUMBER', 'Maximum file upload size in MB', FALSE, NOW(), NOW()),
+('email_verification_required', 'true', 'BOOLEAN', 'Require email verification for new users', FALSE, NOW(), NOW()),
+('maintenance_mode', 'false', 'BOOLEAN', 'Enable maintenance mode', TRUE, NOW(), NOW()),
+('max_mindmaps_per_user', '100', 'NUMBER', 'Maximum mindmaps per user (0 = unlimited)', FALSE, NOW(), NOW()),
+('max_collaborators_per_mindmap', '10', 'NUMBER', 'Maximum collaborators per mindmap', FALSE, NOW(), NOW()),
+('enable_ai_features', 'true', 'BOOLEAN', 'Enable AI workflow features', TRUE, NOW(), NOW()),
 ('ai_daily_limit_per_user', '20', 'NUMBER', 'Daily AI workflow usage limit per user', FALSE, NOW(), NOW());
 
 -- ==============================================================================
