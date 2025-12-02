@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.apache.catalina.connector.ClientAbortException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
@@ -74,6 +75,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(new MessageResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<MessageResponse> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatus status;
+        try {
+            status = HttpStatus.valueOf(ex.getStatusCode().value());
+        } catch (Exception ignore) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        String message = ex.getReason() != null ? ex.getReason() : "";
+        return ResponseEntity.status(status).body(new MessageResponse(message));
     }
 
     /**
@@ -174,4 +187,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.noContent().build();
     }
 }
-

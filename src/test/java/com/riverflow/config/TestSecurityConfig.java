@@ -32,15 +32,16 @@ public class TestSecurityConfig {
 
     @Bean
     @Primary
-    public JwtUtil jwtUtil() {
-        return Mockito.mock(JwtUtil.class);
+    public CustomUserDetailsService customUserDetailsService() {
+        return Mockito.mock(CustomUserDetailsService.class);
     }
 
     @Bean
     @Primary
-    public CustomUserDetailsService customUserDetailsService() {
-        return Mockito.mock(CustomUserDetailsService.class);
+    public JwtUtil jwtUtil() {
+        return Mockito.mock(JwtUtil.class);
     }
+
 
     @Bean
     public SecurityFilterChain testSecurityFilterChain(HttpSecurity http) throws Exception {

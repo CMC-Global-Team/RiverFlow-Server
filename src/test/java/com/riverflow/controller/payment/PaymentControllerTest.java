@@ -19,6 +19,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -110,8 +111,13 @@ class PaymentControllerTest {
         historyItem.setTransactionCode("TOPUP-123");
         historyItem.setAmount(100000L);
 
-        Page<PaymentHistoryResponse> page = new PageImpl<>(Collections.singletonList(historyItem));
+        Page<PaymentHistoryResponse> page = new PageImpl<>(
+                Collections.singletonList(historyItem),
+                PageRequest.of(0, 10),
+                1
+        );
 
+        when(userDetailsService.loadUserEntityByEmail("test@example.com")).thenReturn(testUser);
         when(paymentService.getUserTransactions(1L, 0, 10)).thenReturn(page);
 
         // When & Then
