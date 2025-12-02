@@ -174,6 +174,8 @@ public class PaymentService {
 
     private java.util.List<String> extractCodesFromContent(String content) {
         String cleaned = content == null ? "" : content.toUpperCase();
+        // Remove hyphens to handle payment references like "ZALOPAY-CHUYENTIEN-O5CH7BV0HDOQ-19F676386473"
+        cleaned = cleaned.replace("-", "");
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("[A-Z0-9]{10,16}").matcher(cleaned);
         java.util.List<String> list = new java.util.ArrayList<>();
         while (m.find()) {
