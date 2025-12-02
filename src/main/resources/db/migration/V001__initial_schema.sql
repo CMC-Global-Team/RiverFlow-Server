@@ -451,8 +451,6 @@ GROUP BY w.id, w.name, w.slug, c.name, w.usage_count, w.rating_average, w.rating
 -- STORED PROCEDURES
 -- ==============================================================================
 
-DELIMITER //
-
 -- Procedure: Get user's unread notification count
 DROP PROCEDURE IF EXISTS sp_get_unread_notification_count;
 CREATE PROCEDURE sp_get_unread_notification_count(
@@ -464,7 +462,7 @@ BEGIN
     FROM notifications
     WHERE user_id = p_user_id
     AND is_read = FALSE;
-END //
+END;
 
 -- Procedure: Mark all notifications as read
 DROP PROCEDURE IF EXISTS sp_mark_all_notifications_read;
@@ -476,7 +474,7 @@ BEGIN
     SET is_read = TRUE, read_at = NOW()
     WHERE user_id = p_user_id
     AND is_read = FALSE;
-END //
+END;
 
 -- Procedure: Get popular AI workflows
 DROP PROCEDURE IF EXISTS sp_get_popular_workflows;
@@ -497,7 +495,7 @@ BEGIN
         ORDER BY usage_count DESC, rating_average DESC
         LIMIT p_limit;
     END IF;
-END //
+END;
 
 -- Procedure: Record AI workflow usage
 DROP PROCEDURE IF EXISTS sp_record_workflow_usage;
@@ -523,7 +521,7 @@ BEGIN
     UPDATE ai_workflows
     SET usage_count = usage_count + 1
     WHERE id = p_workflow_id;
-END //
+END;
 
 -- Procedure: Rate AI workflow
 DROP PROCEDURE IF EXISTS sp_rate_workflow;
@@ -559,9 +557,7 @@ BEGIN
             WHERE workflow_id = v_workflow_id AND rating IS NOT NULL
         )
     WHERE w.id = v_workflow_id;
-END //
-
-DELIMITER ;
+END;
 
 -- ==============================================================================
 -- INDEXES FOR PERFORMANCE
