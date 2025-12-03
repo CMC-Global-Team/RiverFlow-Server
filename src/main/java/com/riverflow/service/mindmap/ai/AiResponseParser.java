@@ -2,6 +2,7 @@ package com.riverflow.service.mindmap.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.riverflow.dto.mindmap.ai.Otmz;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -37,13 +38,43 @@ public class AiResponseParser {
                         Map<String, Object> opMap = objectMapper.convertValue(op, Map.class);
                         ops.add(opMap);
                     } catch (Exception e) {
-                        }
+                        // ignore malformed op entries
+                    }
                 }
             }
 
             return new AiDecision(targetType, language, structureType, nodeLabel, ops);
         } catch (Exception e) {
             return new AiDecision(null, null, null, null, List.of());
+        }
+    }
+
+    /**
+     * Parse OTMZ (Thinking step output) into DTO
+     */
+    public Otmz parseOtmz(String json) {
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            Otmz otmz = new Otmz();
+
+            otmz.setMeta(nodeToMap(root.get("meta")));
+            otmz.setPromptAnalysis(nodeToMap(root.get("promptAnalysis")));
+            otmz.setPropertiesDesign(nodeToMap(root.get("propertiesDesign")));
+            otmz.setOptimizedContent(nodeToMap(root.get("optimizedContent")));
+
+            return otmz;
+        } catch (Exception e) {
+            // Return empty DTO on failure for resiliency
+            return new Otmz();
+        }
+    }
+
+    private Map<String, Object> nodeToMap(JsonNode node) {
+        if (node == null || node.isNull()) return Map.of();
+        try {
+            return objectMapper.convertValue(node, Map.class);
+        } catch (IllegalArgumentException ex) {
+            return Map.of();
         }
     }
 
