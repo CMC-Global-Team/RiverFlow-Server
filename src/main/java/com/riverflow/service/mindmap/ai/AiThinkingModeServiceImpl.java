@@ -111,7 +111,7 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
      * Validate user has permission to modify the mindmap
      */
     private void validatePermissions(Mindmap mindmap, Long userId) {
-        boolean isOwner = mindmap.getMysqlUserId().equals(userId);
+        boolean isOwner = mindmap.getMysqlUserId() != null && mindmap.getMysqlUserId().equals(userId);
 
         boolean isEditorCollaborator = mindmap.getCollaborators() != null &&
                 mindmap.getCollaborators().stream()
