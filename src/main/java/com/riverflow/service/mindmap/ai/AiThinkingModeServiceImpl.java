@@ -212,6 +212,9 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
             final boolean[] jsonStarted = { false }; // Use array to make it effectively final
+            final int[] chunkCount = { 0 }; // Track number of chunks received
+
+            System.err.println("[callGeminiStream] Starting Gemini API call for mindmapId: " + mindmapId);
 
             // Send streaming start event
             if (mindmapId != null) {
@@ -227,49 +230,76 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             Iterable<Map> iterable = responseFlux.toIterable();
             iterable.forEach(chunk -> {
                 try {
+                    chunkCount[0]++;
+                    System.err.println("[callGeminiStream] Received chunk #" + chunkCount[0] + ": " + chunk);
+                    
                     List<?> candidates = (List<?>) chunk.get("candidates");
-                    if (candidates != null && !candidates.isEmpty()) {
-                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
-                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
-                        if (content != null) {
-                            List<?> parts = (List<?>) content.get("parts");
-                            if (parts != null && !parts.isEmpty()) {
-                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
-                                String text = String.valueOf(part.get("text"));
-                                if (text != null && !"null".equals(text)) {
-                                    fullText.append(text);
+                    if (candidates == null || candidates.isEmpty()) {
+                        System.err.println("[callGeminiStream] No candidates in chunk #" + chunkCount[0]);
+                        return;
+                    }
+                    
+                    Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                    
+                    // Check for finishReason
+                    Object finishReason = candidate.get("finishReason");
+                    if (finishReason != null) {
+                        System.err.println("[callGeminiStream] Chunk #" + chunkCount[0] + " has finishReason: " + finishReason);
+                    }
+                    
+                    Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                    if (content == null) {
+                        System.err.println("[callGeminiStream] No content in candidate for chunk #" + chunkCount[0]);
+                        return;
+                    }
+                    
+                    List<?> parts = (List<?>) content.get("parts");
+                    if (parts == null || parts.isEmpty()) {
+                        System.err.println("[callGeminiStream] No parts in content for chunk #" + chunkCount[0]);
+                        return;
+                    }
+                    
+                    Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                    String text = String.valueOf(part.get("text"));
+                    
+                    if (text == null || "null".equals(text)) {
+                        System.err.println("[callGeminiStream] No text in part for chunk #" + chunkCount[0]);
+                        return;
+                    }
+                    
+                    System.err.println("[callGeminiStream] Chunk #" + chunkCount[0] + " text: " + text.substring(0, Math.min(100, text.length())) + "...");
+                    fullText.append(text);
 
-                                    // Only send natural language part to client (before JSON)
-                                    if (!jsonStarted[0]) {
-                                        // Check if this chunk starts JSON
-                                        if (text.contains("```json") || text.contains("{")) {
-                                            jsonStarted[0] = true;
-                                            // Send only the part before JSON marker
-                                            String beforeJson = extractNaturalLanguage(text);
-                                            if (!beforeJson.isEmpty()) {
-                                                naturalLanguagePart.append(beforeJson);
-                                                if (mindmapId != null) {
-                                                    sendRealtimeEvent(mindmapId, "ai:stream:chunk",
-                                                            Map.of("chunk", beforeJson, "done", false));
-                                                }
-                                            }
-                                        } else {
-                                            // This is pure natural language, send it
-                                            naturalLanguagePart.append(text);
-                                            if (mindmapId != null) {
-                                                sendRealtimeEvent(mindmapId, "ai:stream:chunk",
-                                                        Map.of("chunk", text, "done", false));
-                                            }
-                                        }
-                                    }
-                                    // If JSON already started, don't send those chunks
+                    // Only send natural language part to client (before JSON)
+                    if (!jsonStarted[0]) {
+                        // Check if this chunk starts JSON
+                        if (text.contains("```json") || text.contains("{")) {
+                            jsonStarted[0] = true;
+                            // Send only the part before JSON marker
+                            String beforeJson = extractNaturalLanguage(text);
+                            if (!beforeJson.isEmpty()) {
+                                naturalLanguagePart.append(beforeJson);
+                                if (mindmapId != null) {
+                                    sendRealtimeEvent(mindmapId, "ai:stream:chunk",
+                                            Map.of("chunk", beforeJson, "done", false));
                                 }
+                            }
+                        } else {
+                            // This is pure natural language, send it
+                            naturalLanguagePart.append(text);
+                            if (mindmapId != null) {
+                                sendRealtimeEvent(mindmapId, "ai:stream:chunk",
+                                        Map.of("chunk", text, "done", false));
                             }
                         }
                     }
                 } catch (Exception e) {
+                    System.err.println("[callGeminiStream] Error processing chunk #" + chunkCount[0] + ": " + e.getMessage());
+                    e.printStackTrace();
                 }
             });
+
+            System.err.println("[callGeminiStream] Finished. Total chunks: " + chunkCount[0] + ", fullText length: " + fullText.length());
 
             // Send streaming done event with natural language summary
             if (mindmapId != null) {
