@@ -72,9 +72,11 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
 
     @Override
     public MindmapResponse generate(ActionList actionList, String mindmapId, String structureType, Long userId) {
-        // 1. Load mindmap
+        // 1. Load mindmap and validate permissions
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        validatePermissions(mindmap, userId);
 
         // 2. Convert ActionList to operations format
         List<Map<String, Object>> operations = new ArrayList<>();
@@ -103,6 +105,26 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                 .build();
 
         return mindmapService.updateMindmap(mindmapId, updateReq, userId);
+    }
+
+    /**
+     * Validate user has permission to modify the mindmap
+     */
+    private void validatePermissions(Mindmap mindmap, Long userId) {
+        boolean isOwner = mindmap.getMysqlUserId().equals(userId);
+
+        boolean isEditorCollaborator = mindmap.getCollaborators() != null &&
+                mindmap.getCollaborators().stream()
+                        .anyMatch(c ->
+                                c.getMysqlUserId() != null &&
+                                        c.getMysqlUserId().equals(userId) &&
+                                        "accepted".equals(c.getStatus()) &&
+                                        "EDITOR".equals(c.getRole())
+                        );
+
+        if (!isOwner && !isEditorCollaborator) {
+            throw new com.riverflow.exception.mindmap.MindmapAccessDeniedException(mindmap.getId(), userId);
+        }
     }
 
     /**
