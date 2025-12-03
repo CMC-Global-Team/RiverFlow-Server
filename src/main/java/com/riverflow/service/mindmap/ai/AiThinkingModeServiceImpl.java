@@ -63,9 +63,25 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             String otmzJson = objectMapper.writeValueAsString(otmz);
             Map<String, Object> payload = promptBuilder.buildActionListPrompt(otmzJson, language);
             String text = callGeminiStream(payload, mindmapId);
+            
+            // Check if Gemini response is null or empty
+            if (text == null || text.trim().isEmpty()) {
+                System.err.println("[plan] Gemini returned null or empty response");
+                return new ActionList();
+            }
+            
             String json = promptBuilder.ensureJson(text);
+            
+            // Check if JSON extraction failed
+            if (json == null || json.trim().isEmpty()) {
+                System.err.println("[plan] ensureJson returned null or empty. Raw response: " + text);
+                return new ActionList();
+            }
+            
             return responseParser.parseActionList(json);
         } catch (Exception e) {
+            System.err.println("[plan] Exception: " + e.getMessage());
+            e.printStackTrace();
             return new ActionList();
         }
     }

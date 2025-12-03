@@ -76,6 +76,13 @@ public class AiResponseParser {
      */
     public ActionList parseActionList(String json) {
         ActionList actionList = new ActionList();
+        
+        // Add null/empty check first
+        if (json == null || json.trim().isEmpty()) {
+            System.err.println("[parseActionList] Received null or empty JSON string");
+            return actionList;
+        }
+        
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode actionsNode = root.get("actions");
@@ -93,8 +100,7 @@ public class AiResponseParser {
                     }
                 }
             } else {
-                System.err.println("[parseActionList] No 'actions' array found in JSON. Root keys: " + 
-                    (root != null ? root.fieldNames().toString() : "null"));
+                System.err.println("[parseActionList] 'actions' array not found in JSON");
             }
         } catch (Exception e) {
             System.err.println("[parseActionList] Failed to parse JSON: " + e.getMessage());
