@@ -2,6 +2,8 @@ package com.riverflow.service.mindmap.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.riverflow.dto.mindmap.ai.Action;
+import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -67,6 +69,32 @@ public class AiResponseParser {
             // Return empty DTO on failure for resiliency
             return new Otmz();
         }
+    }
+
+    /**
+     * Parse Action List (Agent step output) into DTO
+     */
+    public ActionList parseActionList(String json) {
+        ActionList actionList = new ActionList();
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode actionsNode = root.get("actions");
+            if (actionsNode != null && actionsNode.isArray()) {
+                for (JsonNode a : actionsNode) {
+                    try {
+                        Action action = objectMapper.convertValue(a, Action.class);
+                        if (action != null) {
+                            actionList.getActions().add(action);
+                        }
+                    } catch (Exception ignore) {
+                        // skip invalid action entry
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // return empty list on failure
+        }
+        return actionList;
     }
 
     private Map<String, Object> nodeToMap(JsonNode node) {
