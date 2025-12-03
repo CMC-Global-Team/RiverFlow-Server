@@ -86,12 +86,19 @@ public class AiResponseParser {
                         if (action != null) {
                             actionList.getActions().add(action);
                         }
-                    } catch (Exception ignore) {
+                    } catch (Exception e) {
+                        System.err.println("[parseActionList] Failed to parse individual action: " + e.getMessage());
+                        e.printStackTrace();
                         // skip invalid action entry
                     }
                 }
+            } else {
+                System.err.println("[parseActionList] No 'actions' array found in JSON. Root keys: " + 
+                    (root != null ? root.fieldNames().toString() : "null"));
             }
         } catch (Exception e) {
+            System.err.println("[parseActionList] Failed to parse JSON: " + e.getMessage());
+            e.printStackTrace();
             // return empty list on failure
         }
         return actionList;
