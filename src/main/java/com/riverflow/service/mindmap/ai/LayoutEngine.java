@@ -523,23 +523,23 @@ public class LayoutEngine {
                     // Horizontal connection (left-right orientation)
                     if (dx > 0) {
                         // Target is to the right
-                        edge.put("sourceHandle", "right");
-                        edge.put("targetHandle", "left");
+                        edge.put("sourceHandle", "source-right");
+                        edge.put("targetHandle", "target-left");
                     } else {
                         // Target is to the left
-                        edge.put("sourceHandle", "left");
-                        edge.put("targetHandle", "right");
+                        edge.put("sourceHandle", "source-left");
+                        edge.put("targetHandle", "target-right");
                     }
                 } else {
                     // Vertical connection (top-bottom orientation)
                     if (dy > 0) {
                         // Target is below
-                        edge.put("sourceHandle", "bottom");
-                        edge.put("targetHandle", "top");
+                        edge.put("sourceHandle", "source-bottom");
+                        edge.put("targetHandle", "target-top");
                     } else {
                         // Target is above
-                        edge.put("sourceHandle", "top");
-                        edge.put("targetHandle", "bottom");
+                        edge.put("sourceHandle", "source-top");
+                        edge.put("targetHandle", "target-bottom");
                     }
                 }
                 handlesSet++;
