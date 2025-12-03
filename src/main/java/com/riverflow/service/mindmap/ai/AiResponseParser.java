@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.ai.Action;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.dto.mindmap.ai.LoopPlan;
+import com.riverflow.dto.mindmap.ai.LoopTask;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -17,6 +19,64 @@ import java.util.*;
 @Component
 @RequiredArgsConstructor
 public class AiResponseParser {
+
+    /**
+     * Parse Max Mode planner output (iterations + tasks[])
+     */
+    public LoopPlan parseLoopPlan(String json) {
+        LoopPlan plan = new LoopPlan();
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            // iterations
+            JsonNode itNode = root.get("iterations");
+            if (itNode != null && itNode.isNumber()) {
+                plan.setIterations(itNode.asInt());
+            } else {
+                plan.setIterations(1);
+            }
+
+            // tasks
+            JsonNode tasksNode = root.get("tasks");
+            if (tasksNode != null && tasksNode.isArray()) {
+                int idx = 1;
+                for (JsonNode t : tasksNode) {
+                    try {
+                        LoopTask task = new LoopTask();
+                        String id = textOrNull(t.get("id"));
+                        if (id == null || id.isBlank()) id = "t" + idx;
+                        task.setId(id);
+                        task.setTitle(textOrNull(t.get("title")));
+                        task.setDescription(textOrNull(t.get("description")));
+
+                        // dependsOn
+                        List<String> deps = new ArrayList<>();
+                        JsonNode depsNode = t.get("dependsOn");
+                        if (depsNode != null) {
+                            if (depsNode.isArray()) {
+                                for (JsonNode d : depsNode) {
+                                    String v = textOrNull(d);
+                                    if (v != null && !v.isBlank()) deps.add(v);
+                                }
+                            } else {
+                                String v = textOrNull(depsNode);
+                                if (v != null && !v.isBlank()) deps.add(v);
+                            }
+                        }
+                        if (!deps.isEmpty()) task.setDependsOn(deps);
+
+                        plan.getTasks().add(task);
+                        idx++;
+                    } catch (Exception ignore) {
+                        // skip invalid task entry
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // return best-effort parsed plan (may be empty)
+            if (plan.getIterations() == null) plan.setIterations(1);
+        }
+        return plan;
+    }
 
     private final ObjectMapper objectMapper;
 
