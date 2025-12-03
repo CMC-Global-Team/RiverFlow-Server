@@ -1,8 +1,15 @@
 package com.riverflow.service.mindmap.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.riverflow.dto.mindmap.MindmapResponse;
+import com.riverflow.dto.mindmap.UpdateMindmapRequest;
+import com.riverflow.dto.mindmap.ai.Action;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.exception.MindmapNotFoundException;
+import com.riverflow.model.Mindmap;
+import com.riverflow.repository.MindmapRepository;
+import com.riverflow.service.mindmap.MindmapService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +22,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +36,10 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
     private final GeminiPromptBuilder promptBuilder;
     private final AiResponseParser responseParser;
     private final ObjectMapper objectMapper;
+    private final AiOperationExecutor operationExecutor;
+    private final LayoutEngine layoutEngine;
+    private final MindmapRepository mindmapRepository;
+    private final MindmapService mindmapService;
 
     @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
@@ -56,6 +68,41 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
         } catch (Exception e) {
             return new ActionList();
         }
+    }
+
+    @Override
+    public MindmapResponse generate(ActionList actionList, String mindmapId, String structureType, Long userId) {
+        // 1. Load mindmap
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        // 2. Convert ActionList to operations format
+        List<Map<String, Object>> operations = new ArrayList<>();
+        if (actionList != null && actionList.getActions() != null) {
+            for (Action action : actionList.getActions()) {
+                Map<String, Object> op = new HashMap<>();
+                op.put("type", action.getType());
+                if (action.getParams() != null) {
+                    op.putAll(action.getParams());
+                }
+                operations.add(op);
+            }
+        }
+
+        // 3. Execute operations to create nodes
+        List<String> logs = operationExecutor.executeOperations(operations, mindmap);
+
+        // 4. Apply layout
+        String struct = structureType != null ? structureType : "mindmap";
+        layoutEngine.applyLayout(struct, mindmap.getNodes(), mindmap.getEdges());
+
+        // 5. Save mindmap
+        UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
+                .nodes(mindmap.getNodes())
+                .edges(mindmap.getEdges())
+                .build();
+
+        return mindmapService.updateMindmap(mindmapId, updateReq, userId);
     }
 
     /**
