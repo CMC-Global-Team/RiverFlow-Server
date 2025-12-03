@@ -12,6 +12,61 @@ import java.util.*;
 public class GeminiPromptBuilder {
 
         /**
+         * Max Mode [1] Planner: Build prompt to plan loop tasks from user prompt + workspace
+         * Returns JSON-only plan with iterations and tasks[].
+         */
+        public Map<String, Object> buildLoopPlannerPrompt(
+                        String prompt,
+                        String language,
+                        Map<String, Object> workspace,
+                        Integer maxIterations) {
+                String lang = StringUtils.hasText(language) ? language : "vi";
+                int maxIters = (maxIterations != null && maxIterations > 0 && maxIterations <= 12) ? maxIterations : 6;
+
+                StringBuilder system = new StringBuilder();
+                system.append("You are a PLANNER for a multi-step AI loop (Planner → Thinking → Generate).\\n");
+                system.append("Goal: From the user's request and workspace context, create an ordered task list for the loop.\\n");
+                system.append("Output STRICTLY JSON (no markdown), with keys: iterations, tasks.\\n");
+                system.append("Rules:\\n");
+                system.append("- Language for titles/descriptions: ").append(lang).append(".\\n");
+                system.append("- iterations = number of passes (1-\").append(maxIters).append(").\\n");
+                system.append("- Each task must include fields: id, title, description, dependsOn (ids), ");
+                system.append("topic, structureType, levels, firstLevelCount, tags (array).\\n");
+                system.append("- Keep titles concise (1-4 words), descriptions 1-2 sentences.\\n");
+                system.append("- Choose structureType from: mindmap|logic|brace|org|tree|timeline|fishbone.\\n");
+                system.append("- Choose sensible levels (2-3) and firstLevelCount (3-6).\\n");
+                system.append("- tasks must be feasible and collectively solve the prompt.\\n");
+                system.append("- JSON ONLY. No extra commentary or code fences.\\n");
+
+                StringBuilder user = new StringBuilder();
+                user.append("USER PROMPT (" ).append(lang).append("):\\n").append(prompt == null ? "" : prompt).append("\\n\\n");
+                user.append("WORKSPACE SUMMARY (may be partial):\\n");
+                if (workspace != null && !workspace.isEmpty()) {
+                        user.append(workspace.toString());
+                } else {
+                        user.append("{}\n");
+                }
+                user.append("\\nReturn JSON with exact shape: ");
+                user.append("{\"iterations\":n,\"tasks\":[{\"id\":\"t1\",\"title\":\"...\",\"description\":\"...\",\"dependsOn\":[\"t0\"],\"topic\":\"...\",\"structureType\":\"mindmap\",\"levels\":2,\"firstLevelCount\":4,\"tags\":[\"...\"]}]}\n");
+
+                Map<String, Object> systemInstruction = Map.of(
+                                "parts", List.of(Map.of("text", system.toString())));
+                Map<String, Object> userContent = Map.of(
+                                "role", "user",
+                                "parts", List.of(Map.of("text", user.toString())));
+
+                Map<String, Object> generationConfig = new HashMap<>();
+                generationConfig.put("temperature", 0.4);
+                generationConfig.put("maxOutputTokens", 3000);
+
+                Map<String, Object> payload = new HashMap<>();
+                payload.put("systemInstruction", systemInstruction);
+                payload.put("contents", List.of(userContent));
+                payload.put("generationConfig", generationConfig);
+                return payload;
+        }
+
+        /**
          * Build prompt for classifying user action and planning operations
          */
         public Map<String, Object> buildClassifyActionPrompt(
