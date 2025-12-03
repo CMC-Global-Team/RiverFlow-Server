@@ -7,15 +7,7 @@ import java.util.List;
 
 public interface AiThinkingModeService {
 
-    Otmz think(
-            String topic,
-            String language,
-            String structureType,
-            Integer levels,
-            Integer firstLevelCount,
-            List<String> tags,
-            String mode);
+    Otmz think(String topic, String language, String structureType, Integer levels, Integer firstLevelCount, List<String> tags, String mode, String mindmapId);
 
-    ActionList plan(Otmz otmz, String language);
+    ActionList plan(Otmz otmz, String language, String mindmapId);
 }
-
