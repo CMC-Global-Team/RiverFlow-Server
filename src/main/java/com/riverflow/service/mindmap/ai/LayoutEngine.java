@@ -17,6 +17,10 @@ public class LayoutEngine {
     private static final int VERTICAL_SPACING = 120;
     private static final int LEVEL_SPACING = 250;
 
+    // Collision resolution parameters
+    private static final int PADDING = 24;           // extra gap between nodes
+    private static final int MAX_COLLISION_ITERS = 60; // safety cap for iterations
+
     /**
      * Apply layout to nodes based on structure type
      */
@@ -36,7 +40,11 @@ public class LayoutEngine {
             default -> layoutMindmapStyle(nodes, edges);
         }
 
-        }
+        // Ensure collision-free after any layout
+        resolveCollisions(nodes, edges);
+        // Normalize to keep all nodes in positive quadrant and leave margin
+        normalizeToPositiveSpace(nodes, 50, 50);
+    }
 
     /**
      * Mindmap style: Weighted Radial Layout (Collision-free)
@@ -442,5 +450,137 @@ public class LayoutEngine {
                 }
             }
         }
+    }
+
+    // === Collision handling ===
+
+    private void resolveCollisions(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
+        if (nodes == null || nodes.size() < 2) return;
+
+        // Pre-allocate arrays for speed
+        int n = nodes.size();
+        double[] cx = new double[n];
+        double[] cy = new double[n];
+        double[] hw = new double[n];
+        double[] hh = new double[n];
+
+        for (int iter = 0; iter < MAX_COLLISION_ITERS; iter++) {
+            // Build rectangles each iteration (sizes may be static but positions change)
+            for (int i = 0; i < n; i++) {
+                Map<String, Object> node = nodes.get(i);
+                Size size = getNodeSize(node);
+                int x = getX(node);
+                int y = getY(node);
+                hw[i] = (size.width + PADDING) / 2.0;
+                hh[i] = (size.height + PADDING) / 2.0;
+                cx[i] = x + size.width / 2.0;
+                cy[i] = y + size.height / 2.0;
+            }
+
+            boolean anyMoved = false;
+
+            for (int i = 0; i < n; i++) {
+                for (int j = i + 1; j < n; j++) {
+                    double dx = cx[i] - cx[j];
+                    double dy = cy[i] - cy[j];
+
+                    double overlapX = hw[i] + hw[j] - Math.abs(dx);
+                    double overlapY = hh[i] + hh[j] - Math.abs(dy);
+
+                    if (overlapX > 0 && overlapY > 0) {
+                        // They overlap. Push them apart along the axis of least overlap.
+                        if (overlapX < overlapY) {
+                            double push = overlapX / 2.0;
+                            double sx = dx == 0 ? (i % 2 == 0 ? 1 : -1) : Math.signum(dx);
+                            cx[i] += push * sx;
+                            cx[j] -= push * sx;
+                        } else {
+                            double push = overlapY / 2.0;
+                            double sy = dy == 0 ? (j % 2 == 0 ? 1 : -1) : Math.signum(dy);
+                            cy[i] += push * sy;
+                            cy[j] -= push * sy;
+                        }
+                        anyMoved = true;
+                    }
+                }
+            }
+
+            // Write back positions
+            for (int i = 0; i < n; i++) {
+                Map<String, Object> node = nodes.get(i);
+                Size size = getNodeSize(node);
+                int newX = (int) Math.round(cx[i] - size.width / 2.0);
+                int newY = (int) Math.round(cy[i] - size.height / 2.0);
+                setPosition(node, newX, newY);
+            }
+
+            if (!anyMoved) break; // Done
+        }
+    }
+
+    private void normalizeToPositiveSpace(List<Map<String, Object>> nodes, int marginX, int marginY) {
+        if (nodes == null || nodes.isEmpty()) return;
+        int minX = Integer.MAX_VALUE;
+        int minY = Integer.MAX_VALUE;
+
+        for (Map<String, Object> node : nodes) {
+            int x = getX(node);
+            int y = getY(node);
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+        }
+
+        int shiftX = 0, shiftY = 0;
+        if (minX < marginX) shiftX = marginX - minX;
+        if (minY < marginY) shiftY = marginY - minY;
+
+        if (shiftX != 0 || shiftY != 0) {
+            offsetNodes(nodes, shiftX, shiftY);
+        }
+    }
+
+    private int getX(Map<String, Object> node) {
+        Object posObj = node.get("position");
+        if (posObj instanceof Map<?, ?> m) {
+            Object xo = m.get("x");
+            if (xo instanceof Number num) return num.intValue();
+        }
+        return 0;
+    }
+
+    private int getY(Map<String, Object> node) {
+        Object posObj = node.get("position");
+        if (posObj instanceof Map<?, ?> m) {
+            Object yo = m.get("y");
+            if (yo instanceof Number num) return num.intValue();
+        }
+        return 0;
+    }
+
+    private Size getNodeSize(Map<String, Object> node) {
+        int w = NODE_WIDTH;
+        int h = NODE_HEIGHT;
+        Object styleObj = node.get("style");
+        if (styleObj instanceof Map<?, ?> s) {
+            Object soW = s.get("width");
+            Object soH = s.get("height");
+            if (soW instanceof Number) w = Math.max(60, ((Number) soW).intValue());
+            if (soH instanceof Number) h = Math.max(40, ((Number) soH).intValue());
+        }
+        // Some clients may store size inside data
+        Object dataObj = node.get("data");
+        if (dataObj instanceof Map<?, ?> d) {
+            Object dw = d.get("width");
+            Object dh = d.get("height");
+            if (dw instanceof Number) w = Math.max(w, ((Number) dw).intValue());
+            if (dh instanceof Number) h = Math.max(h, ((Number) dh).intValue());
+        }
+        return new Size(w, h);
+    }
+
+    private static class Size {
+        final int width;
+        final int height;
+        Size(int w, int h) { this.width = w; this.height = h; }
     }
 }
