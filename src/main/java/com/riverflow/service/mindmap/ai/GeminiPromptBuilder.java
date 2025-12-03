@@ -148,6 +148,11 @@ public class GeminiPromptBuilder {
             system.append("1. FIRST: A friendly natural language explanation (2-3 sentences) in ").append(lang).append(" describing what you're creating\n");
             system.append("2. THEN: The complete OTMZ JSON on a new line\n");
             system.append("Format: <explanation>\\n\\n```json\\n<otmz>\\n```\n");
+            system.append("CRITICAL: The OTMZ JSON MUST have exactly these 4 keys:\n");
+            system.append("- meta: {date, language, version}\n");
+            system.append("- promptAnalysis: {topic, language, structure, levels, firstLevelCount, constraints, analysis}\n");
+            system.append("- propertiesDesign: {structure, style, directions, visualMetaphor}\n");
+            system.append("- optimizedContent: {title, description, type, levels, firstLevelCount, nodes[]}\n");
             system.append("Rules for JSON:\n");
             system.append("- All labels/descriptions MUST be in ").append(lang).append(".\n");
             system.append("- Structure type: ").append(struct).append(".\n");
@@ -166,7 +171,7 @@ public class GeminiPromptBuilder {
             }
             user.append("\nPlease:\n");
             user.append("1. First explain in ").append(lang).append(" what mindmap you're creating\n");
-            user.append("2. Then provide the OTMZ JSON with all required fields\n");
+            user.append("2. Then provide the OTMZ JSON with ALL 4 REQUIRED KEYS: meta, promptAnalysis, propertiesDesign, optimizedContent\n");
 
             Map<String, Object> systemInstruction = Map.of(
                     "parts", List.of(Map.of("text", system.toString())));
