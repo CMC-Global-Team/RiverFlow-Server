@@ -211,7 +211,7 @@ public class GeminiPromptBuilder {
                                 .append(" branches, MUST have parentId=null or empty\\n");
                 system.append("- Max depth: ").append(levels).append(" levels\\n");
                 system.append("- Diverse content, avoid repetition\\n");
-                system.append("- Node properties: nodeType, colors, background, description, icons\\n");
+                system.append("- Node properties: nodeType, shapes (VARY), colors, background, description, icons\\\\n");
                 system.append("- Edge properties: type, animated, sourceHandle, targetHandle, markerEnd\\n");
                 system.append(buildStructureGuidance(structureType));
                 system.append("- Pure JSON output, no markdown```");
@@ -258,6 +258,7 @@ public class GeminiPromptBuilder {
                 user.append("  ]\\n");
                 user.append("}\\n\\n");
                 user.append("CRITICAL RULES:\\n");
+                user.append("- USE DIVERSE SHAPES: Vary node shapes (rectangle, circle, diamond, hexagon, ellipse, roundedRectangle) for visual distinction\\n");
                 user.append("1. LANGUAGE: ALL titles and descriptions MUST be in ").append(language).append(".\\n");
                 user.append("2. SHAPES: Use diverse shapes (rectangle, circle, diamond, hexagon, ellipse, roundedRectangle).\\n");
                 user.append("3. COLORS: Use vibrant, diverse colors for different branches.\\n");
