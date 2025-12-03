@@ -22,7 +22,8 @@ public class AiThinkingController {
     private final GeminiPromptBuilder promptBuilder;
 
     @PostMapping("/otmz")
-    public ResponseEntity<Otmz> think(@Valid @RequestBody ThinkingModeRequest request) {
+    public ResponseEntity<Otmz> think(@Valid @RequestBody ThinkingModeRequest request,
+                                      @RequestParam(required = false) String mindmapId) {
         Otmz otmz = thinkingService.think(
                 request.getTopic(),
                 request.getLanguage(),
@@ -30,7 +31,8 @@ public class AiThinkingController {
                 request.getLevels(),
                 request.getFirstLevelCount(),
                 request.getTags(),
-                request.getMode()
+                request.getMode(),
+                mindmapId
         );
         return ResponseEntity.ok(otmz);
     }
@@ -55,13 +57,14 @@ public class AiThinkingController {
     // Plan: from OTMZ to ActionList
     @PostMapping("/actions")
     public ResponseEntity<ActionList> plan(@RequestBody Otmz otmz,
-                                           @RequestParam(required = false) String language) {
+                                           @RequestParam(required = false) String language,
+                                           @RequestParam(required = false) String mindmapId) {
         String lang = language;
         if (lang == null && otmz != null && otmz.getMeta() != null) {
             Object metaLang = otmz.getMeta().get("language");
             if (metaLang != null) lang = String.valueOf(metaLang);
         }
-        ActionList actions = thinkingService.plan(otmz, lang);
+        ActionList actions = thinkingService.plan(otmz, lang, mindmapId);
         return ResponseEntity.ok(actions);
     }
 }
