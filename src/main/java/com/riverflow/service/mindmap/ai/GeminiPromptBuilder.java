@@ -29,7 +29,7 @@ public class GeminiPromptBuilder {
                 system.append("Output STRICTLY JSON (no markdown), with keys: iterations, tasks.\\n");
                 system.append("Rules:\\n");
                 system.append("- Language for titles/descriptions: ").append(lang).append(".\\n");
-                system.append("- iterations = number of passes (1-\").append(maxIters).append(").\\n");
+                system.append("- iterations = number of passes (1-").append(maxIters).append(").\\n");
                 system.append("- Each task must include fields: id, title, description, dependsOn (ids), ");
                 system.append("topic, structureType, levels, firstLevelCount, tags (array).\\n");
                 system.append("- Keep titles concise (1-4 words), descriptions 1-2 sentences.\\n");
