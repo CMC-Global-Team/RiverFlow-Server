@@ -38,7 +38,15 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
 
     @Override
     public ActionList plan(Otmz otmz, String language) {
-        throw new UnsupportedOperationException("plan() not implemented yet");
+        try {
+            String otmzJson = objectMapper.writeValueAsString(otmz);
+            Map<String, Object> payload = promptBuilder.buildActionListPrompt(otmzJson, language);
+            String text = callGemini(payload);
+            String json = promptBuilder.ensureJson(text);
+            return responseParser.parseActionList(json);
+        } catch (Exception e) {
+            return new ActionList();
+        }
     }
 
     // Basic non-streaming Gemini call
