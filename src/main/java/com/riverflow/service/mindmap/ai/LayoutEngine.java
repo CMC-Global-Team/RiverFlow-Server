@@ -478,7 +478,12 @@ public class LayoutEngine {
      * the relative positions of connected nodes
      */
     private void calculateEdgeHandles(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
+        System.out.println("=== calculateEdgeHandles() CALLED ===");
+        System.out.println("Nodes count: " + (nodes != null ? nodes.size() : "null"));
+        System.out.println("Edges count: " + (edges != null ? edges.size() : "null"));
+        
         if (nodes == null || edges == null) {
+            System.out.println("WARNING: nodes or edges is null, skipping handle calculation");
             return;
         }
 
@@ -491,8 +496,11 @@ public class LayoutEngine {
                 nodePositions.put(id, pos);
             }
         }
+        
+        System.out.println("Node positions map size: " + nodePositions.size());
 
         // Calculate handles for each edge based on direction
+        int handlesSet = 0;
         for (Map<String, Object> edge : edges) {
             String source = String.valueOf(edge.get("source"));
             String target = String.valueOf(edge.get("target"));
@@ -534,7 +542,14 @@ public class LayoutEngine {
                         edge.put("targetHandle", "bottom");
                     }
                 }
+                handlesSet++;
             }
         }
+        
+        System.out.println("Handles set for " + handlesSet + " edges");
+        if (handlesSet > 0 && !edges.isEmpty()) {
+            System.out.println("Sample edge after handles: " + edges.get(0));
+        }
+        System.out.println("=== END calculateEdgeHandles() ===");
     }
 }
