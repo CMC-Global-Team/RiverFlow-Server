@@ -302,7 +302,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         } else {
             }
 
-        // 5. Save changes
+        // 5. Apply layout to properly position all nodes
+        // Use structure type from AI decision, or fall back to request, or default to mindmap
+        String structureType = decision.structureType() != null 
+                ? decision.structureType() 
+                : (request.getStructureType() != null ? request.getStructureType() : "mindmap");
+        layoutEngine.applyLayout(structureType, mindmap.getNodes(), mindmap.getEdges());
+
+        // 6. Save changes
         UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                 .nodes(mindmap.getNodes())
                 .edges(mindmap.getEdges())
