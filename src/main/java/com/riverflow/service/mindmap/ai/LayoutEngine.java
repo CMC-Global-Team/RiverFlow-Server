@@ -13,9 +13,10 @@ public class LayoutEngine {
 
     private static final int NODE_WIDTH = 200;
     private static final int NODE_HEIGHT = 80;
-    private static final int HORIZONTAL_SPACING = 100;
-    private static final int VERTICAL_SPACING = 120;
-    private static final int LEVEL_SPACING = 250;
+    private static final int HORIZONTAL_SPACING = 300;
+    private static final int VERTICAL_SPACING = 200;
+    private static final int LEVEL_SPACING = 350;
+    private static final double MIN_ANGLE_SEPARATION = Math.toRadians(15); // Minimum 15 degrees between nodes
 
     /**
      * Apply layout to nodes based on structure type
@@ -36,7 +37,9 @@ public class LayoutEngine {
             default -> layoutMindmapStyle(nodes, edges);
         }
 
-        }
+        // Add positionAbsolute for ReactFlow compatibility
+        addPositionAbsolute(nodes);
+    }
 
     /**
      * Mindmap style: Weighted Radial Layout (Collision-free)
@@ -86,14 +89,20 @@ public class LayoutEngine {
         double currentAngle = startAngle;
         double totalSector = endAngle - startAngle;
 
-        // Dynamic radius: Increase slightly as we go deeper to allow more space
-        int radius = (depth + 1) * LEVEL_SPACING;
+        // Dynamic radius: Increase significantly as we go deeper to allow more space
+        // Use 1.5x multiplier for better spacing in complex mindmaps
+        int radius = (int) ((depth + 1) * LEVEL_SPACING * 1.5);
 
         for (String childId : children) {
             int childWeight = weights.get(childId);
 
             // Allocate sector based on subtree weight
             double childSector = (double) childWeight / totalWeight * totalSector;
+            
+            // Apply minimum angular separation to prevent tight clustering
+            if (childSector < MIN_ANGLE_SEPARATION) {
+                childSector = MIN_ANGLE_SEPARATION;
+            }
 
             // Place child in the middle of its sector
             double midAngle = currentAngle + childSector / 2;
@@ -440,6 +449,22 @@ public class LayoutEngine {
                         setPosition(siblings.get(i), x, y);
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Add positionAbsolute property to all nodes for ReactFlow compatibility
+     * This ensures nodes maintain their absolute position in the canvas
+     */
+    private void addPositionAbsolute(List<Map<String, Object>> nodes) {
+        for (Map<String, Object> node : nodes) {
+            Map<?, ?> position = (Map<?, ?>) node.get("position");
+            if (position != null) {
+                Map<String, Object> positionAbsolute = new HashMap<>();
+                positionAbsolute.put("x", position.get("x"));
+                positionAbsolute.put("y", position.get("y"));
+                node.put("positionAbsolute", positionAbsolute);
             }
         }
     }
