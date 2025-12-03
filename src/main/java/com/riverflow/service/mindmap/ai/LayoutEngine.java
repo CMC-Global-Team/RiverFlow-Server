@@ -39,6 +39,9 @@ public class LayoutEngine {
 
         // Add positionAbsolute for ReactFlow compatibility
         addPositionAbsolute(nodes);
+        
+        // Calculate optimal edge handles based on node positions
+        calculateEdgeHandles(nodes, edges);
     }
 
     /**
@@ -465,6 +468,72 @@ public class LayoutEngine {
                 positionAbsolute.put("x", position.get("x"));
                 positionAbsolute.put("y", position.get("y"));
                 node.put("positionAbsolute", positionAbsolute);
+            }
+        }
+    }
+
+    /**
+     * Calculate optimal edge handles based on node positions
+     * Determines sourceHandle and targetHandle (top/bottom/left/right) by analyzing
+     * the relative positions of connected nodes
+     */
+    private void calculateEdgeHandles(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
+        if (nodes == null || edges == null) {
+            return;
+        }
+
+        // Build node position map for quick lookup
+        Map<String, Map<?, ?>> nodePositions = new HashMap<>();
+        for (Map<String, Object> node : nodes) {
+            String id = String.valueOf(node.get("id"));
+            Map<?, ?> pos = (Map<?, ?>) node.get("position");
+            if (pos != null) {
+                nodePositions.put(id, pos);
+            }
+        }
+
+        // Calculate handles for each edge based on direction
+        for (Map<String, Object> edge : edges) {
+            String source = String.valueOf(edge.get("source"));
+            String target = String.valueOf(edge.get("target"));
+
+            Map<?, ?> sourcePos = nodePositions.get(source);
+            Map<?, ?> targetPos = nodePositions.get(target);
+
+            if (sourcePos != null && targetPos != null) {
+                int sx = ((Number) sourcePos.get("x")).intValue();
+                int sy = ((Number) sourcePos.get("y")).intValue();
+                int tx = ((Number) targetPos.get("x")).intValue();
+                int ty = ((Number) targetPos.get("y")).intValue();
+
+                // Calculate direction vector
+                int dx = tx - sx;
+                int dy = ty - sy;
+
+                // Determine handles based on primary direction
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal connection (left-right orientation)
+                    if (dx > 0) {
+                        // Target is to the right
+                        edge.put("sourceHandle", "right");
+                        edge.put("targetHandle", "left");
+                    } else {
+                        // Target is to the left
+                        edge.put("sourceHandle", "left");
+                        edge.put("targetHandle", "right");
+                    }
+                } else {
+                    // Vertical connection (top-bottom orientation)
+                    if (dy > 0) {
+                        // Target is below
+                        edge.put("sourceHandle", "bottom");
+                        edge.put("targetHandle", "top");
+                    } else {
+                        // Target is above
+                        edge.put("sourceHandle", "top");
+                        edge.put("targetHandle", "bottom");
+                    }
+                }
             }
         }
     }
