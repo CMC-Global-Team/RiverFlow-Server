@@ -252,6 +252,18 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             }
         }
 
+        // DEBUG: Log edge creation
+        System.out.println("=== AI MINDMAP GENERATION DEBUG ===");
+        System.out.println("Generated " + rfNodes.size() + " nodes");
+        System.out.println("Generated " + rfEdges.size() + " edges");
+        if (!rfEdges.isEmpty()) {
+            System.out.println("Sample edge BEFORE layout: " + rfEdges.get(0));
+        } else {
+            System.out.println("WARNING: No edges were created!");
+            System.out.println("parentByTempId size: " + parentByTempId.size());
+            System.out.println("idMap size: " + idMap.size());
+        }
+
         // Apply layout based on structure type
         String structureType = request.getStructureType() != null ? request.getStructureType() : "mindmap";
         layoutEngine.applyLayout(structureType, rfNodes, rfEdges);
