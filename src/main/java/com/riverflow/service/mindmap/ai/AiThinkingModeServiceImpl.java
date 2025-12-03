@@ -72,39 +72,44 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
 
     @Override
     public MindmapResponse generate(ActionList actionList, String mindmapId, String structureType, Long userId) {
-        // 1. Load mindmap and validate permissions
-        Mindmap mindmap = mindmapRepository.findById(mindmapId)
-                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+        try {
+            // 1. Load mindmap and validate permissions
+            Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                    .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
-        validatePermissions(mindmap, userId);
+            validatePermissions(mindmap, userId);
 
-        // 2. Convert ActionList to operations format
-        List<Map<String, Object>> operations = new ArrayList<>();
-        if (actionList != null && actionList.getActions() != null) {
-            for (Action action : actionList.getActions()) {
-                Map<String, Object> op = new HashMap<>();
-                op.put("type", action.getType());
-                if (action.getParams() != null) {
-                    op.putAll(action.getParams());
+            // 2. Convert ActionList to operations format
+            List<Map<String, Object>> operations = new ArrayList<>();
+            if (actionList != null && actionList.getActions() != null) {
+                for (Action action : actionList.getActions()) {
+                    Map<String, Object> op = new HashMap<>();
+                    op.put("type", action.getType());
+                    if (action.getParams() != null) {
+                        op.putAll(action.getParams());
+                    }
+                    operations.add(op);
                 }
-                operations.add(op);
             }
+
+            // 3. Execute operations to create nodes
+            List<String> logs = operationExecutor.executeOperations(operations, mindmap);
+
+            // 4. Apply layout
+            String struct = structureType != null ? structureType : "mindmap";
+            layoutEngine.applyLayout(struct, mindmap.getNodes(), mindmap.getEdges());
+
+            // 5. Save mindmap
+            UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
+                    .nodes(mindmap.getNodes())
+                    .edges(mindmap.getEdges())
+                    .build();
+
+            return mindmapService.updateMindmap(mindmapId, updateReq, userId);
+        } catch (Exception e) {
+            e.printStackTrace(); // Log stack trace to console/docker logs
+            throw e; // Rethrow to let global handler return 500
         }
-
-        // 3. Execute operations to create nodes
-        List<String> logs = operationExecutor.executeOperations(operations, mindmap);
-
-        // 4. Apply layout
-        String struct = structureType != null ? structureType : "mindmap";
-        layoutEngine.applyLayout(struct, mindmap.getNodes(), mindmap.getEdges());
-
-        // 5. Save mindmap
-        UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
-                .nodes(mindmap.getNodes())
-                .edges(mindmap.getEdges())
-                .build();
-
-        return mindmapService.updateMindmap(mindmapId, updateReq, userId);
     }
 
     /**
