@@ -11,5 +11,13 @@ import java.util.Map;
 @Data
 public class LoopTask {
     private String id;
+    private String title;
+    private String description;
+    private java.util.List<String> dependsOn;
+    private String topic;
+    private String structureType; // mindmap|logic|brace|org|tree|timeline|fishbone
+    private Integer levels;
+    private Integer firstLevelCount;
+    private java.util.List<String> tags;
 }
 
