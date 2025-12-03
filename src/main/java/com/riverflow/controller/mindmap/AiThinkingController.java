@@ -1,5 +1,6 @@
 package com.riverflow.controller.mindmap;
 
+import com.riverflow.config.jwt.UserPrincipal;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
@@ -9,6 +10,7 @@ import com.riverflow.service.mindmap.ai.GeminiPromptBuilder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -75,8 +77,16 @@ public class AiThinkingController {
             @RequestBody ActionList actionList,
             @RequestParam String mindmapId,
             @RequestParam(required = false) String structureType,
-            @RequestHeader("X-User-Id") Long userId) {
+            Authentication authentication) {
+        Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = thinkingService.generate(actionList, mindmapId, structureType, userId);
         return ResponseEntity.ok(response);
+    }
+
+    private Long getUserIdFromAuth(Authentication authentication) {
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal) {
+            return ((UserPrincipal) authentication.getPrincipal()).getUserId();
+        }
+        throw new IllegalStateException("User not authenticated");
     }
 }
