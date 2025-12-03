@@ -240,11 +240,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 edge.put("type", edgeTypes[typeIndex % edgeTypes.length]);
                 edge.put("animated", typeIndex % 2 == 0);
 
-                // Vary handles for diversity
-                if (typeIndex % 3 == 0) {
-                    edge.put("sourceHandle", handles[(typeIndex / 2) % handles.length]);
-                    edge.put("targetHandle", handles[(typeIndex / 3) % handles.length]);
-                }
+                // Don't set handles here - let calculateEdgeHandles() do it based on positions
 
                 // Add markers occasionally
                 if (typeIndex % 4 == 0) {
