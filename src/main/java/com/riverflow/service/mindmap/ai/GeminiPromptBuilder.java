@@ -20,7 +20,8 @@ public class GeminiPromptBuilder {
                         List<Map<String, Object>> nodes,
                         List<Map<String, Object>> edges,
                         String language,
-                        List<String> hints) {
+                        List<String> hints,
+                        String structureType) {
                 StringBuilder system = new StringBuilder();
                 system.append("Bạn là trợ lý AI thông minh cho mindmap. Nhiệm vụ:\\n");
                 system.append("1. FIRST: Giải thích bằng ngôn ngữ tự nhiên (").append(language)
@@ -77,6 +78,12 @@ public class GeminiPromptBuilder {
                         user.append("\\n");
                 }
                 user.append("\\n");
+
+                // Add structure type requirement if specified
+                if (StringUtils.hasText(structureType) && !"mindmap".equalsIgnoreCase(structureType)) {
+                        user.append("STRUCTURE TYPE REQUIRED: ").append(structureType).append("\\n");
+                        user.append("You MUST return this structureType in your JSON response.\\n\\n");
+                }
 
                 if (hints != null && !hints.isEmpty()) {
                         user.append("Yêu cầu của người dùng:\\n");

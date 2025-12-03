@@ -343,7 +343,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 mindmap.getNodes(),
                 mindmap.getEdges(),
                 lang,
-                request.getHints());
+                request.getHints(),
+                request.getStructureType());
 
         // Use streaming to send AI's natural language response to client
         String response = callGeminiStream(payload, String.valueOf(mindmap.getId()));
