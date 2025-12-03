@@ -2,6 +2,9 @@ package com.riverflow.service.mindmap.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.riverflow.dto.mindmap.ai.Action;
+import com.riverflow.dto.mindmap.ai.ActionList;
+import com.riverflow.dto.mindmap.ai.Otmz;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -37,13 +40,69 @@ public class AiResponseParser {
                         Map<String, Object> opMap = objectMapper.convertValue(op, Map.class);
                         ops.add(opMap);
                     } catch (Exception e) {
-                        }
+                        // ignore malformed op entries
+                    }
                 }
             }
 
             return new AiDecision(targetType, language, structureType, nodeLabel, ops);
         } catch (Exception e) {
             return new AiDecision(null, null, null, null, List.of());
+        }
+    }
+
+    /**
+     * Parse OTMZ (Thinking step output) into DTO
+     */
+    public Otmz parseOtmz(String json) {
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            Otmz otmz = new Otmz();
+
+            otmz.setMeta(nodeToMap(root.get("meta")));
+            otmz.setPromptAnalysis(nodeToMap(root.get("promptAnalysis")));
+            otmz.setPropertiesDesign(nodeToMap(root.get("propertiesDesign")));
+            otmz.setOptimizedContent(nodeToMap(root.get("optimizedContent")));
+
+            return otmz;
+        } catch (Exception e) {
+            // Return empty DTO on failure for resiliency
+            return new Otmz();
+        }
+    }
+
+    /**
+     * Parse Action List (Agent step output) into DTO
+     */
+    public ActionList parseActionList(String json) {
+        ActionList actionList = new ActionList();
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode actionsNode = root.get("actions");
+            if (actionsNode != null && actionsNode.isArray()) {
+                for (JsonNode a : actionsNode) {
+                    try {
+                        Action action = objectMapper.convertValue(a, Action.class);
+                        if (action != null) {
+                            actionList.getActions().add(action);
+                        }
+                    } catch (Exception ignore) {
+                        // skip invalid action entry
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // return empty list on failure
+        }
+        return actionList;
+    }
+
+    private Map<String, Object> nodeToMap(JsonNode node) {
+        if (node == null || node.isNull()) return Map.of();
+        try {
+            return objectMapper.convertValue(node, Map.class);
+        } catch (IllegalArgumentException ex) {
+            return Map.of();
         }
     }
 

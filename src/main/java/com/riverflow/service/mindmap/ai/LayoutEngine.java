@@ -13,9 +13,10 @@ public class LayoutEngine {
 
     private static final int NODE_WIDTH = 200;
     private static final int NODE_HEIGHT = 80;
-    private static final int HORIZONTAL_SPACING = 100;
-    private static final int VERTICAL_SPACING = 120;
-    private static final int LEVEL_SPACING = 250;
+    private static final int HORIZONTAL_SPACING = 300;
+    private static final int VERTICAL_SPACING = 200;
+    private static final int LEVEL_SPACING = 350;
+    private static final double MIN_ANGLE_SEPARATION = Math.toRadians(15); // Minimum 15 degrees between nodes
 
     /**
      * Apply layout to nodes based on structure type
@@ -36,7 +37,12 @@ public class LayoutEngine {
             default -> layoutMindmapStyle(nodes, edges);
         }
 
-        }
+        // Add positionAbsolute for ReactFlow compatibility
+        addPositionAbsolute(nodes);
+        
+        // Calculate optimal edge handles based on node positions
+        calculateEdgeHandles(nodes, edges);
+    }
 
     /**
      * Mindmap style: Weighted Radial Layout (Collision-free)
@@ -86,14 +92,20 @@ public class LayoutEngine {
         double currentAngle = startAngle;
         double totalSector = endAngle - startAngle;
 
-        // Dynamic radius: Increase slightly as we go deeper to allow more space
-        int radius = (depth + 1) * LEVEL_SPACING;
+        // Dynamic radius: Increase significantly as we go deeper to allow more space
+        // Use 1.5x multiplier for better spacing in complex mindmaps
+        int radius = (int) ((depth + 1) * LEVEL_SPACING * 1.5);
 
         for (String childId : children) {
             int childWeight = weights.get(childId);
 
             // Allocate sector based on subtree weight
             double childSector = (double) childWeight / totalWeight * totalSector;
+            
+            // Apply minimum angular separation to prevent tight clustering
+            if (childSector < MIN_ANGLE_SEPARATION) {
+                childSector = MIN_ANGLE_SEPARATION;
+            }
 
             // Place child in the middle of its sector
             double midAngle = currentAngle + childSector / 2;
@@ -442,5 +454,102 @@ public class LayoutEngine {
                 }
             }
         }
+    }
+
+    /**
+     * Add positionAbsolute property to all nodes for ReactFlow compatibility
+     * This ensures nodes maintain their absolute position in the canvas
+     */
+    private void addPositionAbsolute(List<Map<String, Object>> nodes) {
+        for (Map<String, Object> node : nodes) {
+            Map<?, ?> position = (Map<?, ?>) node.get("position");
+            if (position != null) {
+                Map<String, Object> positionAbsolute = new HashMap<>();
+                positionAbsolute.put("x", position.get("x"));
+                positionAbsolute.put("y", position.get("y"));
+                node.put("positionAbsolute", positionAbsolute);
+            }
+        }
+    }
+
+    /**
+     * Calculate optimal edge handles based on node positions
+     * Determines sourceHandle and targetHandle (top/bottom/left/right) by analyzing
+     * the relative positions of connected nodes
+     */
+    private void calculateEdgeHandles(List<Map<String, Object>> nodes, List<Map<String, Object>> edges) {
+        System.out.println("=== calculateEdgeHandles() CALLED ===");
+        System.out.println("Nodes count: " + (nodes != null ? nodes.size() : "null"));
+        System.out.println("Edges count: " + (edges != null ? edges.size() : "null"));
+        
+        if (nodes == null || edges == null) {
+            System.out.println("WARNING: nodes or edges is null, skipping handle calculation");
+            return;
+        }
+
+        // Build node position map for quick lookup
+        Map<String, Map<?, ?>> nodePositions = new HashMap<>();
+        for (Map<String, Object> node : nodes) {
+            String id = String.valueOf(node.get("id"));
+            Map<?, ?> pos = (Map<?, ?>) node.get("position");
+            if (pos != null) {
+                nodePositions.put(id, pos);
+            }
+        }
+        
+        System.out.println("Node positions map size: " + nodePositions.size());
+
+        // Calculate handles for each edge based on direction
+        int handlesSet = 0;
+        for (Map<String, Object> edge : edges) {
+            String source = String.valueOf(edge.get("source"));
+            String target = String.valueOf(edge.get("target"));
+
+            Map<?, ?> sourcePos = nodePositions.get(source);
+            Map<?, ?> targetPos = nodePositions.get(target);
+
+            if (sourcePos != null && targetPos != null) {
+                int sx = ((Number) sourcePos.get("x")).intValue();
+                int sy = ((Number) sourcePos.get("y")).intValue();
+                int tx = ((Number) targetPos.get("x")).intValue();
+                int ty = ((Number) targetPos.get("y")).intValue();
+
+                // Calculate direction vector
+                int dx = tx - sx;
+                int dy = ty - sy;
+
+                // Determine handles based on primary direction
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal connection (left-right orientation)
+                    if (dx > 0) {
+                        // Target is to the right
+                        edge.put("sourceHandle", "source-right");
+                        edge.put("targetHandle", "target-left");
+                    } else {
+                        // Target is to the left
+                        edge.put("sourceHandle", "source-left");
+                        edge.put("targetHandle", "target-right");
+                    }
+                } else {
+                    // Vertical connection (top-bottom orientation)
+                    if (dy > 0) {
+                        // Target is below
+                        edge.put("sourceHandle", "source-bottom");
+                        edge.put("targetHandle", "target-top");
+                    } else {
+                        // Target is above
+                        edge.put("sourceHandle", "source-top");
+                        edge.put("targetHandle", "target-bottom");
+                    }
+                }
+                handlesSet++;
+            }
+        }
+        
+        System.out.println("Handles set for " + handlesSet + " edges");
+        if (handlesSet > 0 && !edges.isEmpty()) {
+            System.out.println("Sample edge after handles: " + edges.get(0));
+        }
+        System.out.println("=== END calculateEdgeHandles() ===");
     }
 }

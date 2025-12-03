@@ -240,11 +240,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 edge.put("type", edgeTypes[typeIndex % edgeTypes.length]);
                 edge.put("animated", typeIndex % 2 == 0);
 
-                // Vary handles for diversity
-                if (typeIndex % 3 == 0) {
-                    edge.put("sourceHandle", handles[(typeIndex / 2) % handles.length]);
-                    edge.put("targetHandle", handles[(typeIndex / 3) % handles.length]);
-                }
+                // Don't set handles here - let calculateEdgeHandles() do it based on positions
 
                 // Add markers occasionally
                 if (typeIndex % 4 == 0) {
@@ -254,6 +250,18 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 rfEdges.add(edge);
                 typeIndex++;
             }
+        }
+
+        // DEBUG: Log edge creation
+        System.out.println("=== AI MINDMAP GENERATION DEBUG ===");
+        System.out.println("Generated " + rfNodes.size() + " nodes");
+        System.out.println("Generated " + rfEdges.size() + " edges");
+        if (!rfEdges.isEmpty()) {
+            System.out.println("Sample edge BEFORE layout: " + rfEdges.get(0));
+        } else {
+            System.out.println("WARNING: No edges were created!");
+            System.out.println("parentByTempId size: " + parentByTempId.size());
+            System.out.println("idMap size: " + idMap.size());
         }
 
         // Apply layout based on structure type
@@ -302,7 +310,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         } else {
             }
 
-        // 5. Save changes
+        // 5. Apply layout to properly position all nodes
+        // Use structure type from AI decision, or fall back to request, or default to mindmap
+        String structureType = decision.structureType() != null 
+                ? decision.structureType() 
+                : (request.getStructureType() != null ? request.getStructureType() : "mindmap");
+        layoutEngine.applyLayout(structureType, mindmap.getNodes(), mindmap.getEdges());
+
+        // 6. Save changes
         UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                 .nodes(mindmap.getNodes())
                 .edges(mindmap.getEdges())
@@ -336,7 +351,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 mindmap.getNodes(),
                 mindmap.getEdges(),
                 lang,
-                request.getHints());
+                request.getHints(),
+                request.getStructureType());
 
         // Use streaming to send AI's natural language response to client
         String response = callGeminiStream(payload, String.valueOf(mindmap.getId()));
