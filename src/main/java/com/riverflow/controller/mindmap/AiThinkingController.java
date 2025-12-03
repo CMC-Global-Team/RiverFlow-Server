@@ -85,7 +85,7 @@ public class AiThinkingController {
 
     private Long getUserIdFromAuth(Authentication authentication) {
         if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal) {
-            return ((UserPrincipal) authentication.getPrincipal()).getUserId();
+            return ((UserPrincipal) authentication.getPrincipal()).getId();
         }
         throw new IllegalStateException("User not authenticated");
     }
