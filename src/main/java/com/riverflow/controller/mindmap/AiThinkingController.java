@@ -1,5 +1,6 @@
 package com.riverflow.controller.mindmap;
 
+import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
 import com.riverflow.dto.mindmap.ai.ThinkingModeRequest;
@@ -66,5 +67,16 @@ public class AiThinkingController {
         }
         ActionList actions = thinkingService.plan(otmz, lang, mindmapId);
         return ResponseEntity.ok(actions);
+    }
+
+    // Generator: execute ActionList to create mindmap
+    @PostMapping("/generate")
+    public ResponseEntity<MindmapResponse> generate(
+            @RequestBody ActionList actionList,
+            @RequestParam String mindmapId,
+            @RequestParam(required = false) String structureType,
+            @RequestHeader("X-User-Id") Long userId) {
+        MindmapResponse response = thinkingService.generate(actionList, mindmapId, structureType, userId);
+        return ResponseEntity.ok(response);
     }
 }
