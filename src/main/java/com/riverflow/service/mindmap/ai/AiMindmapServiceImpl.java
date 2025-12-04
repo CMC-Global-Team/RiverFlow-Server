@@ -399,8 +399,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .build();
 
         // Thinking Mode will deduct its own credits and stream to user
+        // Pass "temp" as mindmapId for now since we're generating a new mindmap
+        // The streaming will still work for sending explanations to the client
         com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
-            thinkingModeService.analyzeAndOptimize(thinkingRequest, userId);
+            thinkingModeService.analyzeAndOptimizeWithStreaming(thinkingRequest, userId, "thinking-gen-" + System.currentTimeMillis());
 
         // Step 2: Agent decides based on optimized spec
         // Use optimized parameters from Thinking Mode
