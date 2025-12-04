@@ -88,4 +88,41 @@ public class RealtimeService {
         data.put("removedEmail", removedEmail);
         emitToRoom(mindmapId, "mindmap:collaborator:removed", data);
     }
+
+    /**
+     * Emit public access level changed event when owner changes view/edit
+     * permission.
+     *
+     * @param mindmapId      The mindmap ID
+     * @param oldAccessLevel The previous access level (view/edit)
+     * @param newAccessLevel The new access level (view/edit)
+     */
+    public void emitPublicAccessChanged(String mindmapId, String oldAccessLevel, String newAccessLevel) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("mindmapId", mindmapId);
+        data.put("oldAccessLevel", oldAccessLevel);
+        data.put("newAccessLevel", newAccessLevel);
+        emitToRoom(mindmapId, "mindmap:public:permission:changed", data);
+    }
+
+    /**
+     * Emit collaborator role changed event when owner changes a collaborator's
+     * role.
+     *
+     * @param mindmapId The mindmap ID
+     * @param userId    The MySQL user ID of the collaborator
+     * @param email     The email of the collaborator
+     * @param oldRole   The previous role (EDITOR/VIEWER)
+     * @param newRole   The new role (EDITOR/VIEWER)
+     */
+    public void emitCollaboratorRoleChanged(String mindmapId, Long userId, String email, String oldRole,
+            String newRole) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("mindmapId", mindmapId);
+        data.put("userId", userId);
+        data.put("email", email);
+        data.put("oldRole", oldRole);
+        data.put("newRole", newRole);
+        emitToRoom(mindmapId, "mindmap:collaborator:role:changed", data);
+    }
 }
