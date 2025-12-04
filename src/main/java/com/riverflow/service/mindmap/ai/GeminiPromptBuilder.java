@@ -319,6 +319,90 @@ public class GeminiPromptBuilder {
                 return s;
         }
 
+    /**
+     * Build prompt for Thinking Mode - AI analyzes user's raw prompt
+     * and returns optimized specification for mindmap generation
+     */
+    public Map<String, Object> buildThinkingModePrompt(
+            String userPrompt,
+            String language,
+            List<String> tags,
+            String preferredStructure,
+            String complexity) {
+        
+        StringBuilder system = new StringBuilder();
+        system.append("You are an AI Thinking Assistant for mindmap creation. Your role:\n");
+        system.append("1. FIRST: Explain in natural language (").append(language).append(") what you understand and plan\n");
+        system.append("2. THEN: Output optimized JSON specification\n");
+        system.append("Format: <natural language explanation>\n\n```json\n<optimized spec>\n```\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("User's raw prompt:\n");
+        user.append("\"").append(userPrompt).append("\"\n\n");
+        
+        // Assuming StringUtils.hasText is available or replaced with a check for null/empty
+        // For this context, I'll assume it's available or a simple check is sufficient.
+        // If StringUtils is not imported, it would cause a compilation error.
+        // For faithful reproduction, I'll keep it as is.
+        if (preferredStructure != null && !preferredStructure.trim().isEmpty()) { // Replaced StringUtils.hasText
+            user.append("Preferred structure: ").append(preferredStructure).append("\n");
+        }
+        if (tags != null && !tags.isEmpty()) {
+            user.append("User-provided tags: ").append(String.join(", ", tags)).append("\n");
+        }
+        user.append("Complexity preference: ").append(complexity).append("\n");
+        user.append("Language: ").append(language).append("\n\n");
+
+        user.append("Your tasks:\n");
+        user.append("1. Analyze the user's intent and needs\n");
+        user.append("2. Explain in ").append(language).append(" (2-3 sentences) what you understood and what you will create\n");
+        user.append("3. Then output JSON with this format:\n");
+        user.append("```json\n{\n");
+        user.append("  \"optimizedTopic\": \"Clear, focused topic extracted from prompt\",\n");
+        user.append("  \"optimizedTitle\": \"Engaging title for the mindmap\",\n");
+        user.append("  \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone (best fit for content)\",\n");
+        user.append("  \"levels\": 2,  // Recommended depth (1-3)\n");
+        user.append("  \"firstLevelCount\": 5,  // Recommended number of main branches (3-6)\n");
+        user.append("  \"tags\": [\"tag1\", \"tag2\"],  // Extracted/refined tags\n");
+        user.append("  \"language\": \"").append(language).append("\",\n");
+        user.append("  \"actionList\": [\n");
+        user.append("    \"Action 1: What the Agent should do first\",\n");
+        user.append("    \"Action 2: What the Agent should do next\",\n");
+        user.append("    \"Action 3: Final steps\"\n");
+        user.append("  ],\n");
+        user.append("  \"reasoning\": \"Why these choices were made\",\n");
+        user.append("  \"additionalProperties\": {\n");
+        user.append("    \"focusAreas\": [\"area1\", \"area2\"],\n");
+        user.append("    \"tone\": \"professional|casual|educational\",\n");
+        user.append("    \"visualStyle\": \"colorful|minimal|business\"\n");
+        user.append("  }\n");
+        user.append("}\n```\n\n");
+
+        user.append("Guidelines:\n");
+        user.append("- Extract the core topic and intent from the user's prompt\n");
+        user.append("- Choose the structure type that best fits the content\n");
+        user.append("- Create a clear action list (3-5 items) for the Agent to follow\n");
+        user.append("- Optimize parameters (levels, firstLevelCount) based on topic complexity\n");
+        user.append("- Provide reasoning for your decisions\n");
+        user.append("- All text in ").append(language).append("\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4); // Balanced between creativity and precision
+        generationConfig.put("maxOutputTokens", 4000);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
         /**
          * Build structure-specific guidance for AI
          */

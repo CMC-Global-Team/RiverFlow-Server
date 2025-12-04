@@ -4,8 +4,11 @@ import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.mindmap.MindmapResponse;
 import com.riverflow.dto.mindmap.ai.GenerateMindmapRequest;
 import com.riverflow.dto.mindmap.ai.OptimizeRequest;
+import com.riverflow.dto.mindmap.ai.ThinkingModeRequest;
+import com.riverflow.dto.mindmap.ai.ThinkingModeResponse;
 import com.riverflow.model.User;
 import com.riverflow.service.mindmap.ai.AiMindmapService;
+import com.riverflow.service.mindmap.ai.AiThinkingModeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiMindmapController {
 
     private final AiMindmapService aiMindmapService;
+    private final AiThinkingModeService thinkingModeService;
     private final CustomUserDetailsService userDetailsService;
 
     @PostMapping("/generate")
@@ -33,7 +37,16 @@ public class AiMindmapController {
         MindmapResponse response = aiMindmapService.generateMindmap(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-//add optimize mindmap request
+
+    @PostMapping("/thinking-mode")
+    public ResponseEntity<ThinkingModeResponse> thinkingMode(
+            @Valid @RequestBody ThinkingModeRequest request,
+            Authentication authentication
+    ) {
+        Long userId = getUserIdFromAuth(authentication);
+        ThinkingModeResponse response = thinkingModeService.analyzeAndOptimize(request, userId);
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/optimize")
     public ResponseEntity<MindmapResponse> optimize(

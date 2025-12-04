@@ -51,6 +51,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private final AiResponseParser responseParser;
     private final GeminiPromptBuilder promptBuilder;
     private final LayoutEngine layoutEngine;
+    private final AiThinkingModeService thinkingModeService;
 
     @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
@@ -65,6 +66,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
         int levels = request.getLevels() != null ? request.getLevels() : 2;
         String mode = determineMode(request.getMode());
+
+        // Check if Thinking Mode should be used
+        if ("thinking".equalsIgnoreCase(mode)) {
+            return generateWithThinkingMode(request, userId);
+        }
 
         int minFirst = "normal".equalsIgnoreCase(mode) ? 3 : 4;
         int maxFirst = "normal".equalsIgnoreCase(mode) ? 5 : 6;
@@ -372,6 +378,193 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (!isOwner && !isEditor) {
             throw new MindmapAccessDeniedException(mindmap.getId(), userId);
         }
+    }
+
+    /**
+     * Generate mindmap using Thinking Mode
+     * Flow: User Prompt -> Thinking Mode (optimize) -> Agent (decide) -> Generator (create)
+     */
+    private MindmapResponse generateWithThinkingMode(GenerateMindmapRequest request, Long userId) {
+        String topic = request.getTopic().trim();
+        String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
+
+        // Step 1: Use Thinking Mode to analyze and optimize the prompt
+        com.riverflow.dto.mindmap.ai.ThinkingModeRequest thinkingRequest = 
+            com.riverflow.dto.mindmap.ai.ThinkingModeRequest.builder()
+                .userPrompt(topic)
+                .language(lang)
+                .tags(request.getTags())
+                .preferredStructure(request.getStructureType())
+                .complexity("normal")
+                .build();
+
+        // Thinking Mode will deduct its own credits and stream to user
+        com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
+            thinkingModeService.analyzeAndOptimize(thinkingRequest, userId);
+
+        // Step 2: Agent decides based on optimized spec
+        // Use optimized parameters from Thinking Mode
+        String optimizedTopic = optimized.getOptimizedTopic() != null 
+            ? optimized.getOptimizedTopic() : topic;
+        String optimizedTitle = optimized.getOptimizedTitle() != null 
+            ? optimized.getOptimizedTitle() : request.getTitle();
+        String structureType = optimized.getStructureType() != null 
+            ? optimized.getStructureType() : "mindmap";
+        int levels = optimized.getLevels() != null 
+            ? optimized.getLevels() : (request.getLevels() != null ? request.getLevels() : 2);
+        int firstLevelCount = optimized.getFirstLevelCount() != null 
+            ? optimized.getFirstLevelCount() : (request.getFirstLevelCount() != null ? request.getFirstLevelCount() : 5);
+        List<String> tags = optimized.getTags() != null 
+            ? optimized.getTags() : request.getTags();
+
+        // Deduct credits for generation (Thinking Mode already deducted its own)
+        deductCredits(userId, "normal");
+
+        // Step 3: Generate mindmap with optimized parameters
+        int minFirst = 3;
+        int maxFirst = 6;
+        Map<String, Object> payload = promptBuilder.buildGeneratePrompt(
+                optimizedTopic, levels, firstLevelCount, lang, tags, "normal", minFirst, maxFirst, structureType);
+
+        String json = callGemini(payload);
+        JsonNode root = parseJson(promptBuilder.ensureJson(json));
+
+        // Parse and use optimized title
+        String aiTitle = textOrNull(root.get("title"));
+        String finalTitle = StringUtils.hasText(aiTitle) ? aiTitle
+                : (StringUtils.hasText(optimizedTitle) ? optimizedTitle : optimizedTopic);
+
+        // Continue with standard mindmap generation flow
+        JsonNode nodesNode = root.get("nodes");
+        if (nodesNode == null || !nodesNode.isArray()) {
+            throw new InvalidMindmapDataException("nodes", "AI didn't return valid nodes array");
+        }
+
+        // Build ReactFlow structure (same as normal generation)
+        List<Map<String, Object>> rfNodes = new ArrayList<>();
+        List<Map<String, Object>> rfEdges = new ArrayList<>();
+        Map<String, String> idMap = new HashMap<>();
+        Map<String, String> parentByTempId = new HashMap<>();
+
+        // Process nodes and edges (reusing existing logic)
+        for (JsonNode n : nodesNode) {
+            String tempId = textOrNull(n.get("id"));
+            String label = textOrNull(n.get("label"));
+            String parentTempId = textOrNull(n.get("parentId"));
+
+            if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
+                continue;
+            }
+            parentByTempId.put(tempId, parentTempId);
+        }
+
+        for (JsonNode n : nodesNode) {
+            String tempId = textOrNull(n.get("id"));
+            String label = textOrNull(n.get("label"));
+
+            if (!StringUtils.hasText(tempId) || !StringUtils.hasText(label)) {
+                continue;
+            }
+
+            String newId = "node-" + UUID.randomUUID();
+            idMap.put(tempId, newId);
+
+            String nodeType = textOrNull(n.get("nodeType"));
+            String color = textOrNull(n.get("color"));
+            String background = textOrNull(n.get("background"));
+            String icon = textOrNull(n.get("icon"));
+            String description = textOrNull(n.get("description"));
+            String shape = textOrNull(n.get("shape"));
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("label", label);
+            if (StringUtils.hasText(description)) data.put("description", description);
+            if (StringUtils.hasText(icon)) data.put("icon", icon);
+            if (StringUtils.hasText(shape)) data.put("shape", shape);
+
+            Map<String, Object> style = new HashMap<>();
+            if (StringUtils.hasText(background)) {
+                style.put("background", background);
+                data.put("bgColor", background);
+            }
+            if (StringUtils.hasText(color)) {
+                style.put("color", color);
+                data.put("color", color);
+            }
+
+            Set<String> supportedShapes = Set.of("rectangle", "circle", "diamond", "hexagon", "ellipse", "roundedRectangle");
+            String finalType = "rectangle";
+            if (StringUtils.hasText(shape) && supportedShapes.contains(shape)) {
+                finalType = shape;
+            } else if (StringUtils.hasText(nodeType) && supportedShapes.contains(nodeType)) {
+                finalType = nodeType;
+            }
+
+            Map<String, Object> rfNode = new HashMap<>();
+            rfNode.put("id", newId);
+            rfNode.put("type", finalType);
+            rfNode.put("data", data);
+            if (!style.isEmpty()) rfNode.put("style", style);
+            rfNode.put("position", Map.of("x", 0, "y", 0));
+            rfNodes.add(rfNode);
+        }
+
+        // Create edges
+        JsonNode edgesNode = root.get("edges");
+        if (edgesNode != null && edgesNode.isArray() && edgesNode.size() > 0) {
+            for (JsonNode e : edgesNode) {
+                String sourceTemp = textOrNull(e.get("source"));
+                String targetTemp = textOrNull(e.get("target"));
+
+                if (!StringUtils.hasText(sourceTemp) || !StringUtils.hasText(targetTemp) ||
+                        !idMap.containsKey(sourceTemp) || !idMap.containsKey(targetTemp)) {
+                    continue;
+                }
+
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", "edge-" + UUID.randomUUID());
+                edge.put("source", idMap.get(sourceTemp));
+                edge.put("target", idMap.get(targetTemp));
+                edge.put("type", StringUtils.hasText(textOrNull(e.get("type"))) ? textOrNull(e.get("type")) : "smoothstep");
+                edge.put("animated", true);
+                rfEdges.add(edge);
+            }
+        } else {
+            // Build edges from parentId relationships
+            String[] edgeTypes = { "smoothstep", "step", "straight", "bezier" };
+            int typeIndex = 0;
+            for (Map.Entry<String, String> entry : parentByTempId.entrySet()) {
+                String childTemp = entry.getKey();
+                String parentTemp = entry.getValue();
+
+                if (!StringUtils.hasText(parentTemp) || !idMap.containsKey(parentTemp) || !idMap.containsKey(childTemp)) {
+                    continue;
+                }
+
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", "edge-" + UUID.randomUUID());
+                edge.put("source", idMap.get(parentTemp));
+                edge.put("target", idMap.get(childTemp));
+                edge.put("type", edgeTypes[typeIndex % edgeTypes.length]);
+                edge.put("animated", typeIndex % 2 == 0);
+                rfEdges.add(edge);
+                typeIndex++;
+            }
+        }
+
+        // Apply layout
+        layoutEngine.applyLayout(structureType, rfNodes, rfEdges);
+
+        // Create mindmap
+        CreateMindmapRequest createReq = CreateMindmapRequest.builder()
+                .title(finalTitle)
+                .nodes(rfNodes)
+                .edges(rfEdges)
+                .aiGenerated(true)
+                .category("ai-generated-thinking")
+                .build();
+
+        return mindmapService.createMindmap(createReq, userId);
     }
 
     private void deductCredits(Long userId, String mode) {
