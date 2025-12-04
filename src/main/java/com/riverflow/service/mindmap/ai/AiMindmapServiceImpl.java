@@ -822,33 +822,6 @@ public class AiMindmapServiceImpl implements AiMindmapService {
      * Call Gemini with streaming to user room (avoids duplicates)
      * Used for generation where we want real-time token streaming
      */
-    /**
-     * Split large chunk into smaller pieces and send with delay for smoother streaming
-     * This simulates token-by-token streaming like ChatGPT
-     */
-    private void sendChunksWithDelay(Long userId, String fullChunk, String eventName) {
-        if (fullChunk == null || fullChunk.isEmpty() || userId == null) {
-            return;
-        }
-
-        // Split into smaller chunks (approximately 3-5 characters per chunk for smooth effect)
-        int chunkSize = 4; // Adjust this for faster/slower streaming
-        for (int i = 0; i < fullChunk.length(); i += chunkSize) {
-            int endIndex = Math.min(i + chunkSize, fullChunk.length());
-            String miniChunk = fullChunk.substring(i, endIndex);
-            
-            sendRealtimeEventToUser(userId, eventName, Map.of("chunk", miniChunk, "done", false));
-            
-            // Small delay between chunks for smoother visual effect (optional)
-            try {
-                Thread.sleep(5); // 5ms delay - adjust for speed
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-    }
-
     private String callGeminiStreamToUser(Map<String, Object> payload, Long userId) {
         if (userId == null) {
             // Fallback to non-streaming if no user
@@ -886,10 +859,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                 if (text != null && !"null".equals(text) && !text.isEmpty()) {
                                     fullText.append(text);
                                     int count = chunkCount.incrementAndGet();
-                                    System.out.println("[AI Stream] Chunk " + count + " (length: " + text.length() + ") -> splitting for user:" + userId);
-                                    
-                                    // Split large chunk into smaller pieces for smoother streaming
-                                    sendChunksWithDelay(userId, text, "ai:stream:chunk");
+                                    // Stream each token chunk to user immediately
+                                    System.out.println("[AI Stream] Chunk " + count + " (length: " + text.length() + ") -> user:" + userId);
+                                    sendRealtimeEventToUser(userId, "ai:stream:chunk",
+                                            Map.of("chunk", text, "done", false));
                                 }
                             }
                         }

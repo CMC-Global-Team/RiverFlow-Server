@@ -188,33 +188,6 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
      * Call Gemini with streaming support
      * Sends events to user-specific room for reliable delivery
      */
-    /**
-     * Split large chunk into smaller pieces and send with delay for smoother streaming
-     * This simulates token-by-token streaming like ChatGPT
-     */
-    private void sendChunksWithDelay(Long userId, String fullChunk, String eventName) {
-        if (fullChunk == null || fullChunk.isEmpty() || userId == null) {
-            return;
-        }
-
-        // Split into smaller chunks (approximately 3-5 characters per chunk for smooth effect)
-        int chunkSize = 4; // Adjust this for faster/slower streaming
-        for (int i = 0; i < fullChunk.length(); i += chunkSize) {
-            int endIndex = Math.min(i + chunkSize, fullChunk.length());
-            String miniChunk = fullChunk.substring(i, endIndex);
-            
-            sendRealtimeEventToUser(userId, eventName, Map.of("chunk", miniChunk, "done", false));
-            
-            // Small delay between chunks for smoother visual effect
-            try {
-                Thread.sleep(5); // 5ms delay - adjust for speed
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-    }
-
     private String callGeminiStream(Map<String, Object> payload, Long userId) {
         try {
             String url = "/v1beta/models/" + model + ":streamGenerateContent";
@@ -258,19 +231,19 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             if (!beforeJson.isEmpty()) {
                                                 naturalLanguagePart.append(beforeJson);
                                                 int count = chunkCount.incrementAndGet();
-                                                System.out.println("[Thinking Mode] Chunk " + count + " (before JSON, length: " + beforeJson.length() + ") -> splitting for user:" + userId);
+                                                System.out.println("[Thinking Mode] Chunk " + count + " (before JSON, length: " + beforeJson.length() + ") -> user:" + userId);
                                                 if (userId != null) {
-                                                    // Split into smaller pieces for smooth streaming
-                                                    sendChunksWithDelay(userId, beforeJson, "ai:thinking:chunk");
+                                                    sendRealtimeEventToUser(userId, "ai:thinking:chunk",
+                                                            Map.of("chunk", beforeJson, "done", false));
                                                 }
                                             }
                                         } else {
                                             naturalLanguagePart.append(text);
                                             int count = chunkCount.incrementAndGet();
-                                            System.out.println("[Thinking Mode] Chunk " + count + " (length: " + text.length() + ") -> splitting for user:" + userId);
+                                            System.out.println("[Thinking Mode] Chunk " + count + " (length: " + text.length() + ") -> user:" + userId);
                                             if (userId != null) {
-                                                // Split into smaller pieces for smooth streaming
-                                                sendChunksWithDelay(userId, text, "ai:thinking:chunk");
+                                                sendRealtimeEventToUser(userId, "ai:thinking:chunk",
+                                                        Map.of("chunk", text, "done", false));
                                             }
                                         }
                                     }
