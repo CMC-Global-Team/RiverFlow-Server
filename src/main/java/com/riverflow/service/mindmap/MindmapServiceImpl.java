@@ -497,8 +497,9 @@ public class MindmapServiceImpl implements MindmapService {
             throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền cập nhật.", mindmapId, userId);
         }
 
-        // Track previous state to detect access revocation
+        // Track previous state to detect access changes
         Boolean wasPublic = mindmap.getIsPublic();
+        String oldAccessLevel = mindmap.getPublicAccessLevel();
 
         mindmap.setIsPublic(isPublic);
         mindmap.setPublicAccessLevel(accessLevel != null ? accessLevel : "private");
@@ -516,6 +517,15 @@ public class MindmapServiceImpl implements MindmapService {
                 (!Boolean.TRUE.equals(isPublic) || "private".equalsIgnoreCase(accessLevel));
         if (accessRevoked) {
             realtimeService.emitAccessRevoked(mindmapId, "public_access_disabled");
+        } else if (Boolean.TRUE.equals(wasPublic) && Boolean.TRUE.equals(isPublic)) {
+            // Emit permission changed if access level changed between view/edit
+            String normalizedOld = oldAccessLevel != null ? oldAccessLevel.toLowerCase() : "";
+            String normalizedNew = accessLevel != null ? accessLevel.toLowerCase() : "";
+            if (!normalizedOld.equals(normalizedNew) &&
+                    (("view".equals(normalizedOld) && "edit".equals(normalizedNew)) ||
+                            ("edit".equals(normalizedOld) && "view".equals(normalizedNew)))) {
+                realtimeService.emitPublicAccessChanged(mindmapId, oldAccessLevel, accessLevel);
+            }
         }
 
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);

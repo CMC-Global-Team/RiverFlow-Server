@@ -149,8 +149,16 @@ public class CollaborationService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Collaborator không tìm thấy"));
 
+        // Track old role before update
+        String oldRole = collaborator.getRole();
+
         collaborator.setRole(role);
         mindmapRepository.save(mindmap);
+
+        // Emit role changed event if role actually changed
+        if (oldRole != null && !oldRole.equalsIgnoreCase(role)) {
+            realtimeService.emitCollaboratorRoleChanged(mindmapId, collaborator.getMysqlUserId(), email, oldRole, role);
+        }
 
         return collaborator;
     }
