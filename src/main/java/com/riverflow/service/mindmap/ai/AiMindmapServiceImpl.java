@@ -825,14 +825,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
     private String callGeminiStreamToUser(Map<String, Object> payload, Long userId) {
         if (userId == null) {
             // Fallback to non-streaming if no user
+            System.out.println("[AI Stream] WARNING: No userId provided, falling back to non-streaming");
             return callGemini(payload);
         }
 
         try {
             String url = "/v1beta/models/" + model + ":streamGenerateContent";
             StringBuilder fullText = new StringBuilder();
+            int chunkCount = 0;
 
             // Send streaming start event
+            System.out.println("[AI Stream] Starting stream for userId: " + userId);
             sendRealtimeEventToUser(userId, "ai:stream:start", Map.of());
 
             Flux<Map> responseFlux = geminiWebClient.post()
@@ -853,9 +856,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                             if (parts != null && !parts.isEmpty()) {
                                 Map<?, ?> part = (Map<?, ?>) parts.get(0);
                                 String text = String.valueOf(part.get("text"));
-                                if (text != null && !"null".equals(text)) {
+                                if (text != null && !"null".equals(text) && !text.isEmpty()) {
                                     fullText.append(text);
-                                    // Stream each token chunk to user
+                                    chunkCount++;
+                                    // Stream each token chunk to user immediately
+                                    System.out.println("[AI Stream] Chunk " + chunkCount + " (length: " + text.length() + ") -> user:" + userId);
                                     sendRealtimeEventToUser(userId, "ai:stream:chunk",
                                             Map.of("chunk", text, "done", false));
                                 }
@@ -863,15 +868,18 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                         }
                     }
                 } catch (Exception e) {
+                    System.out.println("[AI Stream] Error processing chunk: " + e.getMessage());
                     // Continue processing
                 }
             });
 
             // Send done event
+            System.out.println("[AI Stream] Stream complete. Total chunks: " + chunkCount + ", Total length: " + fullText.length());
             sendRealtimeEventToUser(userId, "ai:stream:done", Map.of("done", true));
 
             return fullText.toString();
         } catch (Exception e) {
+            System.out.println("[AI Stream] Fatal error: " + e.getMessage());
             sendRealtimeEventToUser(userId, "ai:stream:error",
                     Map.of("error", e.getMessage()));
             throw new RuntimeException("AI generation failed: " + e.getMessage(), e);
