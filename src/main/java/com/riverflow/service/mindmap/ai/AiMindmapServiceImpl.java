@@ -407,11 +407,12 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         // Thinking Mode will deduct its own credits (3 credits total) and stream to user
         // Pass "temp" as mindmapId for now since we're generating a new mindmap
         // The streaming will still work for sending explanations to the client
-        com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
+                com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
             thinkingModeService.analyzeAndOptimizeWithStreaming(thinkingRequest, userId, "thinking-gen-" + System.currentTimeMillis());
 
         // Send action list as a separate message to show the plan
         if (userId != null && optimized.getActionList() != null && !optimized.getActionList().isEmpty()) {
+            System.out.println("[DEBUG] Sending action list with " + optimized.getActionList().size() + " actions");
             String actionHeader = lang.equals("vi") ? "**Kế hoạch thực hiện:**\n" : "**Action Plan:**\n";
             String actionListText = actionHeader + 
                 String.join("\n", optimized.getActionList().stream()
@@ -420,6 +421,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             
             sendRealtimeEventToUser(userId, "ai:thinking:actionlist", 
                 Map.of("text", actionListText, "actions", optimized.getActionList()));
+            System.out.println("[DEBUG] Action list event sent to user:" + userId);
+        } else {
+            System.out.println("[DEBUG] Action list not sent - userId=" + userId + 
+                ", actionList=" + (optimized.getActionList() != null ? optimized.getActionList().size() : "null"));
         }
 
         // Step 2: Agent decides based on optimized spec
