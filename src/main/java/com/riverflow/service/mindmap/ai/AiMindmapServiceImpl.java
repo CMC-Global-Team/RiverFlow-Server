@@ -404,7 +404,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .complexity("normal")
                 .build();
 
-        // Thinking Mode will deduct its own credits and stream to user
+        // Thinking Mode will deduct its own credits (3 credits total) and stream to user
         // Pass "temp" as mindmapId for now since we're generating a new mindmap
         // The streaming will still work for sending explanations to the client
         com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
@@ -412,7 +412,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         // Send action list as a separate message to show the plan
         if (userId != null && optimized.getActionList() != null && !optimized.getActionList().isEmpty()) {
-            String actionListText = "**Kế hoạch thực hiện:**\n" + 
+            String actionHeader = lang.equals("vi") ? "**Kế hoạch thực hiện:**\n" : "**Action Plan:**\n";
+            String actionListText = actionHeader + 
                 String.join("\n", optimized.getActionList().stream()
                     .map(action -> "- " + action)
                     .toArray(String[]::new));
@@ -436,8 +437,8 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         List<String> tags = optimized.getTags() != null 
             ? optimized.getTags() : request.getTags();
 
-        // Deduct credits for generation (Thinking Mode already deducted its own)
-        deductCredits(userId, "normal");
+        // NO extra credit deduction - Thinking Mode already deducted 3 credits
+        // This makes the total cost 3 credits (not 4)
 
         // Step 3: Generate mindmap with optimized parameters
         int minFirst = 3;
