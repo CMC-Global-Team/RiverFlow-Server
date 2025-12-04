@@ -370,6 +370,14 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
         MindmapResponse updated = mindmapService.updateMindmap(mindmap.getId(), updateReq, userId);
 
+        // 8. Broadcast to all users in the mindmap room to sync changes
+        sendRealtimeEvent(mindmap.getId(), "mindmap:ai:updated", Map.of(
+            "nodes", mindmap.getNodes(),
+            "edges", mindmap.getEdges(),
+            "userId", userId != null ? userId : 0,
+            "action", "ai_optimize"
+        ));
+
         // Verify the changes persisted by reloading from database
         Mindmap reloaded = mindmapRepository.findById(mindmap.getId()).orElse(null);
         if (reloaded != null) {
