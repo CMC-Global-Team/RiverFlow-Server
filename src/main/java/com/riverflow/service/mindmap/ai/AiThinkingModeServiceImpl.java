@@ -194,8 +194,10 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
             final boolean[] jsonStarted = { false };
+            int chunkCount = 0;
 
             // Send streaming start event to user room
+            System.out.println("[Thinking Mode Stream] Starting stream for userId: " + userId);
             if (userId != null) {
                 sendRealtimeEventToUser(userId, "ai:thinking:start", Map.of());
             }
@@ -218,7 +220,7 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                             if (parts != null && !parts.isEmpty()) {
                                 Map<?, ?> part = (Map<?, ?>) parts.get(0);
                                 String text = String.valueOf(part.get("text"));
-                                if (text != null && !"null".equals(text)) {
+                                if (text != null && !"null".equals(text) && !text.isEmpty()) {
                                     fullText.append(text);
 
                                     // Only send natural language part to client (before JSON)
@@ -228,6 +230,8 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             String beforeJson = extractNaturalLanguage(text);
                                             if (!beforeJson.isEmpty()) {
                                                 naturalLanguagePart.append(beforeJson);
+                                                chunkCount++;
+                                                System.out.println("[Thinking Mode] Chunk " + chunkCount + " (before JSON, length: " + beforeJson.length() + ") -> user:" + userId);
                                                 if (userId != null) {
                                                     sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                             Map.of("chunk", beforeJson, "done", false));
@@ -235,6 +239,8 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             }
                                         } else {
                                             naturalLanguagePart.append(text);
+                                            chunkCount++;
+                                            System.out.println("[Thinking Mode] Chunk " + chunkCount + " (length: " + text.length() + ") -> user:" + userId);
                                             if (userId != null) {
                                                 sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                         Map.of("chunk", text, "done", false));
@@ -246,22 +252,25 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                         }
                     }
                 } catch (Exception e) {
+                    System.out.println("[Thinking Mode] Error processing chunk: " + e.getMessage());
                     // Continue processing
                 }
             });
 
             // Send streaming done event
+            String naturalLangFinal = naturalLanguagePart.toString().trim();
+            if (naturalLangFinal.isEmpty()) {
+                naturalLangFinal = extractNaturalLanguage(fullText.toString());
+            }
+            System.out.println("[Thinking Mode] Stream complete. Total chunks: " + chunkCount + ", Natural language length: " + naturalLangFinal.length());
             if (userId != null) {
-                String naturalLangFinal = naturalLanguagePart.toString().trim();
-                if (naturalLangFinal.isEmpty()) {
-                    naturalLangFinal = extractNaturalLanguage(fullText.toString());
-                }
                 sendRealtimeEventToUser(userId, "ai:thinking:done",
                         Map.of("fullText", naturalLangFinal));
             }
 
             return fullText.toString();
         } catch (Exception e) {
+            System.out.println("[Thinking Mode] Fatal error: " + e.getMessage());
             if (userId != null) {
                 sendRealtimeEventToUser(userId, "ai:thinking:error",
                         Map.of("error", e.getMessage()));
