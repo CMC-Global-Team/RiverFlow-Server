@@ -378,8 +378,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (userId == null)
             return;
 
-        long cost = "max".equalsIgnoreCase(mode) ? 5L
-                : ("thinking".equalsIgnoreCase(mode) ? 3L : 1L);
+        long cost = "max".equalsIgnoreCase(mode) ? 5L : 1L;
 
         com.riverflow.model.User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
