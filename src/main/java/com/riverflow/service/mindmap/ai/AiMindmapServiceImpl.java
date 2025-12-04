@@ -410,6 +410,17 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
             thinkingModeService.analyzeAndOptimizeWithStreaming(thinkingRequest, userId, "thinking-gen-" + System.currentTimeMillis());
 
+        // Send action list as a separate message to show the plan
+        if (userId != null && optimized.getActionList() != null && !optimized.getActionList().isEmpty()) {
+            String actionListText = "**Kế hoạch thực hiện:**\n" + 
+                String.join("\n", optimized.getActionList().stream()
+                    .map(action -> "- " + action)
+                    .toArray(String[]::new));
+            
+            sendRealtimeEventToUser(userId, "ai:thinking:actionlist", 
+                Map.of("text", actionListText, "actions", optimized.getActionList()));
+        }
+
         // Step 2: Agent decides based on optimized spec
         // Use optimized parameters from Thinking Mode
         String optimizedTopic = optimized.getOptimizedTopic() != null 
