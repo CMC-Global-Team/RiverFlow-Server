@@ -7,6 +7,7 @@ import com.riverflow.dto.mindmap.ai.GenerateMindmapRequest;
 import com.riverflow.dto.mindmap.ai.OptimizeRequest;
 import com.riverflow.model.User;
 import com.riverflow.service.mindmap.ai.AiMindmapService;
+import com.riverflow.service.mindmap.ai.AiThinkingModeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,9 @@ class AiMindmapControllerTest {
 
     @MockBean
     private AiMindmapService aiMindmapService;
+
+    @MockBean
+    private AiThinkingModeService thinkingModeService;
 
     @MockBean
     private CustomUserDetailsService userDetailsService;
