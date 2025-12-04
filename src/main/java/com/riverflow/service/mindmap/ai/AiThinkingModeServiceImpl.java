@@ -194,7 +194,7 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
             final boolean[] jsonStarted = { false };
-            int chunkCount = 0;
+            final java.util.concurrent.atomic.AtomicInteger chunkCount = new java.util.concurrent.atomic.AtomicInteger(0);
 
             // Send streaming start event to user room
             System.out.println("[Thinking Mode Stream] Starting stream for userId: " + userId);
@@ -230,8 +230,8 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             String beforeJson = extractNaturalLanguage(text);
                                             if (!beforeJson.isEmpty()) {
                                                 naturalLanguagePart.append(beforeJson);
-                                                chunkCount++;
-                                                System.out.println("[Thinking Mode] Chunk " + chunkCount + " (before JSON, length: " + beforeJson.length() + ") -> user:" + userId);
+                                                int count = chunkCount.incrementAndGet();
+                                                System.out.println("[Thinking Mode] Chunk " + count + " (before JSON, length: " + beforeJson.length() + ") -> user:" + userId);
                                                 if (userId != null) {
                                                     sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                             Map.of("chunk", beforeJson, "done", false));
@@ -239,8 +239,8 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             }
                                         } else {
                                             naturalLanguagePart.append(text);
-                                            chunkCount++;
-                                            System.out.println("[Thinking Mode] Chunk " + chunkCount + " (length: " + text.length() + ") -> user:" + userId);
+                                            int count = chunkCount.incrementAndGet();
+                                            System.out.println("[Thinking Mode] Chunk " + count + " (length: " + text.length() + ") -> user:" + userId);
                                             if (userId != null) {
                                                 sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                         Map.of("chunk", text, "done", false));
@@ -262,7 +262,7 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             if (naturalLangFinal.isEmpty()) {
                 naturalLangFinal = extractNaturalLanguage(fullText.toString());
             }
-            System.out.println("[Thinking Mode] Stream complete. Total chunks: " + chunkCount + ", Natural language length: " + naturalLangFinal.length());
+            System.out.println("[Thinking Mode] Stream complete. Total chunks: " + chunkCount.get() + ", Natural language length: " + naturalLangFinal.length());
             if (userId != null) {
                 sendRealtimeEventToUser(userId, "ai:thinking:done",
                         Map.of("fullText", naturalLangFinal));

@@ -832,7 +832,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         try {
             String url = "/v1beta/models/" + model + ":streamGenerateContent";
             StringBuilder fullText = new StringBuilder();
-            int chunkCount = 0;
+            final java.util.concurrent.atomic.AtomicInteger chunkCount = new java.util.concurrent.atomic.AtomicInteger(0);
 
             // Send streaming start event
             System.out.println("[AI Stream] Starting stream for userId: " + userId);
@@ -858,9 +858,9 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                                 String text = String.valueOf(part.get("text"));
                                 if (text != null && !"null".equals(text) && !text.isEmpty()) {
                                     fullText.append(text);
-                                    chunkCount++;
+                                    int count = chunkCount.incrementAndGet();
                                     // Stream each token chunk to user immediately
-                                    System.out.println("[AI Stream] Chunk " + chunkCount + " (length: " + text.length() + ") -> user:" + userId);
+                                    System.out.println("[AI Stream] Chunk " + count + " (length: " + text.length() + ") -> user:" + userId);
                                     sendRealtimeEventToUser(userId, "ai:stream:chunk",
                                             Map.of("chunk", text, "done", false));
                                 }
@@ -874,7 +874,7 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             });
 
             // Send done event
-            System.out.println("[AI Stream] Stream complete. Total chunks: " + chunkCount + ", Total length: " + fullText.length());
+            System.out.println("[AI Stream] Stream complete. Total chunks: " + chunkCount.get() + ", Total length: " + fullText.length());
             sendRealtimeEventToUser(userId, "ai:stream:done", Map.of("done", true));
 
             return fullText.toString();
