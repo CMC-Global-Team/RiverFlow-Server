@@ -60,8 +60,8 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                 request.getComplexity()
         );
 
-        // Call Gemini with streaming support
-        String aiResponse = callGeminiStream(payload, mindmapId);
+        // Call Gemini with streaming support - use userId for room
+        String aiResponse = callGeminiStream(payload, userId);
 
         // Parse JSON response
         String jsonResponse = promptBuilder.ensureJson(aiResponse);
@@ -170,17 +170,18 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
 
     /**
      * Call Gemini with streaming support
+     * Sends events to user-specific room for reliable delivery
      */
-    private String callGeminiStream(Map<String, Object> payload, String mindmapId) {
+    private String callGeminiStream(Map<String, Object> payload, Long userId) {
         try {
             String url = "/v1beta/models/" + model + ":streamGenerateContent";
             StringBuilder fullText = new StringBuilder();
             StringBuilder naturalLanguagePart = new StringBuilder();
             final boolean[] jsonStarted = { false };
 
-            // Send streaming start event
-            if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:thinking:start", Map.of());
+            // Send streaming start event to user room
+            if (userId != null) {
+                sendRealtimeEventToUser(userId, "ai:thinking:start", Map.of());
             }
 
             Flux<Map> responseFlux = geminiWebClient.post()
@@ -211,15 +212,15 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                                             String beforeJson = extractNaturalLanguage(text);
                                             if (!beforeJson.isEmpty()) {
                                                 naturalLanguagePart.append(beforeJson);
-                                                if (mindmapId != null) {
-                                                    sendRealtimeEvent(mindmapId, "ai:thinking:chunk",
+                                                if (userId != null) {
+                                                    sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                             Map.of("chunk", beforeJson, "done", false));
                                                 }
                                             }
                                         } else {
                                             naturalLanguagePart.append(text);
-                                            if (mindmapId != null) {
-                                                sendRealtimeEvent(mindmapId, "ai:thinking:chunk",
+                                            if (userId != null) {
+                                                sendRealtimeEventToUser(userId, "ai:thinking:chunk",
                                                         Map.of("chunk", text, "done", false));
                                             }
                                         }
@@ -234,19 +235,19 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             });
 
             // Send streaming done event
-            if (mindmapId != null) {
+            if (userId != null) {
                 String naturalLangFinal = naturalLanguagePart.toString().trim();
                 if (naturalLangFinal.isEmpty()) {
                     naturalLangFinal = extractNaturalLanguage(fullText.toString());
                 }
-                sendRealtimeEvent(mindmapId, "ai:thinking:done",
+                sendRealtimeEventToUser(userId, "ai:thinking:done",
                         Map.of("fullText", naturalLangFinal));
             }
 
             return fullText.toString();
         } catch (Exception e) {
-            if (mindmapId != null) {
-                sendRealtimeEvent(mindmapId, "ai:thinking:error",
+            if (userId != null) {
+                sendRealtimeEventToUser(userId, "ai:thinking:error",
                         Map.of("error", e.getMessage()));
             }
             throw new RuntimeException("Thinking Mode AI service failed: " + e.getMessage());
@@ -269,5 +270,32 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
     private Integer intOrNull(JsonNode node) {
         if (node == null || node.isNull()) return null;
         return node.isInt() ? node.asInt() : null;
+    }
+
+    /**
+     * Send realtime event to user-specific room
+     */
+    private void sendRealtimeEventToUser(Long userId, String event, Map<String, Object> data) {
+        if (realtimeServerUrl == null || realtimeServerUrl.isBlank() || userId == null) {
+            return;
+        }
+        try {
+            String room = "user:" + userId;
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("room", room);
+            payload.put("event", event);
+            payload.put("data", data != null ? data : Map.of());
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(realtimeServerUrl + "/realtime/mindmap/event"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            // Silently ignore realtime errors
+        }
     }
 }

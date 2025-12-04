@@ -82,6 +82,11 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         // Deduct credits
         deductCredits(userId, mode);
 
+        // Notify user that generation is starting
+        if (userId != null) {
+            sendRealtimeEventToUser(userId, "ai:generate:start", Map.of("mode", mode, "topic", topic));
+        }
+
         // Ask Gemini to generate mindmap
         Map<String, Object> payload = promptBuilder.buildGeneratePrompt(
                 topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst,
@@ -399,8 +404,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 .build();
 
         // Thinking Mode will deduct its own credits and stream to user
+        // Pass "temp" as mindmapId for now since we're generating a new mindmap
+        // The streaming will still work for sending explanations to the client
         com.riverflow.dto.mindmap.ai.ThinkingModeResponse optimized = 
-            thinkingModeService.analyzeAndOptimize(thinkingRequest, userId);
+            thinkingModeService.analyzeAndOptimizeWithStreaming(thinkingRequest, userId, "thinking-gen-" + System.currentTimeMillis());
 
         // Step 2: Agent decides based on optimized spec
         // Use optimized parameters from Thinking Mode
@@ -587,13 +594,43 @@ public class AiMindmapServiceImpl implements AiMindmapService {
 
     /**
      * Send realtime event to WebSocket server
+     * Supports both mindmap-based and user-based rooms
      */
     private void sendRealtimeEvent(String mindmapId, String event, Map<String, Object> data) {
         if (realtimeServerUrl == null || realtimeServerUrl.isBlank()) {
             return;
         }
         try {
-            String room = "mindmap:" + mindmapId;
+            String room = mindmapId != null ? "mindmap:" + mindmapId : null;
+            Map<String, Object> payload = new HashMap<>();
+            if (room != null) {
+                payload.put("room", room);
+            }
+            payload.put("event", event);
+            payload.put("data", data != null ? data : Map.of());
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(realtimeServerUrl + "/realtime/mindmap/event"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            // Silently ignore realtime errors
+        }
+    }
+
+    /**
+     * Send realtime event to user-specific room
+     */
+    private void sendRealtimeEventToUser(Long userId, String event, Map<String, Object> data) {
+        if (realtimeServerUrl == null || realtimeServerUrl.isBlank() || userId == null) {
+            return;
+        }
+        try {
+            String room = "user:" + userId;
             Map<String, Object> payload = new HashMap<>();
             payload.put("room", room);
             payload.put("event", event);
@@ -606,16 +643,10 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
                     .build();
 
-            client.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-                    .thenAccept(resp -> {
-                        if (resp.statusCode() >= 400) {
-                            }
-                    })
-                    .exceptionally(ex -> {
-                        return null;
-                    });
+            client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception e) {
-            }
+            // Silently ignore realtime errors
+        }
     }
 
     /**
