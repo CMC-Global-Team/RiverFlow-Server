@@ -89,10 +89,14 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
 
         // Extract action list
         JsonNode actionListNode = root.get("actionList");
+        System.out.println("[DEBUG ThinkingMode] actionListNode: " + (actionListNode != null ? actionListNode.toString() : "null"));
         if (actionListNode != null && actionListNode.isArray()) {
             List<String> actionList = new ArrayList<>();
             actionListNode.forEach(action -> actionList.add(action.asText()));
             response.setActionList(actionList);
+            System.out.println("[DEBUG ThinkingMode] Extracted " + actionList.size() + " actions");
+        } else {
+            System.out.println("[DEBUG ThinkingMode] No action list found in AI response");
         }
 
         // Extract additional properties
