@@ -11,6 +11,7 @@ import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.mindmap.CollaborationInvitationRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.SmtpEmailService;
+import com.riverflow.service.realtime.RealtimeService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,17 +29,20 @@ public class CollaborationService {
     private final CollaborationInvitationRepository invitationRepository;
     private final UserRepository userRepository;
     private final SmtpEmailService smtpEmailService;
+    private final RealtimeService realtimeService;
 
     /**
      * Mời cộng tác viên mới
      */
     @Transactional
-    public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request, Long ownerId) {
+    public CollaborationInvitation inviteCollaborator(String mindmapId, InviteCollaboratorRequest request,
+            Long ownerId) {
         Mindmap mindmap = mindmapRepository.findById(mindmapId)
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, ownerId));
 
         if (!mindmap.getMysqlUserId().equals(ownerId)) {
-            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền mời cộng tác viên.", mindmapId, ownerId);
+            throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền mời cộng tác viên.", mindmapId,
+                    ownerId);
         }
 
         String emailToInvite = request.getEmail().trim().toLowerCase();
@@ -55,7 +59,8 @@ public class CollaborationService {
             }
         }
 
-        if (invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(mindmapId, emailToInvite, "pending").isPresent()) {
+        if (invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(mindmapId, emailToInvite, "pending")
+                .isPresent()) {
             throw new IllegalArgumentException("Đã có lời mời đang chờ xác nhận gửi tới email này.");
         }
 
@@ -86,23 +91,22 @@ public class CollaborationService {
                     .invitedAt(LocalDateTime.now())
                     .status("pending")
                     .build();
-            
+
             mindmap.getCollaborators().add(collaborator);
             mindmapRepository.save(mindmap);
-            }
+        }
 
         // Gửi email mời
         try {
             User ownerUser = userRepository.findById(ownerId).orElse(null);
             String inviterName = (ownerUser != null) ? ownerUser.getFullName() : "Someone";
-            
+
             smtpEmailService.sendInvitationEmail(
                     emailToInvite,
                     token,
                     inviterName,
-                    mindmap.getTitle()
-            );
-            } catch (Exception e) {
+                    mindmap.getTitle());
+        } catch (Exception e) {
             // Không throw exception, vì lời mời đã được tạo
         }
 
@@ -169,34 +173,37 @@ public class CollaborationService {
                 .findFirst()
                 .orElse(null);
 
+        // Store collaborator info for emitting event before removing
+        Long removedUserId = (collaborator != null) ? collaborator.getMysqlUserId() : null;
+
         // Case 1: Collaborator exists in mindmap - remove regardless of status
         if (collaborator != null) {
-            mindmap.getCollaborators().removeIf(c -> 
-                    c.getEmail() != null && c.getEmail().equalsIgnoreCase(email)
-            );
+            mindmap.getCollaborators().removeIf(c -> c.getEmail() != null && c.getEmail().equalsIgnoreCase(email));
             mindmapRepository.save(mindmap);
-            } else {
-            // Case 2: Collaborator doesn't exist in mindmap but might have pending invitation
-            // This happens when user was invited but hasn't registered yet
-            }
+        }
 
         // Remove pending invitation(s) for this email regardless
         var pendingInvitations = invitationRepository.findByMindmapIdAndInvitedEmailAndStatus(
-                mindmapId, 
-                email.toLowerCase(), 
-                "pending"
-        );
-        
+                mindmapId,
+                email.toLowerCase(),
+                "pending");
+
         if (pendingInvitations.isPresent()) {
             CollaborationInvitation invitation = pendingInvitations.get();
             invitation.setStatus("cancelled");
             invitation.setUpdatedAt(LocalDateTime.now());
             invitationRepository.save(invitation);
-            }
+        }
 
         // If neither collaborator nor invitation exists, throw error
         if (collaborator == null && pendingInvitations.isEmpty()) {
-            throw new IllegalArgumentException("Người dùng này không phải là collaborator hoặc không có lời mời đang chờ xác nhận.");
+            throw new IllegalArgumentException(
+                    "Người dùng này không phải là collaborator hoặc không có lời mời đang chờ xác nhận.");
+        }
+
+        // Emit collaborator removed event for real-time redirect
+        if (removedUserId != null) {
+            realtimeService.emitCollaboratorRemoved(mindmapId, removedUserId, email);
         }
     }
 
@@ -233,7 +240,7 @@ public class CollaborationService {
             // Collaborator doesn't exist (user signed up after being invited)
             User acceptingUser = userRepository.findById(userId).orElse(null);
             String userEmail = (acceptingUser != null) ? acceptingUser.getEmail() : invitation.getInvitedEmail();
-            
+
             collaborator = Collaborator.builder()
                     .mysqlUserId(userId)
                     .email(userEmail)
@@ -242,13 +249,13 @@ public class CollaborationService {
                     .invitedAt(invitation.getCreatedAt())
                     .status("pending")
                     .build();
-            
+
             mindmap.getCollaborators().add(collaborator);
-            }
+        }
 
         collaborator.setStatus("accepted");
         collaborator.setAcceptedAt(LocalDateTime.now());
-        
+
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
         // Cập nhật status của lời mời
         invitation.setStatus("accepted");
@@ -256,7 +263,7 @@ public class CollaborationService {
         invitation.setAcceptedByUserId(userId);
         invitationRepository.save(invitation);
 
-        }
+    }
 
     /**
      * Từ chối lời mời cộng tác viên
@@ -280,14 +287,13 @@ public class CollaborationService {
             Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
                     .orElse(null);
             if (mindmap != null) {
-                mindmap.getCollaborators().removeIf(c -> 
-                        c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId) && "pending".equals(c.getStatus())
-                );
+                mindmap.getCollaborators().removeIf(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId)
+                        && "pending".equals(c.getStatus()));
                 mindmapRepository.save(mindmap);
             }
         }
 
-        }
+    }
 
     /**
      * Lấy lời mời bằng token
@@ -309,7 +315,8 @@ public class CollaborationService {
         }
 
         // Return all pending invitations (including those for unregistered users)
-        // This will show all pending invites regardless of whether user has registered or been added as collaborator
+        // This will show all pending invites regardless of whether user has registered
+        // or been added as collaborator
         return invitationRepository.findByMindmapIdAndStatus(mindmapId, "pending");
     }
 
@@ -322,14 +329,13 @@ public class CollaborationService {
                 .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
 
         // Find and remove the collaborator
-        boolean removed = mindmap.getCollaborators().removeIf(c -> 
-                c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId)
-        );
+        boolean removed = mindmap.getCollaborators()
+                .removeIf(c -> c.getMysqlUserId() != null && c.getMysqlUserId().equals(userId));
 
         if (!removed) {
             throw new IllegalArgumentException("Người dùng này không phải là collaborator của mindmap này.");
         }
 
         mindmapRepository.save(mindmap);
-        }
+    }
 }
