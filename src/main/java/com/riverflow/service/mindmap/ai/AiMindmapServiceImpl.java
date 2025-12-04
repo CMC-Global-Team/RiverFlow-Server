@@ -87,12 +87,13 @@ public class AiMindmapServiceImpl implements AiMindmapService {
             sendRealtimeEventToUser(userId, "ai:generate:start", Map.of("mode", mode, "topic", topic));
         }
 
-        // Ask Gemini to generate mindmap
+        // Ask Gemini to generate mindmap with streaming
         Map<String, Object> payload = promptBuilder.buildGeneratePrompt(
                 topic, levels, firstLevelCount, lang, request.getTags(), mode, minFirst, maxFirst,
                 request.getStructureType() != null ? request.getStructureType() : "mindmap");
 
-        String json = callGemini(payload);
+        // Use streaming for real-time feedback
+        String json = callGeminiStreamToUser(payload, userId);
         JsonNode root = parseJson(promptBuilder.ensureJson(json));
 
         // Parse title from AI response, fallback to request title or topic
@@ -756,6 +757,66 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                         Map.of("error", e.getMessage()));
             }
             throw new RuntimeException("AI service failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Call Gemini with streaming to user room (avoids duplicates)
+     * Used for generation where we want real-time token streaming
+     */
+    private String callGeminiStreamToUser(Map<String, Object> payload, Long userId) {
+        if (userId == null) {
+            // Fallback to non-streaming if no user
+            return callGemini(payload);
+        }
+
+        try {
+            String url = "/v1beta/models/" + model + ":streamGenerateContent";
+            StringBuilder fullText = new StringBuilder();
+
+            // Send streaming start event
+            sendRealtimeEventToUser(userId, "ai:stream:start", Map.of());
+
+            Flux<Map> responseFlux = geminiWebClient.post()
+                    .uri(url)
+                    .body(BodyInserters.fromValue(payload))
+                    .retrieve()
+                    .bodyToFlux(Map.class);
+
+            Iterable<Map> iterable = responseFlux.toIterable();
+            iterable.forEach(chunk -> {
+                try {
+                    List<?> candidates = (List<?>) chunk.get("candidates");
+                    if (candidates != null && !candidates.isEmpty()) {
+                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                        if (content != null) {
+                            List<?> parts = (List<?>) content.get("parts");
+                            if (parts != null && !parts.isEmpty()) {
+                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                                String text = String.valueOf(part.get("text"));
+                                if (text != null && !"null".equals(text)) {
+                                    fullText.append(text);
+                                    // Stream each token chunk to user
+                                    sendRealtimeEventToUser(userId, "ai:stream:chunk",
+                                            Map.of("chunk", text, "done", false));
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // Continue processing
+                }
+            });
+
+            // Send done event
+            sendRealtimeEventToUser(userId, "ai:stream:done", Map.of("done", true));
+
+            return fullText.toString();
+        } catch (Exception e) {
+            sendRealtimeEventToUser(userId, "ai:stream:error",
+                    Map.of("error", e.getMessage()));
+            throw new RuntimeException("AI generation failed: " + e.getMessage(), e);
         }
     }
 
