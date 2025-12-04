@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.riverflow.service.mindmap.MindmapHistoryService;
 import com.riverflow.service.mindmap.UndoRedoService;
+import com.riverflow.service.realtime.RealtimeService;
 import com.riverflow.model.mindmap.subdocuments.Collaborator;
 import com.riverflow.model.mindmap.subdocuments.MindmapMetadata;
 
@@ -39,6 +40,7 @@ public class MindmapServiceImpl implements MindmapService {
     private final MongoTemplate mongoTemplate;
     private final MindmapHistoryService historyService;
     private final UndoRedoService undoRedoService;
+    private final RealtimeService realtimeService;
 
     @Override
     @Transactional
@@ -71,8 +73,7 @@ public class MindmapServiceImpl implements MindmapService {
                 userId,
                 "create_mindmap",
                 null,
-                MindmapMapper.toResponse(savedMindmap)
-        );
+                MindmapMapper.toResponse(savedMindmap));
 
         MindmapResponse response = MindmapMapper.toResponse(savedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(savedMindmap.getId(), userId));
@@ -88,7 +89,8 @@ public class MindmapServiceImpl implements MindmapService {
 
         // Check if user has access
         if (!hasAccess(mindmap, userId)) {
-            // If mindmap is public, include shareToken in exception so client can load via public API
+            // If mindmap is public, include shareToken in exception so client can load via
+            // public API
             String shareToken = null;
             if (Boolean.TRUE.equals(mindmap.getIsPublic()) && mindmap.getShareToken() != null) {
                 shareToken = mindmap.getShareToken();
@@ -111,17 +113,15 @@ public class MindmapServiceImpl implements MindmapService {
 
         // Check if user is the owner
         boolean isOwner = mindmap.getMysqlUserId().equals(userId);
-        
+
         // Check if user is an EDITOR collaborator
-        boolean isEditorCollaborator = mindmap.getCollaborators() != null && 
-            mindmap.getCollaborators().stream()
-                .anyMatch(c -> 
-                    c.getMysqlUserId() != null &&
-                    c.getMysqlUserId().equals(userId) && 
-                    "accepted".equals(c.getStatus()) &&
-                    "EDITOR".equals(c.getRole())
-                );
-        
+        boolean isEditorCollaborator = mindmap.getCollaborators() != null &&
+                mindmap.getCollaborators().stream()
+                        .anyMatch(c -> c.getMysqlUserId() != null &&
+                                c.getMysqlUserId().equals(userId) &&
+                                "accepted".equals(c.getStatus()) &&
+                                "EDITOR".equals(c.getRole()));
+
         if (!isOwner && !isEditorCollaborator) {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
@@ -209,7 +209,7 @@ public class MindmapServiceImpl implements MindmapService {
 
         historyService.recordChange(mindmapId, userId, "delete_mindmap", oldStatus, "deleted");
 
-        }
+    }
 
     @Override
     @Transactional
@@ -223,7 +223,7 @@ public class MindmapServiceImpl implements MindmapService {
         }
 
         mindmapRepository.delete(mindmap);
-        }
+    }
 
     @Override
     public List<MindmapSummaryResponse> getAllMindmapsByUser(Long userId) {
@@ -236,10 +236,8 @@ public class MindmapServiceImpl implements MindmapService {
         collaboratorQuery.addCriteria(
                 Criteria.where("collaborators").elemMatch(
                         Criteria.where("mysqlUserId").is(userId)
-                                .and("status").is("accepted")
-                )
-                .and("status").is("active")
-        );
+                                .and("status").is("accepted"))
+                        .and("status").is("active"));
         List<Mindmap> collaboratedMindmaps = mongoTemplate.find(collaboratorQuery, Mindmap.class);
 
         // Combine results and remove duplicates
@@ -401,9 +399,7 @@ public class MindmapServiceImpl implements MindmapService {
                 Criteria.where("status").is("active"),
                 new Criteria().orOperator(
                         Criteria.where("title").regex(keyword, "i"),
-                        Criteria.where("description").regex(keyword, "i")
-                )
-        );
+                        Criteria.where("description").regex(keyword, "i")));
 
         query.addCriteria(criteria);
 
@@ -467,14 +463,11 @@ public class MindmapServiceImpl implements MindmapService {
                 .build();
 
         newMindmap.setNodes(
-                originalMindmap.getNodes() != null ? new ArrayList<>(originalMindmap.getNodes()) : new ArrayList<>()
-        );
+                originalMindmap.getNodes() != null ? new ArrayList<>(originalMindmap.getNodes()) : new ArrayList<>());
         newMindmap.setEdges(
-                originalMindmap.getEdges() != null ? new ArrayList<>(originalMindmap.getEdges()) : new ArrayList<>()
-        );
+                originalMindmap.getEdges() != null ? new ArrayList<>(originalMindmap.getEdges()) : new ArrayList<>());
         newMindmap.setTags(
-                originalMindmap.getTags() != null ? new ArrayList<>(originalMindmap.getTags()) : new ArrayList<>()
-        );
+                originalMindmap.getTags() != null ? new ArrayList<>(originalMindmap.getTags()) : new ArrayList<>());
 
         Mindmap savedMindmap = mindmapRepository.save(newMindmap);
         historyService.recordChange(
@@ -482,8 +475,7 @@ public class MindmapServiceImpl implements MindmapService {
                 userId,
                 "create_duplicate",
                 originalMapId,
-                MindmapMapper.toResponse(savedMindmap)
-        );
+                MindmapMapper.toResponse(savedMindmap));
 
         MindmapResponse response = MindmapMapper.toResponse(savedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(savedMindmap.getId(), userId));
@@ -505,16 +497,27 @@ public class MindmapServiceImpl implements MindmapService {
             throw new MindmapAccessDeniedException("Chỉ chủ sở hữu mới có quyền cập nhật.", mindmapId, userId);
         }
 
+        // Track previous state to detect access revocation
+        Boolean wasPublic = mindmap.getIsPublic();
+
         mindmap.setIsPublic(isPublic);
         mindmap.setPublicAccessLevel(accessLevel != null ? accessLevel : "private");
         mindmap.setUpdatedAt(LocalDateTime.now());
-        
+
         // Generate shareToken if making public and it doesn't have one
         if (Boolean.TRUE.equals(isPublic) && mindmap.getShareToken() == null) {
             mindmap.setShareToken(java.util.UUID.randomUUID().toString());
-            }
+        }
 
         Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+
+        // Emit access revoked event if public access was disabled or changed to private
+        boolean accessRevoked = Boolean.TRUE.equals(wasPublic) &&
+                (!Boolean.TRUE.equals(isPublic) || "private".equalsIgnoreCase(accessLevel));
+        if (accessRevoked) {
+            realtimeService.emitAccessRevoked(mindmapId, "public_access_disabled");
+        }
+
         MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
         response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
         response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
@@ -544,20 +547,19 @@ public class MindmapServiceImpl implements MindmapService {
         // Check if user is a collaborator (accepted or pending status)
         if (mindmap.getCollaborators() != null && !mindmap.getCollaborators().isEmpty()) {
             boolean hasAccess = mindmap.getCollaborators().stream()
-                    .anyMatch(collaborator -> 
-                        collaborator.getMysqlUserId() != null &&
-                        collaborator.getMysqlUserId().equals(userId) && 
-                        ("accepted".equals(collaborator.getStatus()) || "pending".equals(collaborator.getStatus()))
-                    );
+                    .anyMatch(collaborator -> collaborator.getMysqlUserId() != null &&
+                            collaborator.getMysqlUserId().equals(userId) &&
+                            ("accepted".equals(collaborator.getStatus())
+                                    || "pending".equals(collaborator.getStatus())));
             if (hasAccess) {
                 return true;
             }
-            
+
             // Log all collaborators for debugging
             mindmap.getCollaborators().forEach(c -> {
-                });
+            });
         } else {
-            }
+        }
 
         return false;
     }
@@ -566,7 +568,8 @@ public class MindmapServiceImpl implements MindmapService {
     @Transactional
     public MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request) {
         Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
-                .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
+                .orElseThrow(
+                        () -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
 
         if (!Boolean.TRUE.equals(mindmap.getIsPublic()) || !"edit".equals(mindmap.getPublicAccessLevel())) {
             throw new MindmapAccessDeniedException("This mindmap is not editable publicly", mindmap.getId(), null);
@@ -574,10 +577,14 @@ public class MindmapServiceImpl implements MindmapService {
 
         MindmapResponse oldState = MindmapMapper.toResponse(mindmap);
 
-        if (request.getTitle() != null) mindmap.setTitle(request.getTitle());
-        if (request.getNodes() != null) mindmap.setNodes(request.getNodes());
-        if (request.getEdges() != null) mindmap.setEdges(request.getEdges());
-        if (request.getViewport() != null) mindmap.setViewport(MindmapMapper.toViewportEntity(request.getViewport()));
+        if (request.getTitle() != null)
+            mindmap.setTitle(request.getTitle());
+        if (request.getNodes() != null)
+            mindmap.setNodes(request.getNodes());
+        if (request.getEdges() != null)
+            mindmap.setEdges(request.getEdges());
+        if (request.getViewport() != null)
+            mindmap.setViewport(MindmapMapper.toViewportEntity(request.getViewport()));
         mindmap.setUpdatedAt(LocalDateTime.now());
 
         Mindmap updated = mindmapRepository.save(mindmap);
@@ -587,8 +594,7 @@ public class MindmapServiceImpl implements MindmapService {
                 mindmap.getMysqlUserId(),
                 "public_update",
                 oldState,
-                MindmapMapper.toResponse(updated)
-        );
+                MindmapMapper.toResponse(updated));
 
         return MindmapMapper.toResponse(updated);
     }
@@ -596,7 +602,8 @@ public class MindmapServiceImpl implements MindmapService {
     @Override
     public MindmapResponse getMindmapByShareToken(String shareToken) {
         Mindmap mindmap = mindmapRepository.findByShareToken(shareToken)
-                .orElseThrow(() -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
+                .orElseThrow(
+                        () -> new MindmapNotFoundException("Mindmap not found with shareToken: " + shareToken, null));
 
         // Verify mindmap is public
         if (!Boolean.TRUE.equals(mindmap.getIsPublic())) {
@@ -604,18 +611,17 @@ public class MindmapServiceImpl implements MindmapService {
         }
 
         MindmapResponse response = MindmapMapper.toResponse(mindmap);
-        
+
         // Add owner info
         User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
         if (owner != null) {
             response.setOwnerName(owner.getFullName());
             response.setOwnerAvatar(owner.getAvatar());
         }
-        
+
         response.setCanUndo(false);
         response.setCanRedo(false);
 
         return response;
     }
 }
-
