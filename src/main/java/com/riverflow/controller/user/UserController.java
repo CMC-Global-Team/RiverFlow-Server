@@ -8,12 +8,18 @@ import com.riverflow.service.user.AvatarService;
 import com.riverflow.service.user.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -116,6 +122,90 @@ public class UserController {
         Map<String, String> error = new HashMap<>();
         error.put("error", message);
         return error;
+    }
+
+    /**
+     * API Endpoint: Get all users (Admin only)
+     * GET /api/user/all
+     * Returns all users without pagination
+     */
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        List<UserResponse> users = userService.getAllUsers();
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * API Endpoint: Get all users with pagination (Admin only)
+     * GET /api/user?page=0&size=10&sort=createdAt,desc
+     */
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Page<UserResponse>> getAllUsersPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection) {
+
+        Sort.Direction direction = sortDirection.equalsIgnoreCase("asc")
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
+
+        Page<UserResponse> users = userService.getAllUsers(pageable);
+        return ResponseEntity.ok(users);
+    }
+
+    /**
+     * API Endpoint: Get user by ID (Admin only)
+     * GET /api/user/{userId}
+     */
+    @GetMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long userId) {
+        try {
+            UserResponse response = userService.getUserById(userId);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * API Endpoint: Soft delete user (Admin only)
+     * DELETE /api/user/{userId}
+     * Sets user status to 'deleted' instead of removing from database
+     */
+    @DeleteMapping("/{userId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> deleteUser(@PathVariable Long userId) {
+        try {
+            userService.deleteUser(userId);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "User deleted successfully");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * API Endpoint: Hard delete user (Admin only - use with caution)
+     * DELETE /api/user/{userId}/permanent
+     * Permanently removes user from database
+     */
+    @DeleteMapping("/{userId}/permanent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, String>> hardDeleteUser(@PathVariable Long userId) {
+        try {
+            userService.hardDeleteUser(userId);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "User permanently deleted");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
