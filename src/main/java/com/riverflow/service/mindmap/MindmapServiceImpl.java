@@ -634,4 +634,59 @@ public class MindmapServiceImpl implements MindmapService {
 
         return response;
     }
+
+    @Override
+    @Transactional
+    public MindmapResponse updateEmbedSettings(String mindmapId, Boolean isEmbedEnabled, Long userId) {
+        Mindmap mindmap = mindmapRepository.findById(mindmapId)
+                .orElseThrow(() -> new MindmapNotFoundException(mindmapId, userId));
+
+        // Only owner can update embed settings
+        if (!mindmap.getMysqlUserId().equals(userId)) {
+            throw new MindmapAccessDeniedException("Only owner can update embed settings", mindmapId, userId);
+        }
+
+        mindmap.setIsEmbedEnabled(isEmbedEnabled);
+
+        // Generate embed token if enabling and no token exists
+        if (Boolean.TRUE.equals(isEmbedEnabled) && mindmap.getEmbedToken() == null) {
+            mindmap.setEmbedToken(java.util.UUID.randomUUID().toString());
+        }
+
+        mindmap.setUpdatedAt(LocalDateTime.now());
+        Mindmap updatedMindmap = mindmapRepository.save(mindmap);
+
+        MindmapResponse response = MindmapMapper.toResponse(updatedMindmap);
+        response.setCanUndo(undoRedoService.checkCanUndo(mindmapId, userId));
+        response.setCanRedo(undoRedoService.checkCanRedo(mindmapId, userId));
+
+        return response;
+    }
+
+    @Override
+    public MindmapResponse getMindmapByEmbedToken(String embedToken) {
+        Mindmap mindmap = mindmapRepository.findByEmbedToken(embedToken)
+                .orElseThrow(() -> new MindmapNotFoundException("Embedded mindmap not found with token: " + embedToken,
+                        null));
+
+        // Verify embedding is enabled
+        if (!Boolean.TRUE.equals(mindmap.getIsEmbedEnabled())) {
+            throw new MindmapAccessDeniedException("Embedding is disabled for this mindmap", mindmap.getId(), null);
+        }
+
+        MindmapResponse response = MindmapMapper.toResponse(mindmap);
+
+        // Add owner info
+        User owner = userRepository.findById(mindmap.getMysqlUserId()).orElse(null);
+        if (owner != null) {
+            response.setOwnerName(owner.getFullName());
+            response.setOwnerAvatar(owner.getAvatar());
+        }
+
+        // Embedded view is always read-only, no undo/redo
+        response.setCanUndo(false);
+        response.setCanRedo(false);
+
+        return response;
+    }
 }

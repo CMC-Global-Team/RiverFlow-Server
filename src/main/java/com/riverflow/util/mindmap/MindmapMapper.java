@@ -9,7 +9,7 @@ import com.riverflow.model.mindmap.subdocuments.Viewport;
  * Mapper utility for converting between Mindmap entities and DTOs
  */
 public class MindmapMapper {
-    
+
     /**
      * Convert Mindmap entity to MindmapResponse DTO
      */
@@ -17,7 +17,7 @@ public class MindmapMapper {
         if (mindmap == null) {
             return null;
         }
-        
+
         return MindmapResponse.builder()
                 .id(mindmap.getId())
                 .mysqlUserId(mindmap.getMysqlUserId())
@@ -43,9 +43,11 @@ public class MindmapMapper {
                 .metadata(mindmap.getMetadata())
                 .createdAt(mindmap.getCreatedAt())
                 .updatedAt(mindmap.getUpdatedAt())
+                .isEmbedEnabled(mindmap.getIsEmbedEnabled())
+                .embedToken(mindmap.getEmbedToken())
                 .build();
     }
-    
+
     /**
      * Convert Mindmap entity to MindmapSummaryResponse DTO
      */
@@ -53,7 +55,7 @@ public class MindmapMapper {
         if (mindmap == null) {
             return null;
         }
-        
+
         return MindmapSummaryResponse.builder()
                 .id(mindmap.getId())
                 .mysqlUserId(mindmap.getMysqlUserId())
@@ -84,7 +86,7 @@ public class MindmapMapper {
         if (mindmap == null) {
             return null;
         }
-        
+
         return MindmapSummaryResponse.builder()
                 .id(mindmap.getId())
                 .mysqlUserId(mindmap.getMysqlUserId())
@@ -107,7 +109,7 @@ public class MindmapMapper {
                 .ownerAvatar(ownerAvatar)
                 .build();
     }
-    
+
     /**
      * Convert Viewport entity to ViewportDto
      */
@@ -115,14 +117,14 @@ public class MindmapMapper {
         if (viewport == null) {
             return null;
         }
-        
+
         return ViewportDto.builder()
                 .x(viewport.getX())
                 .y(viewport.getY())
                 .zoom(viewport.getZoom())
                 .build();
     }
-    
+
     /**
      * Convert ViewportDto to Viewport entity
      */
@@ -130,14 +132,14 @@ public class MindmapMapper {
         if (dto == null) {
             return null;
         }
-        
+
         return Viewport.builder()
                 .x(dto.getX())
                 .y(dto.getY())
                 .zoom(dto.getZoom())
                 .build();
     }
-    
+
     /**
      * Convert MindmapSettings entity to MindmapSettingsDto
      */
@@ -145,7 +147,7 @@ public class MindmapMapper {
         if (settings == null) {
             return null;
         }
-        
+
         return MindmapSettingsDto.builder()
                 .fitView(settings.getFitView())
                 .snapToGrid(settings.getSnapToGrid())
@@ -162,7 +164,7 @@ public class MindmapMapper {
                 .connectionMode(settings.getConnectionMode())
                 .build();
     }
-    
+
     /**
      * Convert MindmapSettingsDto to MindmapSettings entity
      */
@@ -170,7 +172,7 @@ public class MindmapMapper {
         if (dto == null) {
             return null;
         }
-        
+
         return MindmapSettings.builder()
                 .fitView(dto.getFitView())
                 .snapToGrid(dto.getSnapToGrid())
@@ -188,4 +190,3 @@ public class MindmapMapper {
                 .build();
     }
 }
-
