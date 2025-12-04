@@ -125,118 +125,7 @@ public class GeminiPromptBuilder {
                 return payload;
         }
 
-        /**
-         * Build prompt that asks Gemini to THINK and output OTMZ JSON only.
-         */
-        public Map<String, Object> buildThinkingOtmzPrompt(
-                String topic,
-                String language,
-                String structureType,
-                Integer levels,
-                Integer firstLevelCount,
-                List<String> tags,
-                String mode) {
 
-            String lang = StringUtils.hasText(language) ? language : "vi";
-            String struct = StringUtils.hasText(structureType) ? structureType : "mindmap";
-            int depth = levels != null ? levels : 2;
-            int first = firstLevelCount != null ? firstLevelCount : 4;
-
-            StringBuilder system = new StringBuilder();
-            system.append("You analyze a topic and design a mindmap plan.\n");
-            system.append("IMPORTANT: Respond in TWO parts:\n");
-            system.append("1. FIRST: A friendly natural language explanation (2-3 sentences) in ").append(lang).append(" describing what you're creating\n");
-            system.append("2. THEN: The complete OTMZ JSON on a new line\n");
-            system.append("Format: <explanation>\\n\\n```json\\n<otmz>\\n```\n");
-            system.append("CRITICAL: The OTMZ JSON MUST have exactly these 4 keys:\n");
-            system.append("- meta: {date, language, version}\n");
-            system.append("- promptAnalysis: {topic, language, structure, levels, firstLevelCount, constraints, analysis}\n");
-            system.append("- propertiesDesign: {structure, style, directions, visualMetaphor}\n");
-            system.append("- optimizedContent: {title, description, type, levels, firstLevelCount, nodes[]}\n");
-            system.append("Rules for JSON:\n");
-            system.append("- All labels/descriptions MUST be in ").append(lang).append(".\n");
-            system.append("- Structure type: ").append(struct).append(".\n");
-            system.append("- Provide concise titles (1-4 words) and 1-2 sentence descriptions.\n");
-            system.append("- Respect levels and firstLevelCount.\n");
-            system.append(buildStructureGuidance(struct));
-
-            StringBuilder user = new StringBuilder();
-            user.append("Topic: ").append(topic).append("\n");
-            user.append("Language: ").append(lang).append("\n");
-            user.append("Structure: ").append(struct).append("\n");
-            user.append("Levels: ").append(depth).append("\n");
-            user.append("FirstLevelCount: ").append(first).append("\n");
-            if (tags != null && !tags.isEmpty()) {
-                user.append("Tags: ").append(String.join(", ", tags)).append("\n");
-            }
-            user.append("\nPlease:\n");
-            user.append("1. First explain in ").append(lang).append(" what mindmap you're creating\n");
-            user.append("2. Then provide the OTMZ JSON with ALL 4 REQUIRED KEYS: meta, promptAnalysis, propertiesDesign, optimizedContent\n");
-
-            Map<String, Object> systemInstruction = Map.of(
-                    "parts", List.of(Map.of("text", system.toString())));
-            Map<String, Object> userContent = Map.of(
-                    "role", "user",
-                    "parts", List.of(Map.of("text", user.toString())));
-
-            Map<String, Object> generationConfig = new HashMap<>();
-            double temp = "max".equalsIgnoreCase(mode) ? 1.0
-                    : ("thinking".equalsIgnoreCase(mode) ? 0.8 : 0.7);
-            generationConfig.put("temperature", temp);
-            generationConfig.put("maxOutputTokens", 6000);
-
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("systemInstruction", systemInstruction);
-            payload.put("contents", List.of(userContent));
-            payload.put("generationConfig", generationConfig);
-            return payload;
-        }
-
-        /**
-     * Build prompt that converts an OTMZ JSON into an Action List JSON.
-     */
-    public Map<String, Object> buildActionListPrompt(String otmzJson, String language) {
-        String lang = StringUtils.hasText(language) ? language : "vi";
-
-        StringBuilder system = new StringBuilder();
-        system.append("You transform an OTMZ JSON into an execution Action List.\n");
-        system.append("IMPORTANT: Respond in TWO parts:\n");
-        system.append("1. FIRST: A brief friendly explanation (1-2 sentences) in ").append(lang).append(" of what actions you're generating\n");
-        system.append("2. THEN: The complete Action List JSON on a new line\n");
-        system.append("Format: <explanation>\\n\\n```json\\n<actions>\\n```\n");
-        system.append("Rules for JSON:\n");
-        system.append("- Allowed action types: add_node, update_node, delete_node, delete_subtree, set_title, set_structureType.\n");
-        system.append("- Respect meta.structureType, meta.levels, meta.firstLevelCount.\n");
-        system.append("- Use propertiesDesign.node (shapes, colorPalette, backgroundStrategy, iconPolicy) when present.\n");
-        system.append("- Every add_node MUST include a 'description' in ").append(lang).append(".\n");
-        system.append("- First-level nodes MUST have parentLabel = null.\n");
-        system.append("- Order: set_title, set_structureType first; then add_node roots; then children.\n");
-
-        StringBuilder user = new StringBuilder();
-        user.append("OTMZ:\n");
-        user.append(otmzJson).append("\n\n");
-        user.append("Please:\n");
-        user.append("1. First explain in ").append(lang).append(" what you're creating\n");
-        user.append("2. Then return the Action List JSON: ");
-        user.append("{\"actions\":[{\"type\":\"set_title\",\"params\":{\"title\":\"...\"}},");
-        user.append("{\"type\":\"add_node\",\"params\":{\"parentLabel\":null,\"label\":\"...\",\"description\":\"...\",\"shape\":\"rectangle\",\"color\":\"#...\",\"background\":\"#...\",\"icon\":\"...\"}}]}");
-
-        Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", system.toString())));
-        Map<String, Object> userContent = Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", user.toString())));
-
-        Map<String, Object> generationConfig = new HashMap<>();
-        generationConfig.put("temperature", 0.4);
-        generationConfig.put("maxOutputTokens", 4000);
-
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("systemInstruction", systemInstruction);
-        payload.put("contents", List.of(userContent));
-        payload.put("generationConfig", generationConfig);
-        return payload;
-    }
 
         /**
          * Build hierarchical display of nodes recursively
@@ -385,8 +274,7 @@ public class GeminiPromptBuilder {
                                 "role", "user",
                                 "parts", List.of(Map.of("text", user.toString())));
                 Map<String, Object> generationConfig = new HashMap<>();
-                double temp = "max".equalsIgnoreCase(mode) ? 1.0
-                                : ("thinking".equalsIgnoreCase(mode) ? 0.8 : 0.7);
+                double temp = "max".equalsIgnoreCase(mode) ? 1.0 : 0.7;
                 generationConfig.put("temperature", temp);
                 generationConfig.put("maxOutputTokens", 8000);
 
