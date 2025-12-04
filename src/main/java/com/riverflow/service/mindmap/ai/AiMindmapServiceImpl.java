@@ -306,8 +306,41 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         String mode = determineMode(request.getMode());
         deductCredits(userId, mode);
 
-        // 3. Ask Gemini AI to analyze and plan operations
+        // 3. For Thinking Mode, use ThinkingModeService to analyze and send action list
         String lang = request.getLanguage() != null ? request.getLanguage() : "vi";
+        
+        // If thinking mode, get optimized parameters and send action list
+        if ("thinking".equalsIgnoreCase(mode) && request.getHints() != null && !request.getHints().isEmpty()) {
+            // Use first hint as user prompt for thinking mode
+            String userPrompt = request.getHints().get(0);
+            
+            com.riverflow.dto.mindmap.ai.ThinkingModeRequest thinkingRequest = 
+                com.riverflow.dto.mindmap.ai.ThinkingModeRequest.builder()
+                    .userPrompt(userPrompt)
+                    .language(lang)
+                    .preferredStructure(request.getStructureType())
+                    .complexity("normal")
+                    .build();
+            
+            // Get thinking mode analysis - DON'T deduct credits again (already deducted above)
+            // Pass mindmapId for proper room routing
+            com.riverflow.dto.mindmap.ai.ThinkingModeResponse thinkingResult = 
+                thinkingModeService.analyzeAndOptimizeWithStreaming(thinkingRequest, null, mindmap.getId());
+            
+            // Send action list to user
+            if (userId != null && thinkingResult.getActionList() != null && !thinkingResult.getActionList().isEmpty()) {
+                String actionHeader = lang.equals("vi") ? "**Kế hoạch thực hiện:**\n" : "**Action Plan:**\n";
+                String actionListText = actionHeader + 
+                    String.join("\n", thinkingResult.getActionList().stream()
+                        .map(action -> "- " + action)
+                        .toArray(String[]::new));
+                
+                sendRealtimeEventToUser(userId, "ai:thinking:actionlist", 
+                    Map.of("text", actionListText, "actions", thinkingResult.getActionList()));
+            }
+        }
+        
+        // 4. Ask Gemini AI to analyze and plan operations
         AiDecision decision = askAiForDecision(mindmap, request, lang);
 
         if (decision.hasOps()) {
@@ -315,21 +348,21 @@ public class AiMindmapServiceImpl implements AiMindmapService {
                 }
         }
 
-        // 4. Execute AI-decided operations
+        // 5. Execute AI-decided operations
         List<String> logs = new ArrayList<>();
         if (decision.hasOps()) {
             logs.addAll(operationExecutor.executeOperations(decision.ops(), mindmap));
         } else {
             }
 
-        // 5. Apply layout to properly position all nodes
+        // 6. Apply layout to properly position all nodes
         // Use structure type from AI decision, or fall back to request, or default to mindmap
         String structureType = decision.structureType() != null 
                 ? decision.structureType() 
                 : (request.getStructureType() != null ? request.getStructureType() : "mindmap");
         layoutEngine.applyLayout(structureType, mindmap.getNodes(), mindmap.getEdges());
 
-        // 6. Save changes
+        // 7. Save changes
         UpdateMindmapRequest updateReq = UpdateMindmapRequest.builder()
                 .nodes(mindmap.getNodes())
                 .edges(mindmap.getEdges())
@@ -596,7 +629,15 @@ public class AiMindmapServiceImpl implements AiMindmapService {
         if (userId == null)
             return;
 
-        long cost = "max".equalsIgnoreCase(mode) ? 5L : 1L;
+        // Determine credit cost based on mode
+        long cost;
+        if ("max".equalsIgnoreCase(mode)) {
+            cost = 5L;
+        } else if ("thinking".equalsIgnoreCase(mode)) {
+            cost = 3L; // Thinking mode costs 3 credits
+        } else {
+            cost = 1L; // Normal mode costs 1 credit
+        }
 
         com.riverflow.model.User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));

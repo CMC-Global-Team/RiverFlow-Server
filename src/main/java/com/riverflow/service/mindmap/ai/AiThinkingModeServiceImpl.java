@@ -49,7 +49,10 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
     @Override
     public ThinkingModeResponse analyzeAndOptimizeWithStreaming(ThinkingModeRequest request, Long userId, String mindmapId) {
         // Deduct credits for thinking mode (3 credits for deep analysis)
-        deductCredits(userId, 3L);
+        // Only deduct if userId is provided (when called directly, not from optimize)
+        if (userId != null) {
+            deductCredits(userId, 3L);
+        }
 
         // Build prompt for Thinking Mode
         Map<String, Object> payload = promptBuilder.buildThinkingModePrompt(
@@ -60,8 +63,17 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
                 request.getComplexity()
         );
 
-        // Call Gemini with streaming support - use userId for room
-        String aiResponse = callGeminiStream(payload, userId);
+        // Call Gemini with streaming support - use userId or mindmapId for room
+        String aiResponse;
+        if (userId != null) {
+            aiResponse = callGeminiStream(payload, userId);
+        } else if (mindmapId != null) {
+            // When called from optimize, stream to mindmap room
+            aiResponse = callGeminiStreamToMindmap(payload, mindmapId);
+        } else {
+            // Fallback - no streaming
+            aiResponse = callGeminiNoStream(payload);
+        }
 
         // Parse JSON response
         String jsonResponse = promptBuilder.ensureJson(aiResponse);
@@ -302,4 +314,147 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
             // Silently ignore realtime errors
         }
     }
+
+    /**
+     * Send realtime event to mindmap-specific room
+     */
+    private void sendRealtimeEventToMindmap(String mindmapId, String event, Map<String, Object> data) {
+        if (realtimeServerUrl == null || realtimeServerUrl.isBlank() || mindmapId == null) {
+            return;
+        }
+        try {
+            String room = "mindmap:" + mindmapId;
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("room", room);
+            payload.put("event", event);
+            payload.put("data", data != null ? data : Map.of());
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(realtimeServerUrl + "/realtime/mindmap/event"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload)))
+                    .build();
+
+            client.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception e) {
+            // Silently ignore realtime errors
+        }
+    }
+
+    /**
+     * Call Gemini with streaming to mindmap room
+     */
+    private String callGeminiStreamToMindmap(Map<String, Object> payload, String mindmapId) {
+        try {
+            String url = "/v1beta/models/" + model + ":streamGenerateContent";
+            StringBuilder fullText = new StringBuilder();
+            StringBuilder naturalLanguagePart = new StringBuilder();
+            final boolean[] jsonStarted = { false };
+
+            // Send streaming start event to mindmap room
+            if (mindmapId != null) {
+                sendRealtimeEventToMindmap(mindmapId, "ai:thinking:start", Map.of());
+            }
+
+            Flux<Map> responseFlux = geminiWebClient.post()
+                    .uri(url)
+                    .body(BodyInserters.fromValue(payload))
+                    .retrieve()
+                    .bodyToFlux(Map.class);
+
+            Iterable<Map> iterable = responseFlux.toIterable();
+            iterable.forEach(chunk -> {
+                try {
+                    List<?> candidates = (List<?>) chunk.get("candidates");
+                    if (candidates != null && !candidates.isEmpty()) {
+                        Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                        Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                        if (content != null) {
+                            List<?> parts = (List<?>) content.get("parts");
+                            if (parts != null && !parts.isEmpty()) {
+                                Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                                String text = String.valueOf(part.get("text"));
+                                if (text != null && !"null".equals(text)) {
+                                    fullText.append(text);
+
+                                    // Only send natural language part to client (before JSON)
+                                    if (!jsonStarted[0]) {
+                                        if (text.contains("```json") || text.contains("{")) {
+                                            jsonStarted[0] = true;
+                                            String beforeJson = extractNaturalLanguage(text);
+                                            if (!beforeJson.isEmpty()) {
+                                                naturalLanguagePart.append(beforeJson);
+                                                if (mindmapId != null) {
+                                                    sendRealtimeEventToMindmap(mindmapId, "ai:thinking:chunk",
+                                                            Map.of("chunk", beforeJson, "done", false));
+                                                }
+                                            }
+                                        } else {
+                                            naturalLanguagePart.append(text);
+                                            if (mindmapId != null) {
+                                                sendRealtimeEventToMindmap(mindmapId, "ai:thinking:chunk",
+                                                        Map.of("chunk", text, "done", false));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // Continue processing
+                }
+            });
+
+            // Send streaming done event
+            if (mindmapId != null) {
+                String naturalLangFinal = naturalLanguagePart.toString().trim();
+                if (naturalLangFinal.isEmpty()) {
+                    naturalLangFinal = extractNaturalLanguage(fullText.toString());
+                }
+                sendRealtimeEventToMindmap(mindmapId, "ai:thinking:done",
+                        Map.of("fullText", naturalLangFinal));
+            }
+
+            return fullText.toString();
+        } catch (Exception e) {
+            if (mindmapId != null) {
+                sendRealtimeEventToMindmap(mindmapId, "ai:thinking:error",
+                        Map.of("error", e.getMessage()));
+            }
+            throw new RuntimeException("Thinking Mode AI service failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Call Gemini without streaming (fallback)
+     */
+    private String callGeminiNoStream(Map<String, Object> payload) {
+        try {
+            String url = "/v1beta/models/" + model + ":generateContent";
+            Map<?, ?> response = geminiWebClient.post()
+                    .uri(url)
+                    .body(BodyInserters.fromValue(payload))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            if (response == null) {
+                throw new RuntimeException("Gemini API returned null");
+            }
+
+            List<?> candidates = (List<?>) response.get("candidates");
+            if (candidates == null || candidates.isEmpty()) {
+                throw new RuntimeException("No candidates in Gemini response");
+            }
+
+            Map<?, ?> content = (Map<?, ?>) ((Map<?, ?>) candidates.get(0)).get("content");
+            List<?> parts = (List<?>) content.get("parts");
+            return String.valueOf(((Map<?, ?>) parts.get(0)).get("text"));
+        } catch (Exception e) {
+            throw new RuntimeException("Thinking Mode AI service failed: " + e.getMessage());
+        }
+    }
 }
+
