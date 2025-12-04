@@ -11,67 +11,67 @@ import java.util.List;
  * Service interface for Mindmap operations
  */
 public interface MindmapService {
-    
+
     /**
      * Create a new mindmap
      */
     MindmapResponse createMindmap(CreateMindmapRequest request, Long userId);
-    
+
     /**
      * Get mindmap by ID
      */
     MindmapResponse getMindmapById(String mindmapId, Long userId);
-    
+
     /**
      * Update an existing mindmap
      */
     MindmapResponse updateMindmap(String mindmapId, UpdateMindmapRequest request, Long userId);
-    
+
     /**
      * Delete a mindmap (soft delete - set status to 'deleted')
      */
     void deleteMindmap(String mindmapId, Long userId);
-    
+
     /**
      * Permanently delete a mindmap
      */
     void permanentlyDeleteMindmap(String mindmapId, Long userId);
-    
+
     /**
      * Get all mindmaps for a user
      */
     List<MindmapSummaryResponse> getAllMindmapsByUser(Long userId);
-    
+
     /**
      * Get mindmaps by category
      */
     List<MindmapSummaryResponse> getMindmapsByCategory(Long userId, String category);
-    
+
     /**
      * Get favorite mindmaps
      */
     List<MindmapSummaryResponse> getFavoriteMindmaps(Long userId);
-    
+
     /**
      * Get archived mindmaps
      */
     List<MindmapSummaryResponse> getArchivedMindmaps(Long userId);
-    
+
     /**
      * Toggle favorite status
      */
     MindmapResponse toggleFavorite(String mindmapId, Long userId);
-    
+
     /**
      * Archive a mindmap
      */
     MindmapResponse archiveMindmap(String mindmapId, Long userId);
-    
+
     /**
      * Unarchive a mindmap
      */
     MindmapResponse unarchiveMindmap(String mindmapId, Long userId);
-    
+
     /**
      * Search mindmaps by title or description
      */
@@ -81,26 +81,43 @@ public interface MindmapService {
      * Nhân bản (duplicate) một mindmap đã có.
      *
      * @param originalMapId ID của mindmap gốc
-     * @param userId ID (MySQL) của người dùng (sẽ là owner mới)
+     * @param userId        ID (MySQL) của người dùng (sẽ là owner mới)
      * @return MindmapResponse của mindmap MỚI đã được nhân bản
      */
     MindmapResponse duplicateMindmap(String originalMapId, Long userId);
 
     /**
      * Update public access level for a mindmap
-     * @param mindmapId ID của mindmap
-     * @param isPublic Có công khai hay không
+     * 
+     * @param mindmapId   ID của mindmap
+     * @param isPublic    Có công khai hay không
      * @param accessLevel Quyền truy cập: view, edit, private
-     * @param userId ID (MySQL) của người dùng
+     * @param userId      ID (MySQL) của người dùng
      */
     MindmapResponse updatePublicAccess(String mindmapId, Boolean isPublic, String accessLevel, Long userId);
 
     /**
      * Get public mindmap by share token (NO AUTH REQUIRED)
+     * 
      * @param shareToken Share token của mindmap công khai
      */
     MindmapResponse updateMindmapByShareToken(String shareToken, UpdateMindmapRequest request);
 
     MindmapResponse getMindmapByShareToken(String shareToken);
-}
 
+    /**
+     * Update embed settings for a mindmap (owner only)
+     * 
+     * @param mindmapId      ID of the mindmap
+     * @param isEmbedEnabled Whether embedding is enabled
+     * @param userId         ID of the user (must be owner)
+     */
+    MindmapResponse updateEmbedSettings(String mindmapId, Boolean isEmbedEnabled, Long userId);
+
+    /**
+     * Get mindmap for embed view (NO AUTH REQUIRED)
+     * 
+     * @param embedToken Embed token of the mindmap
+     */
+    MindmapResponse getMindmapByEmbedToken(String embedToken);
+}

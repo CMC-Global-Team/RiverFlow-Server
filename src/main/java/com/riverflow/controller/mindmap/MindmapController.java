@@ -31,7 +31,7 @@ import java.util.*;
 @RequestMapping("/mindmaps")
 @RequiredArgsConstructor
 public class MindmapController {
-    
+
     private final MindmapService mindmapService;
     private final CustomUserDetailsService userDetailsService;
     private final UndoRedoService undoRedoService;
@@ -46,12 +46,12 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> createMindmap(
             @Valid @RequestBody CreateMindmapRequest request,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = mindmapService.createMindmap(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
-    
+
     /**
      * Get all mindmaps for current user
      * GET /api/mindmaps
@@ -59,12 +59,12 @@ public class MindmapController {
     @GetMapping
     public ResponseEntity<List<MindmapSummaryResponse>> getAllMindmaps(
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.getAllMindmapsByUser(userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Get mindmap by ID
      * GET /api/mindmaps/{id}
@@ -73,7 +73,7 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> getMindmapById(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         // Handle unauthenticated users - allow access if mindmap is public
         Long userId = null;
         if (authentication != null) {
@@ -83,11 +83,11 @@ public class MindmapController {
                 userId = null;
             }
         }
-        
+
         MindmapResponse response = mindmapService.getMindmapById(id, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Update mindmap
      * PUT /api/mindmaps/{id}
@@ -97,12 +97,12 @@ public class MindmapController {
             @PathVariable String id,
             @Valid @RequestBody UpdateMindmapRequest request,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = mindmapService.updateMindmap(id, request, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Delete mindmap (soft delete)
      * DELETE /api/mindmaps/{id}
@@ -111,12 +111,12 @@ public class MindmapController {
     public ResponseEntity<MessageResponse> deleteMindmap(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         mindmapService.deleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap deleted successfully"));
     }
-    
+
     /**
      * Permanently delete mindmap
      * DELETE /api/mindmaps/{id}/permanent
@@ -125,7 +125,7 @@ public class MindmapController {
     public ResponseEntity<MessageResponse> permanentlyDeleteMindmap(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         mindmapService.permanentlyDeleteMindmap(id, userId);
         return ResponseEntity.ok(new MessageResponse("Mindmap permanently deleted"));
@@ -144,7 +144,7 @@ public class MindmapController {
         MindmapResponse response = mindmapService.duplicateMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Get mindmaps by category
      * GET /api/mindmaps/category/{category}
@@ -153,12 +153,12 @@ public class MindmapController {
     public ResponseEntity<List<MindmapSummaryResponse>> getMindmapsByCategory(
             @PathVariable String category,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.getMindmapsByCategory(userId, category);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Get favorite mindmaps
      * GET /api/mindmaps/favorites
@@ -166,12 +166,12 @@ public class MindmapController {
     @GetMapping("/favorites")
     public ResponseEntity<List<MindmapSummaryResponse>> getFavoriteMindmaps(
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.getFavoriteMindmaps(userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Get archived mindmaps
      * GET /api/mindmaps/archived
@@ -179,12 +179,12 @@ public class MindmapController {
     @GetMapping("/archived")
     public ResponseEntity<List<MindmapSummaryResponse>> getArchivedMindmaps(
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.getArchivedMindmaps(userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Toggle favorite status
      * POST /api/mindmaps/{id}/toggle-favorite
@@ -193,12 +193,12 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> toggleFavorite(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = mindmapService.toggleFavorite(id, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Archive mindmap
      * POST /api/mindmaps/{id}/archive
@@ -207,12 +207,12 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> archiveMindmap(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = mindmapService.archiveMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Unarchive mindmap
      * POST /api/mindmaps/{id}/unarchive
@@ -221,12 +221,12 @@ public class MindmapController {
     public ResponseEntity<MindmapResponse> unarchiveMindmap(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         MindmapResponse response = mindmapService.unarchiveMindmap(id, userId);
         return ResponseEntity.ok(response);
     }
-    
+
     /**
      * Search mindmaps
      * GET /api/mindmaps/search?keyword=...
@@ -235,7 +235,7 @@ public class MindmapController {
     public ResponseEntity<List<MindmapSummaryResponse>> searchMindmaps(
             @RequestParam String keyword,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
         return ResponseEntity.ok(response);
@@ -346,7 +346,7 @@ public class MindmapController {
         Long userId = getUserIdFromAuth(authentication);
         Boolean isPublic = (Boolean) request.get("isPublic");
         String accessLevel = (String) request.get("accessLevel");
-        
+
         MindmapResponse response = mindmapService.updatePublicAccess(id, isPublic, accessLevel, userId);
         return ResponseEntity.ok(response);
     }
@@ -363,7 +363,7 @@ public class MindmapController {
         Long userId = getUserIdFromAuth(authentication);
         try {
             collaborationService.acceptInvitation(token, userId);
-            
+
             // Get invitation details to return mindmapId
             CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
             Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId())
@@ -374,7 +374,7 @@ public class MindmapController {
             response.put("message", "Lời mời được chấp nhận thành công. Mindmap đã được thêm vào bộ sưu tập của bạn.");
             response.put("mindmapId", mindmap.getId());
             response.put("mindmapTitle", mindmap.getTitle());
-            
+
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -406,7 +406,7 @@ public class MindmapController {
     public ResponseEntity<?> verifyInvitation(@PathVariable String token) {
         try {
             CollaborationInvitation invitation = collaborationService.getInvitationByToken(token);
-            
+
             if (invitation == null || "expired".equals(invitation.getStatus())) {
                 return ResponseEntity.status(400).body(new MessageResponse("Invitation has expired."));
             }
@@ -443,7 +443,7 @@ public class MindmapController {
     public ResponseEntity<MessageResponse> leaveCollaboration(
             @PathVariable String id,
             Authentication authentication) {
-        
+
         Long userId = getUserIdFromAuth(authentication);
         collaborationService.leaveCollaboration(id, userId);
         return ResponseEntity.ok(new MessageResponse("Bạn đã rời khỏi project thành công."));
@@ -464,19 +464,47 @@ public class MindmapController {
     @GetMapping("/public/{shareToken}")
     public ResponseEntity<MindmapResponse> getPublicMindmap(
             @PathVariable String shareToken) {
-        
+
         MindmapResponse response = mindmapService.getMindmapByShareToken(shareToken);
         return ResponseEntity.ok(response);
     }
-    
+
+    /**
+     * Update embed settings for a mindmap (owner only)
+     * PUT /api/mindmaps/{id}/embed
+     */
+    @PutMapping("/{id}/embed")
+    public ResponseEntity<MindmapResponse> updateEmbedSettings(
+            @PathVariable String id,
+            @RequestBody Map<String, Boolean> request,
+            Authentication authentication) {
+
+        Long userId = getUserIdFromAuth(authentication);
+        Boolean isEmbedEnabled = request.get("isEmbedEnabled");
+        MindmapResponse response = mindmapService.updateEmbedSettings(id, isEmbedEnabled, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get mindmap for embed view (NO AUTH REQUIRED)
+     * GET /api/mindmaps/embed/{embedToken}
+     */
+    @GetMapping("/embed/{embedToken}")
+    public ResponseEntity<MindmapResponse> getEmbedMindmap(
+            @PathVariable String embedToken) {
+
+        MindmapResponse response = mindmapService.getMindmapByEmbedToken(embedToken);
+        return ResponseEntity.ok(response);
+    }
+
     /**
      * Helper method to get user ID from authentication
      */
     private Long getUserIdFromAuth(Authentication authentication) {
-        if (authentication == null) return null;
+        if (authentication == null)
+            return null;
         String email = authentication.getName();
         User user = userDetailsService.loadUserEntityByEmail(email);
         return user.getId();
     }
 }
-
