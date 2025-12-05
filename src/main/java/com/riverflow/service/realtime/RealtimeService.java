@@ -125,4 +125,16 @@ public class RealtimeService {
         data.put("newRole", newRole);
         emitToRoom(mindmapId, "mindmap:collaborator:role:changed", data);
     }
+
+    /**
+     * Emit mindmap deleted event when owner permanently deletes a mindmap.
+     * This kicks all users currently viewing or editing the mindmap.
+     *
+     * @param mindmapId The mindmap ID
+     */
+    public void emitMindmapDeleted(String mindmapId) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("mindmapId", mindmapId);
+        emitToRoom(mindmapId, "mindmap:deleted", data);
+    }
 }

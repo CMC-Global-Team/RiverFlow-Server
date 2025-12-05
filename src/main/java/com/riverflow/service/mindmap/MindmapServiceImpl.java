@@ -201,14 +201,11 @@ public class MindmapServiceImpl implements MindmapService {
             throw new MindmapAccessDeniedException(mindmapId, userId);
         }
 
-        String oldStatus = mindmap.getStatus();
+        // Emit deleted event BEFORE deleting to notify all connected users
+        realtimeService.emitMindmapDeleted(mindmapId);
 
-        mindmap.setStatus("deleted");
-        mindmap.setUpdatedAt(LocalDateTime.now());
-        mindmapRepository.save(mindmap);
-
-        historyService.recordChange(mindmapId, userId, "delete_mindmap", oldStatus, "deleted");
-
+        // Hard delete - permanently remove from database
+        mindmapRepository.delete(mindmap);
     }
 
     @Override
