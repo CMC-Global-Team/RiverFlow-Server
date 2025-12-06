@@ -10,6 +10,7 @@ public class GoogleAuthConfig {
 
 	@Value("${app.google.client-id:}")
 	private String clientId;
+
+	@Value("${app.google.client-secret:}")
+	private String clientSecret;
 }
-
-
