@@ -53,38 +53,40 @@ public class GoogleAuthService {
 			String accessToken = jwtUtil.generateAccessToken(userDetails);
 			String refreshToken = jwtUtil.generateRefreshToken(userDetails);
 
-		user.setLastLoginAt(LocalDateTime.now());
-		userRepository.save(user);
+			user.setLastLoginAt(LocalDateTime.now());
+			userRepository.save(user);
 
-		// Generate avatar URL if avatar data exists in database
-		// Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL already includes /api
-		String avatarUrl = null;
-		if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
-			avatarUrl = "/user/avatar/" + user.getId();
-		} else if (user.getAvatar() != null) {
-			// Fallback to legacy URL-based avatar
-			avatarUrl = user.getAvatar();
-		}
+			// Generate avatar URL if avatar data exists in database
+			// Note: Return /user/avatar/{userId} (without /api prefix) since client baseURL
+			// already includes /api
+			String avatarUrl = null;
+			if (user.getAvatarData() != null && user.getAvatarData().length > 0) {
+				avatarUrl = "/user/avatar/" + user.getId();
+			} else if (user.getAvatar() != null) {
+				// Fallback to legacy URL-based avatar
+				avatarUrl = user.getAvatar();
+			}
 
-		return SignInResponse.builder()
-				.accessToken(accessToken)
-				.refreshToken(refreshToken)
-				.expiresIn(null) // Optional: can compute from config if needed
-				.userId(user.getId())
-				.email(user.getEmail())
-				.fullName(user.getFullName())
-				.role("ROLE_USER")
-				.avatar(avatarUrl)
-				.build();
+			return SignInResponse.builder()
+					.accessToken(accessToken)
+					.refreshToken(refreshToken)
+					.expiresIn(null) // Optional: can compute from config if needed
+					.userId(user.getId())
+					.email(user.getEmail())
+					.fullName(user.getFullName())
+					.role(user.getRole() != null ? user.getRole().name().toUpperCase() : "USER")
+					.avatar(avatarUrl)
+					.build();
 		} catch (Exception ex) {
 			throw new RuntimeException("Google authentication failed");
 		}
-	}	GoogleIdToken verifyIdToken(String idTokenString) throws GeneralSecurityException {
+	}
+
+	GoogleIdToken verifyIdToken(String idTokenString) throws GeneralSecurityException {
 		try {
 			GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
 					GoogleNetHttpTransport.newTrustedTransport(),
-					GsonFactory.getDefaultInstance()
-			)
+					GsonFactory.getDefaultInstance())
 					.setAudience(Collections.singletonList(googleAuthConfig.getClientId()))
 					.build();
 			return verifier.verify(idTokenString);
@@ -132,5 +134,3 @@ public class GoogleAuthService {
 		return userRepository.save(user);
 	}
 }
-
-
