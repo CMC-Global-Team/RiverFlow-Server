@@ -67,7 +67,8 @@ public class AdminUserService {
                 predicates.add(criteriaBuilder.or(emailPredicate, namePredicate));
             }
 
-            // Filter by status
+            // Filter by status (exclude deleted users by default if no status filter
+            // provided)
             if (status != null && !status.trim().isEmpty()) {
                 try {
                     User.UserStatus userStatus = User.UserStatus.valueOf(status.toLowerCase());
@@ -75,6 +76,9 @@ public class AdminUserService {
                 } catch (IllegalArgumentException ignored) {
                     // Invalid status, ignore filter
                 }
+            } else {
+                // By default, exclude deleted users
+                predicates.add(criteriaBuilder.notEqual(root.get("status"), User.UserStatus.deleted));
             }
 
             // Filter by role
