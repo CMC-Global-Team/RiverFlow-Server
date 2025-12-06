@@ -499,7 +499,7 @@ class AdminUserServiceTest {
                     .id(1L)
                     .code("TXN001")
                     .transferAmount(50000L)
-                    .status(PaymentTransaction.Status.processed)
+                    .status(PaymentTransaction.TransactionStatus.processed)
                     .gateway("VietQR")
                     .content("Credit purchase")
                     .build();
