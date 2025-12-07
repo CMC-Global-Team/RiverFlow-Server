@@ -69,7 +69,8 @@ public class UndoRedoService {
         switch (action.getAction()) {
             case "create_mindmap":
                 if (state.equals("before")) { // Undo "create"
-                    if (mindmap != null) mindmapRepository.delete(mindmap);
+                    if (mindmap != null)
+                        mindmapRepository.delete(mindmap);
                     return null;
                 } else { // Redo "create"
                     Object afterState = action.getChanges().get("after");
@@ -78,19 +79,36 @@ public class UndoRedoService {
                 }
 
             case "update_mindmap":
-                if (mindmap == null) throw new MindmapNotFoundException(mindmapId, userId);
+            case "public_update":
+                if (mindmap == null)
+                    throw new MindmapNotFoundException(mindmapId, userId);
 
                 Object snapshot = action.getChanges().get(state);
-                if (snapshot == null) throw new RuntimeException("Lịch sử hỏng: thiếu snapshot '" + state + "'");
+                if (snapshot == null)
+                    throw new RuntimeException("Lịch sử hỏng: thiếu snapshot '" + state + "'");
 
                 Mindmap restoredState = objectMapper.convertValue(snapshot, Mindmap.class);
                 return mindmapRepository.save(applyRestoredState(mindmap, restoredState));
+
+            case "create_duplicate":
+                if (state.equals("before")) {
+                    // Undo duplicate: delete the duplicated mindmap
+                    if (mindmap != null)
+                        mindmapRepository.delete(mindmap);
+                    return null;
+                } else {
+                    // Redo duplicate: restore the duplicated mindmap
+                    Object afterState = action.getChanges().get("after");
+                    Mindmap restoredMindmap = objectMapper.convertValue(afterState, Mindmap.class);
+                    return mindmapRepository.save(restoredMindmap);
+                }
 
             case "toggle_favorite":
             case "archive_mindmap":
             case "unarchive_mindmap":
             case "delete_mindmap":
-                if (mindmap == null) throw new MindmapNotFoundException(mindmapId, userId);
+                if (mindmap == null)
+                    throw new MindmapNotFoundException(mindmapId, userId);
 
                 Object simpleState = action.getChanges().get(state);
                 return mindmapRepository.save(applySimpleChange(mindmap, action.getAction(), simpleState));
