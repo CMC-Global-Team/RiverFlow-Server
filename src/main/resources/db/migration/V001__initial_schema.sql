@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('admin', 'user') NOT NULL DEFAULT 'user',
     
     -- OAuth fields
-    oauth_provider ENUM('email', 'google', 'github', 'facebook') NOT NULL DEFAULT 'email',
+    oauth_provider ENUM('email', 'google', 'github', 'facebook', 'auth0') NOT NULL DEFAULT 'email',
     oauth_id VARCHAR(255) NULL COMMENT 'ID from OAuth provider',
     
     -- Email verification
