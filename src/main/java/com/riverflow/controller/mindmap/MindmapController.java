@@ -14,7 +14,6 @@ import com.riverflow.model.mindmap.Mindmap;
 import com.riverflow.repository.mindmap.MindmapRepository;
 import com.riverflow.service.mindmap.CollaborationService;
 import com.riverflow.service.mindmap.MindmapService;
-import com.riverflow.service.mindmap.UndoRedoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -34,7 +33,6 @@ public class MindmapController {
 
     private final MindmapService mindmapService;
     private final CustomUserDetailsService userDetailsService;
-    private final UndoRedoService undoRedoService;
     private final CollaborationService collaborationService;
     private final MindmapRepository mindmapRepository;
 
@@ -238,26 +236,6 @@ public class MindmapController {
 
         Long userId = getUserIdFromAuth(authentication);
         List<MindmapSummaryResponse> response = mindmapService.searchMindmaps(userId, keyword);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{id}/undo")
-    public ResponseEntity<MindmapResponse> undo(
-            @PathVariable String id,
-            Authentication authentication) {
-
-        Long userId = getUserIdFromAuth(authentication);
-        MindmapResponse response = undoRedoService.undo(id, userId);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{id}/redo")
-    public ResponseEntity<MindmapResponse> redo(
-            @PathVariable String id,
-            Authentication authentication) {
-
-        Long userId = getUserIdFromAuth(authentication);
-        MindmapResponse response = undoRedoService.redo(id, userId);
         return ResponseEntity.ok(response);
     }
 
