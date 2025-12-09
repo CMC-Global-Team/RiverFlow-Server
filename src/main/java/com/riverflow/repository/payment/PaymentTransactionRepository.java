@@ -60,10 +60,9 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
         /**
          * Sum amounts for processed transactions between dates
          */
-        @Query("SELECT COALESCE(SUM(p.transferAmount), 0) FROM PaymentTransaction p " +
-                        "WHERE p.status = com.riverflow.model.payment.PaymentTransaction$TransactionStatus.processed " +
-                        "AND p.transferType = com.riverflow.model.payment.PaymentTransaction$TransferType.in " +
-                        "AND p.createdAt BETWEEN :startDate AND :endDate")
+        @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
+                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "AND created_at BETWEEN :startDate AND :endDate", nativeQuery = true)
         Long sumProcessedAmountBetween(@Param("startDate") LocalDateTime startDate,
                         @Param("endDate") LocalDateTime endDate);
 
@@ -124,17 +123,15 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
         /**
          * Get total processed revenue (in transfers only)
          */
-        @Query("SELECT COALESCE(SUM(p.transferAmount), 0) FROM PaymentTransaction p " +
-                        "WHERE p.status = com.riverflow.model.payment.PaymentTransaction$TransactionStatus.processed " +
-                        "AND p.transferType = com.riverflow.model.payment.PaymentTransaction$TransferType.in")
+        @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
+                        "WHERE status = 'processed' AND transfer_type = 'in'", nativeQuery = true)
         Long sumTotalProcessedRevenue();
 
         /**
          * Get processed revenue after a specific date
          */
-        @Query("SELECT COALESCE(SUM(p.transferAmount), 0) FROM PaymentTransaction p " +
-                        "WHERE p.status = com.riverflow.model.payment.PaymentTransaction$TransactionStatus.processed " +
-                        "AND p.transferType = com.riverflow.model.payment.PaymentTransaction$TransferType.in " +
-                        "AND p.createdAt >= :startDate")
+        @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
+                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "AND created_at >= :startDate", nativeQuery = true)
         Long sumProcessedRevenueAfter(@Param("startDate") LocalDateTime startDate);
 }
