@@ -174,6 +174,7 @@ public class User {
 
     public enum Role {
         admin,
-        user
+        user,
+        super_admin
     }
 }

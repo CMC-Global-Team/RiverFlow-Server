@@ -109,7 +109,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    null, null, null, "createdAt", "desc", 0, 10);
+                    null, null, null, "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).hasSize(2);
@@ -128,7 +128,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    "user@example", null, null, "createdAt", "desc", 0, 10);
+                    "user@example", null, null, "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).hasSize(1);
@@ -145,7 +145,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    null, "active", null, "createdAt", "desc", 0, 10);
+                    null, "active", null, "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).hasSize(1);
@@ -162,7 +162,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    null, null, "admin", "createdAt", "desc", 0, 10);
+                    null, null, "admin", "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).hasSize(1);
@@ -180,7 +180,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    null, null, null, "email", "asc", 0, 10);
+                    null, null, null, "email", "asc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).hasSize(2);
@@ -197,7 +197,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    "nonexistent", null, null, "createdAt", "desc", 0, 10);
+                    "nonexistent", null, null, "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result.getContent()).isEmpty();
@@ -213,7 +213,7 @@ class AdminUserServiceTest {
 
             // When
             Page<AdminUserResponse> result = adminUserService.getAllUsers(
-                    null, "invalid_status", null, "createdAt", "desc", 0, 10);
+                    null, "invalid_status", null, "createdAt", "desc", 0, 10, false);
 
             // Then
             assertThat(result).isNotNull();
@@ -292,7 +292,7 @@ class AdminUserServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
 
             // When
-            AdminUserResponse result = adminUserService.updateUser(1L, request);
+            AdminUserResponse result = adminUserService.updateUser(1L, request, User.Role.super_admin);
 
             // Then
             assertThat(result).isNotNull();
@@ -310,7 +310,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(999L, request))
+            assertThatThrownBy(() -> adminUserService.updateUser(999L, request, User.Role.super_admin))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("User not found");
         }
@@ -326,7 +326,7 @@ class AdminUserServiceTest {
             when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request))
+            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Email already in use");
         }
@@ -341,7 +341,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request))
+            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Invalid role");
         }
@@ -356,7 +356,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request))
+            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Invalid status");
         }

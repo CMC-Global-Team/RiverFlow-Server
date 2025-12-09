@@ -1,16 +1,19 @@
 package com.riverflow.controller.admin;
 
+import com.riverflow.config.jwt.UserPrincipal;
 import com.riverflow.dto.admin.AdminChangePasswordRequest;
 import com.riverflow.dto.admin.AdminUpdateCreditRequest;
 import com.riverflow.dto.admin.AdminUserRequest;
 import com.riverflow.dto.admin.AdminUserResponse;
 import com.riverflow.dto.payment.PaymentHistoryResponse;
+import com.riverflow.model.User;
 import com.riverflow.service.admin.AdminUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -18,12 +21,12 @@ import java.util.Map;
 
 /**
  * REST Controller for admin user management
- * All endpoints require ADMIN role
+ * All endpoints require ADMIN or SUPER_ADMIN role
  */
 @RestController
 @RequestMapping("/admin/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
 public class AdminUserController {
 
     private final AdminUserService adminUserService;
@@ -31,20 +34,27 @@ public class AdminUserController {
     /**
      * Get all users with pagination, search, filter, and sort
      * GET
-     * /api/admin/users?page=0&size=10&search=email&status=active&role=user&sortBy=createdAt&sortDir=desc
+     * /api/admin/users?page=0&size=10&search=email&status=active&role=user&sortBy=createdAt&sortDir=desc&includeSoftDeleted=false
+     * Note: includeSoftDeleted only works for SUPER_ADMIN role
      */
     @GetMapping
     public ResponseEntity<Page<AdminUserResponse>> getAllUsers(
+            @AuthenticationPrincipal UserPrincipal currentUser,
             @RequestParam(defaultValue = "") String search,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String role,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean includeSoftDeleted) {
+
+        // Only SUPER_ADMIN can include soft-deleted users
+        boolean canIncludeSoftDeleted = includeSoftDeleted &&
+                currentUser.getRole() == User.Role.super_admin;
 
         Page<AdminUserResponse> users = adminUserService.getAllUsers(
-                search, status, role, sortBy, sortDir, page, size);
+                search, status, role, sortBy, sortDir, page, size, canIncludeSoftDeleted);
         return ResponseEntity.ok(users);
     }
 
@@ -61,12 +71,14 @@ public class AdminUserController {
     /**
      * Update user information
      * PUT /api/admin/users/{id}
+     * Note: Role changes are only allowed for SUPER_ADMIN
      */
     @PutMapping("/{id}")
     public ResponseEntity<AdminUserResponse> updateUser(
+            @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
             @Valid @RequestBody AdminUserRequest request) {
-        AdminUserResponse user = adminUserService.updateUser(id, request);
+        AdminUserResponse user = adminUserService.updateUser(id, request, currentUser.getRole());
         return ResponseEntity.ok(user);
     }
 
