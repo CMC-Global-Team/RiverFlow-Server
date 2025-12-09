@@ -58,10 +58,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
         // ==================== REPORT QUERIES ====================
 
         /**
-         * Sum amounts for processed transactions between dates
+         * Sum amounts for all incoming transactions between dates
          */
         @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "WHERE transfer_type = 'in' " +
                         "AND created_at BETWEEN :startDate AND :endDate", nativeQuery = true)
         Long sumProcessedAmountBetween(@Param("startDate") LocalDateTime startDate,
                         @Param("endDate") LocalDateTime endDate);
@@ -74,14 +74,14 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
                         @Param("endDate") LocalDateTime endDate);
 
         /**
-         * Get daily revenue (processed payments) for a date range
+         * Get daily revenue (all incoming payments) for a date range
          * Returns list of Object[] where [0] = date, [1] = sum amount, [2] = count
          */
         @Query(value = "SELECT DATE(created_at) as date, " +
                         "COALESCE(SUM(transfer_amount), 0) as amount, " +
                         "COUNT(*) as count " +
                         "FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "WHERE transfer_type = 'in' " +
                         "AND created_at BETWEEN :startDate AND :endDate " +
                         "GROUP BY DATE(created_at) " +
                         "ORDER BY date ASC", nativeQuery = true)
@@ -97,7 +97,7 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
                         "COALESCE(SUM(transfer_amount), 0) as amount, " +
                         "COUNT(*) as count " +
                         "FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "WHERE transfer_type = 'in' " +
                         "AND created_at BETWEEN :startDate AND :endDate " +
                         "GROUP BY YEAR(created_at), WEEK(created_at) " +
                         "ORDER BY year ASC, week ASC", nativeQuery = true)
@@ -113,7 +113,7 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
                         "COALESCE(SUM(transfer_amount), 0) as amount, " +
                         "COUNT(*) as count " +
                         "FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "WHERE transfer_type = 'in' " +
                         "AND created_at BETWEEN :startDate AND :endDate " +
                         "GROUP BY YEAR(created_at), MONTH(created_at) " +
                         "ORDER BY year ASC, month ASC", nativeQuery = true)
@@ -121,17 +121,17 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
                         @Param("endDate") LocalDateTime endDate);
 
         /**
-         * Get total processed revenue (in transfers only)
+         * Get total revenue (all incoming transfers)
          */
         @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in'", nativeQuery = true)
+                        "WHERE transfer_type = 'in'", nativeQuery = true)
         Long sumTotalProcessedRevenue();
 
         /**
-         * Get processed revenue after a specific date
+         * Get revenue after a specific date (all incoming transfers)
          */
         @Query(value = "SELECT COALESCE(SUM(transfer_amount), 0) FROM payment_transactions " +
-                        "WHERE status = 'processed' AND transfer_type = 'in' " +
+                        "WHERE transfer_type = 'in' " +
                         "AND created_at >= :startDate", nativeQuery = true)
         Long sumProcessedRevenueAfter(@Param("startDate") LocalDateTime startDate);
 }
