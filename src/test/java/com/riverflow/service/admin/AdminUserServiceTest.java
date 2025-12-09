@@ -9,6 +9,7 @@ import com.riverflow.model.User;
 import com.riverflow.model.payment.PaymentTransaction;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
+import com.riverflow.service.logging.ActivityLoggingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -47,6 +48,9 @@ class AdminUserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private ActivityLoggingService activityLoggingService;
 
     @InjectMocks
     private AdminUserService adminUserService;
@@ -292,7 +296,8 @@ class AdminUserServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
 
             // When
-            AdminUserResponse result = adminUserService.updateUser(1L, request, User.Role.super_admin);
+            AdminUserResponse result = adminUserService.updateUser(1L, request, User.Role.super_admin, 2L,
+                    "admin@test.com");
 
             // Then
             assertThat(result).isNotNull();
@@ -310,7 +315,8 @@ class AdminUserServiceTest {
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(999L, request, User.Role.super_admin))
+            assertThatThrownBy(
+                    () -> adminUserService.updateUser(999L, request, User.Role.super_admin, 2L, "admin@test.com"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("User not found");
         }
@@ -326,7 +332,8 @@ class AdminUserServiceTest {
             when(userRepository.existsByEmail("existing@example.com")).thenReturn(true);
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
+            assertThatThrownBy(
+                    () -> adminUserService.updateUser(1L, request, User.Role.super_admin, 2L, "admin@test.com"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Email already in use");
         }
@@ -341,7 +348,8 @@ class AdminUserServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
+            assertThatThrownBy(
+                    () -> adminUserService.updateUser(1L, request, User.Role.super_admin, 2L, "admin@test.com"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Invalid role");
         }
@@ -356,7 +364,8 @@ class AdminUserServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUser(1L, request, User.Role.super_admin))
+            assertThatThrownBy(
+                    () -> adminUserService.updateUser(1L, request, User.Role.super_admin, 2L, "admin@test.com"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Invalid status");
         }
@@ -374,7 +383,7 @@ class AdminUserServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
 
             // When
-            adminUserService.softDeleteUser(1L);
+            adminUserService.softDeleteUser(1L, 2L, "admin@test.com", "ADMIN");
 
             // Then
             verify(userRepository).findById(1L);
@@ -388,7 +397,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.softDeleteUser(999L))
+            assertThatThrownBy(() -> adminUserService.softDeleteUser(999L, 2L, "admin@test.com", "ADMIN"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("User not found");
         }
@@ -409,7 +418,7 @@ class AdminUserServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
 
             // When
-            AdminUserResponse result = adminUserService.updateUserCredit(1L, request);
+            AdminUserResponse result = adminUserService.updateUserCredit(1L, request, 2L, "admin@test.com", "ADMIN");
 
             // Then
             assertThat(result).isNotNull();
@@ -426,7 +435,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.updateUserCredit(999L, request))
+            assertThatThrownBy(() -> adminUserService.updateUserCredit(999L, request, 2L, "admin@test.com", "ADMIN"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("User not found");
         }
@@ -448,7 +457,7 @@ class AdminUserServiceTest {
             when(userRepository.save(any(User.class))).thenReturn(testUser);
 
             // When
-            adminUserService.changeUserPassword(1L, request);
+            adminUserService.changeUserPassword(1L, request, 2L, "admin@test.com", "ADMIN");
 
             // Then
             verify(passwordEncoder).encode("newPassword123");
@@ -466,7 +475,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.changeUserPassword(1L, request))
+            assertThatThrownBy(() -> adminUserService.changeUserPassword(1L, request, 2L, "admin@test.com", "ADMIN"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("Cannot change password for OAuth users");
         }
@@ -481,7 +490,7 @@ class AdminUserServiceTest {
             when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
             // When & Then
-            assertThatThrownBy(() -> adminUserService.changeUserPassword(999L, request))
+            assertThatThrownBy(() -> adminUserService.changeUserPassword(999L, request, 2L, "admin@test.com", "ADMIN"))
                     .isInstanceOf(ResponseStatusException.class)
                     .hasMessageContaining("User not found");
         }

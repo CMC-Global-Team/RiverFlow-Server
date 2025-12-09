@@ -265,7 +265,7 @@ class AdminUserControllerTest {
                                                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                                                 "ROLE_ADMIN")));
 
-                when(adminUserService.updateUser(eq(1L), any(AdminUserRequest.class), any()))
+                when(adminUserService.updateUser(eq(1L), any(AdminUserRequest.class), any(), anyLong(), anyString()))
                                 .thenReturn(updatedResponse);
 
                 // When & Then
@@ -278,7 +278,7 @@ class AdminUserControllerTest {
                                 .andExpect(jsonPath("$.fullName").value("Updated Name"))
                                 .andExpect(jsonPath("$.role").value("admin"));
 
-                verify(adminUserService).updateUser(eq(1L), any(AdminUserRequest.class), any());
+                verify(adminUserService).updateUser(eq(1L), any(AdminUserRequest.class), any(), anyLong(), anyString());
         }
 
         @Test
@@ -296,7 +296,7 @@ class AdminUserControllerTest {
                                                 new org.springframework.security.core.authority.SimpleGrantedAuthority(
                                                                 "ROLE_ADMIN")));
 
-                when(adminUserService.updateUser(eq(999L), any(AdminUserRequest.class), any()))
+                when(adminUserService.updateUser(eq(999L), any(AdminUserRequest.class), any(), anyLong(), anyString()))
                                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
                 // When & Then
@@ -310,37 +310,52 @@ class AdminUserControllerTest {
         // ============= DELETE /admin/users/{id} Tests =============
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("DELETE /admin/users/{id} - Should soft delete user successfully")
         void deleteUser_ValidId_Returns200() throws Exception {
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
                 // Given
-                doNothing().when(adminUserService).softDeleteUser(1L);
+                doNothing().when(adminUserService).softDeleteUser(anyLong(), anyLong(), anyString(), anyString());
 
                 // When & Then
-                mockMvc.perform(delete("/admin/users/1"))
+                mockMvc.perform(delete("/admin/users/1")
+                                .with(user(mockAdmin)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.message").value("User deleted successfully"));
 
-                verify(adminUserService).softDeleteUser(1L);
+                verify(adminUserService).softDeleteUser(eq(1L), anyLong(), anyString(), anyString());
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("DELETE /admin/users/{id} - Should return 404 for non-existent user")
         void deleteUser_UserNotFound_Returns404() throws Exception {
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
                 // Given
                 doThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"))
-                                .when(adminUserService).softDeleteUser(999L);
+                                .when(adminUserService).softDeleteUser(eq(999L), anyLong(), anyString(), anyString());
 
                 // When & Then
-                mockMvc.perform(delete("/admin/users/999"))
+                mockMvc.perform(delete("/admin/users/999")
+                                .with(user(mockAdmin)))
                                 .andExpect(status().isNotFound());
         }
 
         // ============= PUT /admin/users/{id}/credit Tests =============
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id}/credit - Should update user credit successfully")
         void updateUserCredit_ValidRequest_ReturnsUpdatedUser() throws Exception {
                 // Given
@@ -355,32 +370,52 @@ class AdminUserControllerTest {
                                 .credit(500L)
                                 .build();
 
-                when(adminUserService.updateUserCredit(eq(1L), any(AdminUpdateCreditRequest.class)))
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
+                when(adminUserService.updateUserCredit(eq(1L), any(AdminUpdateCreditRequest.class), anyLong(),
+                                anyString(), anyString()))
                                 .thenReturn(updatedResponse);
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/1/credit")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.credit").value(500));
 
-                verify(adminUserService).updateUserCredit(eq(1L), any(AdminUpdateCreditRequest.class));
+                verify(adminUserService).updateUserCredit(eq(1L), any(AdminUpdateCreditRequest.class), anyLong(),
+                                anyString(), anyString());
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id}/credit - Should return 404 for non-existent user")
         void updateUserCredit_UserNotFound_Returns404() throws Exception {
                 // Given
                 AdminUpdateCreditRequest request = new AdminUpdateCreditRequest();
                 request.setCredit(500L);
 
-                when(adminUserService.updateUserCredit(eq(999L), any(AdminUpdateCreditRequest.class)))
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
+                when(adminUserService.updateUserCredit(eq(999L), any(AdminUpdateCreditRequest.class), anyLong(),
+                                anyString(), anyString()))
                                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/999/credit")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isNotFound());
@@ -389,39 +424,58 @@ class AdminUserControllerTest {
         // ============= PUT /admin/users/{id}/password Tests =============
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id}/password - Should change password successfully")
         void changeUserPassword_ValidRequest_Returns200() throws Exception {
                 // Given
                 AdminChangePasswordRequest request = new AdminChangePasswordRequest();
                 request.setNewPassword("newPassword123");
 
-                doNothing().when(adminUserService).changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class));
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
+                doNothing().when(adminUserService).changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class),
+                                anyLong(), anyString(), anyString());
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/1/password")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.message").value("Password changed successfully"));
 
-                verify(adminUserService).changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class));
+                verify(adminUserService).changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class), anyLong(),
+                                anyString(), anyString());
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id}/password - Should return 400 for OAuth user")
         void changeUserPassword_OAuthUser_Returns400() throws Exception {
                 // Given
                 AdminChangePasswordRequest request = new AdminChangePasswordRequest();
                 request.setNewPassword("newPassword123");
 
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
                 doThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change password for OAuth users"))
                                 .when(adminUserService)
-                                .changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class));
+                                .changeUserPassword(eq(1L), any(AdminChangePasswordRequest.class), anyLong(),
+                                                anyString(), anyString());
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/1/password")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isBadRequest());
