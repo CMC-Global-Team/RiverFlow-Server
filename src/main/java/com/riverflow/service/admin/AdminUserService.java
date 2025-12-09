@@ -38,6 +38,9 @@ public class AdminUserService {
 
     /**
      * Get all users with search, filter, sort, and pagination
+     * 
+     * @param includeSoftDeleted If true, include soft-deleted users (only for
+     *                           super_admin)
      */
     @Transactional(readOnly = true)
     public Page<AdminUserResponse> getAllUsers(
@@ -47,7 +50,8 @@ public class AdminUserService {
             String sortBy,
             String sortDir,
             int page,
-            int size) {
+            int size,
+            boolean includeSoftDeleted) {
 
         // Build sort
         Sort sort = Sort.by(sortDir.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortBy);
@@ -67,8 +71,8 @@ public class AdminUserService {
                 predicates.add(criteriaBuilder.or(emailPredicate, namePredicate));
             }
 
-            // Filter by status (exclude deleted users by default if no status filter
-            // provided)
+            // Filter by status (exclude deleted users by default unless includeSoftDeleted
+            // is true)
             if (status != null && !status.trim().isEmpty()) {
                 try {
                     User.UserStatus userStatus = User.UserStatus.valueOf(status.toLowerCase());
@@ -76,8 +80,8 @@ public class AdminUserService {
                 } catch (IllegalArgumentException ignored) {
                     // Invalid status, ignore filter
                 }
-            } else {
-                // By default, exclude deleted users
+            } else if (!includeSoftDeleted) {
+                // By default, exclude deleted users unless super-admin requests to include them
                 predicates.add(criteriaBuilder.notEqual(root.get("status"), User.UserStatus.deleted));
             }
 
@@ -111,9 +115,12 @@ public class AdminUserService {
 
     /**
      * Update user information
+     * 
+     * @param currentUserRole The role of the currently authenticated user (for
+     *                        authorization)
      */
     @Transactional
-    public AdminUserResponse updateUser(Long userId, AdminUserRequest request) {
+    public AdminUserResponse updateUser(Long userId, AdminUserRequest request, User.Role currentUserRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with id: " + userId));
@@ -130,7 +137,12 @@ public class AdminUserService {
             }
             user.setEmail(request.getEmail());
         }
+        // Only super_admin can change user roles
         if (request.getRole() != null) {
+            if (currentUserRole != User.Role.super_admin) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN, "Only super admin can change user roles");
+            }
             try {
                 user.setRole(User.Role.valueOf(request.getRole().toLowerCase()));
             } catch (IllegalArgumentException e) {
