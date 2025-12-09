@@ -42,6 +42,9 @@ class RiverFlowApplicationTests {
     @MockBean
     private MongoConverter mongoConverter;
 
+    @MockBean
+    private com.riverflow.repository.logging.ActivityLogRepository activityLogRepository;
+
     @Test
     void contextLoads() {
     }
