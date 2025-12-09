@@ -188,12 +188,11 @@ public class ActivityLoggingService {
             }
         }
 
-        // Breakdown by actor role
+        // Breakdown by actor role (simplified - counts by actor role field)
         Map<String, Long> byActorRole = new HashMap<>();
-        byActorRole.put("USER", activityLogRepository.countByCategory("PAYMENT")); // Approximate
-        byActorRole.put("ADMIN", activityLogRepository.countByCategoryAndTimestampBetween(
-                ActivityLog.Category.USER_MANAGEMENT.name(), LocalDateTime.MIN, now));
-        byActorRole.put("SUPER_ADMIN", 0L); // Will be calculated more accurately if needed
+        byActorRole.put("USER", activityLogRepository.countByActorRole("USER"));
+        byActorRole.put("ADMIN", activityLogRepository.countByActorRole("ADMIN"));
+        byActorRole.put("SUPER_ADMIN", activityLogRepository.countByActorRole("SUPER_ADMIN"));
 
         return LogStatisticsResponse.builder()
                 .totalLogs(totalLogs)
