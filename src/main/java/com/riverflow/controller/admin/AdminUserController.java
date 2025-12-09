@@ -78,7 +78,9 @@ public class AdminUserController {
             @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
             @Valid @RequestBody AdminUserRequest request) {
-        AdminUserResponse user = adminUserService.updateUser(id, request, currentUser.getRole());
+        AdminUserResponse user = adminUserService.updateUser(
+                id, request, currentUser.getRole(),
+                currentUser.getId(), currentUser.getUsername());
         return ResponseEntity.ok(user);
     }
 
@@ -87,8 +89,12 @@ public class AdminUserController {
      * DELETE /api/admin/users/{id}
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> deleteUser(@PathVariable Long id) {
-        adminUserService.softDeleteUser(id);
+    public ResponseEntity<Map<String, String>> deleteUser(
+            @AuthenticationPrincipal UserPrincipal currentUser,
+            @PathVariable Long id) {
+        adminUserService.softDeleteUser(
+                id, currentUser.getId(), currentUser.getUsername(),
+                currentUser.getRole().name().toUpperCase());
         Map<String, String> response = new HashMap<>();
         response.put("message", "User deleted successfully");
         return ResponseEntity.ok(response);
@@ -100,9 +106,12 @@ public class AdminUserController {
      */
     @PutMapping("/{id}/credit")
     public ResponseEntity<AdminUserResponse> updateUserCredit(
+            @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
             @Valid @RequestBody AdminUpdateCreditRequest request) {
-        AdminUserResponse user = adminUserService.updateUserCredit(id, request);
+        AdminUserResponse user = adminUserService.updateUserCredit(
+                id, request, currentUser.getId(), currentUser.getUsername(),
+                currentUser.getRole().name().toUpperCase());
         return ResponseEntity.ok(user);
     }
 
@@ -112,9 +121,12 @@ public class AdminUserController {
      */
     @PutMapping("/{id}/password")
     public ResponseEntity<Map<String, String>> changeUserPassword(
+            @AuthenticationPrincipal UserPrincipal currentUser,
             @PathVariable Long id,
             @Valid @RequestBody AdminChangePasswordRequest request) {
-        adminUserService.changeUserPassword(id, request);
+        adminUserService.changeUserPassword(
+                id, request, currentUser.getId(), currentUser.getUsername(),
+                currentUser.getRole().name().toUpperCase());
         Map<String, String> response = new HashMap<>();
         response.put("message", "Password changed successfully");
         return ResponseEntity.ok(response);

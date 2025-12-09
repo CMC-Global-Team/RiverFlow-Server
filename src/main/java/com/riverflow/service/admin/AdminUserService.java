@@ -6,9 +6,11 @@ import com.riverflow.dto.admin.AdminUserRequest;
 import com.riverflow.dto.admin.AdminUserResponse;
 import com.riverflow.dto.payment.PaymentHistoryResponse;
 import com.riverflow.model.User;
+import com.riverflow.model.logging.ActivityLog;
 import com.riverflow.model.payment.PaymentTransaction;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
+import com.riverflow.service.logging.ActivityLoggingService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,7 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ActivityLoggingService activityLoggingService;
 
     /**
      * Get all users with search, filter, sort, and pagination
@@ -120,7 +123,8 @@ public class AdminUserService {
      *                        authorization)
      */
     @Transactional
-    public AdminUserResponse updateUser(Long userId, AdminUserRequest request, User.Role currentUserRole) {
+    public AdminUserResponse updateUser(Long userId, AdminUserRequest request, User.Role currentUserRole,
+            Long actorId, String actorEmail) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with id: " + userId));
@@ -174,6 +178,13 @@ public class AdminUserService {
         }
 
         userRepository.save(user);
+
+        // Log the action
+        activityLoggingService.logUserManagementAction(
+                actorId, actorEmail, currentUserRole.name().toUpperCase(),
+                ActivityLog.Action.USER_UPDATE.name(), userId,
+                String.format("{\"targetEmail\":\"%s\",\"changes\":\"updated\"}", user.getEmail()));
+
         return mapToAdminUserResponse(user);
     }
 
@@ -181,26 +192,42 @@ public class AdminUserService {
      * Soft delete user (set status to 'deleted')
      */
     @Transactional
-    public void softDeleteUser(Long userId) {
+    public void softDeleteUser(Long userId, Long actorId, String actorEmail, String actorRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with id: " + userId));
 
         user.setStatus(User.UserStatus.deleted);
         userRepository.save(user);
+
+        // Log the action
+        activityLoggingService.logUserManagementAction(
+                actorId, actorEmail, actorRole,
+                ActivityLog.Action.USER_SOFT_DELETE.name(), userId,
+                String.format("{\"targetEmail\":\"%s\"}", user.getEmail()));
     }
 
     /**
      * Update user credit
      */
     @Transactional
-    public AdminUserResponse updateUserCredit(Long userId, AdminUpdateCreditRequest request) {
+    public AdminUserResponse updateUserCredit(Long userId, AdminUpdateCreditRequest request,
+            Long actorId, String actorEmail, String actorRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with id: " + userId));
 
+        Long oldCredit = user.getCredit();
         user.setCredit(request.getCredit());
         userRepository.save(user);
+
+        // Log the action
+        activityLoggingService.logUserManagementAction(
+                actorId, actorEmail, actorRole,
+                ActivityLog.Action.CREDIT_UPDATE.name(), userId,
+                String.format("{\"targetEmail\":\"%s\",\"oldCredit\":%d,\"newCredit\":%d}",
+                        user.getEmail(), oldCredit != null ? oldCredit : 0, request.getCredit()));
+
         return mapToAdminUserResponse(user);
     }
 
@@ -208,7 +235,8 @@ public class AdminUserService {
      * Change user password
      */
     @Transactional
-    public void changeUserPassword(Long userId, AdminChangePasswordRequest request) {
+    public void changeUserPassword(Long userId, AdminChangePasswordRequest request,
+            Long actorId, String actorEmail, String actorRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "User not found with id: " + userId));
@@ -223,6 +251,12 @@ public class AdminUserService {
         String hashedPassword = passwordEncoder.encode(request.getNewPassword());
         user.setPasswordHash(hashedPassword);
         userRepository.save(user);
+
+        // Log the action
+        activityLoggingService.logUserManagementAction(
+                actorId, actorEmail, actorRole,
+                ActivityLog.Action.PASSWORD_CHANGE.name(), userId,
+                String.format("{\"targetEmail\":\"%s\"}", user.getEmail()));
     }
 
     /**
