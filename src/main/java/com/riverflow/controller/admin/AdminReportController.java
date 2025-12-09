@@ -23,7 +23,7 @@ import java.time.format.DateTimeFormatter;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/admin/reports")
+@RequestMapping("/admin/reports")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('SUPER_ADMIN')")
 public class AdminReportController {
