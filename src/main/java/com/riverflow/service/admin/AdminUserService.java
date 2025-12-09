@@ -208,6 +208,27 @@ public class AdminUserService {
     }
 
     /**
+     * Permanently delete user from database (SUPER_ADMIN only)
+     */
+    @Transactional
+    public void permanentDeleteUser(Long userId, Long actorId, String actorEmail) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+
+        String targetEmail = user.getEmail();
+
+        // Delete the user permanently
+        userRepository.delete(user);
+
+        // Log the action
+        activityLoggingService.logUserManagementAction(
+                actorId, actorEmail, "SUPER_ADMIN",
+                ActivityLog.Action.USER_HARD_DELETE.name(), userId,
+                String.format("{\"targetEmail\":\"%s\"}", targetEmail));
+    }
+
+    /**
      * Update user credit
      */
     @Transactional
