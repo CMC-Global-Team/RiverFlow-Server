@@ -35,6 +35,10 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+
+import com.riverflow.config.jwt.UserPrincipal;
+import com.riverflow.model.User;
 
 /**
  * Controller tests for AdminUserController using MockMvc
@@ -235,7 +239,6 @@ class AdminUserControllerTest {
         // ============= PUT /admin/users/{id} Tests =============
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id} - Should update user successfully")
         void updateUser_ValidRequest_ReturnsUpdatedUser() throws Exception {
                 // Given
@@ -254,11 +257,20 @@ class AdminUserControllerTest {
                                 .credit(100L)
                                 .build();
 
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.super_admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
                 when(adminUserService.updateUser(eq(1L), any(AdminUserRequest.class), any()))
                                 .thenReturn(updatedResponse);
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/1")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isOk())
@@ -270,18 +282,26 @@ class AdminUserControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "ADMIN")
         @DisplayName("PUT /admin/users/{id} - Should return 404 for non-existent user")
         void updateUser_UserNotFound_Returns404() throws Exception {
                 // Given
                 AdminUserRequest request = new AdminUserRequest();
                 request.setFullName("Updated Name");
 
+                // Create a proper UserPrincipal for injection
+                UserPrincipal mockAdmin = new UserPrincipal(
+                                1L, "admin@test.com", "password", true, false,
+                                User.Role.super_admin,
+                                java.util.Collections.singleton(
+                                                new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                "ROLE_ADMIN")));
+
                 when(adminUserService.updateUser(eq(999L), any(AdminUserRequest.class), any()))
                                 .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
                 // When & Then
                 mockMvc.perform(put("/admin/users/999")
+                                .with(user(mockAdmin))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andExpect(status().isNotFound());
