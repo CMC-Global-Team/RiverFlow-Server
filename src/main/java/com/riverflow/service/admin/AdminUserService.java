@@ -191,6 +191,19 @@ public class AdminUserService {
     }
 
     /**
+     * Hard delete user (permanently remove from database)
+     * Only for SUPER_ADMIN
+     */
+    @Transactional
+    public void hardDeleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+
+        userRepository.delete(user);
+    }
+
+    /**
      * Update user credit
      */
     @Transactional

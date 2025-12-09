@@ -95,6 +95,20 @@ public class AdminUserController {
     }
 
     /**
+     * Hard delete user (permanently remove from database)
+     * DELETE /api/admin/users/{id}/permanent
+     * Note: Only SUPER_ADMIN can permanently delete users
+     */
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<Map<String, String>> hardDeleteUser(@PathVariable Long id) {
+        adminUserService.hardDeleteUser(id);
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "User permanently deleted");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * Update user credit
      * PUT /api/admin/users/{id}/credit
      */
