@@ -3,8 +3,10 @@ package com.riverflow.service.admin;
 import com.riverflow.dto.admin.AdminPaymentResponse;
 import com.riverflow.dto.admin.PaymentStatisticsResponse;
 import com.riverflow.dto.admin.PaymentStatusUpdateRequest;
+import com.riverflow.model.logging.ActivityLog;
 import com.riverflow.model.payment.PaymentTransaction;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
+import com.riverflow.service.logging.ActivityLoggingService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -39,6 +41,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class AdminPaymentService {
 
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final ActivityLoggingService activityLoggingService;
 
     /**
      * Get all payments with search, filter, sort, and pagination
@@ -83,10 +86,13 @@ public class AdminPaymentService {
      * Update payment status
      */
     @Transactional
-    public AdminPaymentResponse updatePaymentStatus(Long paymentId, PaymentStatusUpdateRequest request) {
+    public AdminPaymentResponse updatePaymentStatus(Long paymentId, PaymentStatusUpdateRequest request,
+            Long actorId, String actorEmail, String actorRole) {
         PaymentTransaction payment = paymentTransactionRepository.findById(paymentId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Payment not found with id: " + paymentId));
+
+        String oldStatus = payment.getStatus() != null ? payment.getStatus().name() : "unknown";
 
         try {
             PaymentTransaction.TransactionStatus newStatus = PaymentTransaction.TransactionStatus
@@ -98,6 +104,13 @@ public class AdminPaymentService {
         }
 
         paymentTransactionRepository.save(payment);
+
+        // Log the action
+        activityLoggingService.logPaymentManagementAction(
+                actorId, actorEmail, actorRole,
+                ActivityLog.Action.PAYMENT_STATUS_UPDATE.name(), paymentId,
+                String.format("{\"oldStatus\":\"%s\",\"newStatus\":\"%s\"}", oldStatus, request.getStatus()));
+
         return mapToAdminPaymentResponse(payment);
     }
 
