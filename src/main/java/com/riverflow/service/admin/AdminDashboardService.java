@@ -137,7 +137,7 @@ public class AdminDashboardService {
         return AdminDashboardResponse.RecentActivityItem.builder()
                 .id(activity.getId())
                 .action(activity.getActivityType())
-                .actor(activity.getUserId() != null ? "User #" + activity.getUserId() : "System")
+                .actor(activity.getUser() != null ? "User #" + activity.getUser().getId() : "System")
                 .target(activity.getEntityType() + " #" + activity.getEntityId())
                 .details(activity.getDetails())
                 .timestamp(activity.getCreatedAt())
