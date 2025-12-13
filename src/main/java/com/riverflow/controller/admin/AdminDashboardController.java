@@ -3,7 +3,6 @@ package com.riverflow.controller.admin;
 import com.riverflow.dto.admin.AdminDashboardResponse;
 import com.riverflow.model.User;
 import com.riverflow.service.admin.AdminDashboardService;
-import com.riverflow.service.authentication.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminDashboardController {
 
     private final AdminDashboardService adminDashboardService;
-    private final JwtService jwtService;
 
     /**
      * Get dashboard data
