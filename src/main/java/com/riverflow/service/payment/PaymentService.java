@@ -7,6 +7,7 @@ import com.riverflow.model.payment.PaymentTransaction;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.payment.CreditTopupRequestRepository;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
+import com.riverflow.service.NotificationService;
 import com.riverflow.service.logging.ActivityLoggingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,7 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final PaymentTransactionRepository transactionRepository;
     private final ActivityLoggingService activityLoggingService;
+    private final NotificationService notificationService;
 
     @Value("${app.sepay.api-key:}")
     private String sepayApiKey;
@@ -186,6 +188,17 @@ public class PaymentService {
                 tx.getId(),
                 payload.getTransferAmount(),
                 addCredits);
+
+        // Create notification for successful credit top-up
+        notificationService.createNotification(
+                user.getId(),
+                NotificationService.TYPE_CREDIT_TOPUP_SUCCESS,
+                "Credit Top-up Successful",
+                "Your top-up of " + addCredits + " credits has been completed successfully.",
+                "payment",
+                tx.getId().toString(),
+                "/dashboard",
+                "View Credits");
     }
 
     private String generateUniqueCode() {
