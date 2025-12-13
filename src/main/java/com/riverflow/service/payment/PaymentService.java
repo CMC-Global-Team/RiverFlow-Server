@@ -7,6 +7,8 @@ import com.riverflow.model.payment.PaymentTransaction;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.payment.CreditTopupRequestRepository;
 import com.riverflow.repository.payment.PaymentTransactionRepository;
+import com.riverflow.service.NotificationService;
+import com.riverflow.service.logging.ActivityLoggingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class PaymentService {
     private final CreditTopupRequestRepository topupRequestRepository;
     private final UserRepository userRepository;
     private final PaymentTransactionRepository transactionRepository;
+    private final ActivityLoggingService activityLoggingService;
+    private final NotificationService notificationService;
 
     @Value("${app.sepay.api-key:}")
     private String sepayApiKey;
@@ -62,14 +66,16 @@ public class PaymentService {
         String template = "compact";
         String download = "0";
         String base = "https://qr.sepay.vn/img";
-        return base + "?acc=" + accountNumber + "&bank=" + bank + "&amount=" + amount + "&des=" + code + "&template=" + template + "&download=" + download;
+        return base + "?acc=" + accountNumber + "&bank=" + bank + "&amount=" + amount + "&des=" + code + "&template="
+                + template + "&download=" + download;
     }
 
     @Transactional
     public void handleSepayWebhook(SepayWebhookPayload payload, String apiKeyHeader) {
         if (apiKeyHeader != null) {
             apiKeyHeader = apiKeyHeader.trim();
-            if ((apiKeyHeader.startsWith("\"") && apiKeyHeader.endsWith("\"")) || (apiKeyHeader.startsWith("'") && apiKeyHeader.endsWith("'"))) {
+            if ((apiKeyHeader.startsWith("\"") && apiKeyHeader.endsWith("\""))
+                    || (apiKeyHeader.startsWith("'") && apiKeyHeader.endsWith("'"))) {
                 apiKeyHeader = apiKeyHeader.substring(1, apiKeyHeader.length() - 1);
             }
         }
@@ -83,9 +89,10 @@ public class PaymentService {
                 }
             }
         }
-        PaymentTransaction.TransferType type = payload.getTransferType() != null && payload.getTransferType().equalsIgnoreCase("in")
-                ? PaymentTransaction.TransferType.in
-                : PaymentTransaction.TransferType.out;
+        PaymentTransaction.TransferType type = payload.getTransferType() != null
+                && payload.getTransferType().equalsIgnoreCase("in")
+                        ? PaymentTransaction.TransferType.in
+                        : PaymentTransaction.TransferType.out;
         PaymentTransaction tx = PaymentTransaction.builder()
                 .externalId(payload.getId())
                 .gateway(payload.getGateway() != null ? payload.getGateway() : "sepay")
@@ -109,13 +116,15 @@ public class PaymentService {
         if (sepayRequireAuth && !keyOk) {
             Integer expLen = expectedKey == null ? null : expectedKey.length();
             Integer hdrLen = apiKeyHeader == null ? null : apiKeyHeader.length();
-            System.out.println("[PAYMENT DEBUG] Auth validation failed - requireAuth: " + sepayRequireAuth + ", keyOk: " + keyOk + ", expLen: " + expLen + ", hdrLen: " + hdrLen);
+            System.out.println("[PAYMENT DEBUG] Auth validation failed - requireAuth: " + sepayRequireAuth + ", keyOk: "
+                    + keyOk + ", expLen: " + expLen + ", hdrLen: " + hdrLen);
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
         }
         if (payload.getAccountNumber() == null || !payload.getAccountNumber().equals(accountNumber)) {
-            System.out.println("[PAYMENT DEBUG] Account number mismatch - payload: " + payload.getAccountNumber() + ", expected: " + accountNumber);
+            System.out.println("[PAYMENT DEBUG] Account number mismatch - payload: " + payload.getAccountNumber()
+                    + ", expected: " + accountNumber);
             tx.setStatus(PaymentTransaction.TransactionStatus.ignored);
             transactionRepository.save(tx);
             return;
@@ -127,7 +136,8 @@ public class PaymentService {
         }
         String code = codeCandidate;
         if (code == null || code.isEmpty()) {
-            System.out.println("[PAYMENT DEBUG] Code extraction failed - codeCandidate: " + codeCandidate + ", content: " + payload.getContent());
+            System.out.println("[PAYMENT DEBUG] Code extraction failed - codeCandidate: " + codeCandidate
+                    + ", content: " + payload.getContent());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
             transactionRepository.save(tx);
             return;
@@ -148,7 +158,8 @@ public class PaymentService {
             return;
         }
         if (!req.getAmount().equals(payload.getTransferAmount())) {
-            System.out.println("[PAYMENT DEBUG] Amount mismatch - request amount: " + req.getAmount() + ", transfer amount: " + payload.getTransferAmount());
+            System.out.println("[PAYMENT DEBUG] Amount mismatch - request amount: " + req.getAmount()
+                    + ", transfer amount: " + payload.getTransferAmount());
             tx.setMatchedRequest(req);
             tx.setUser(req.getUser());
             tx.setStatus(PaymentTransaction.TransactionStatus.invalid);
@@ -158,7 +169,8 @@ public class PaymentService {
         User user = req.getUser();
         long current = user.getCredit() == null ? 0L : user.getCredit();
         long addCredits = vndPerCredit > 0 ? (payload.getTransferAmount() / vndPerCredit) : 0L;
-        System.out.println("[PAYMENT DEBUG] SUCCESS - Processing payment for user " + user.getId() + ", adding " + addCredits + " credits (current: " + current + ")");
+        System.out.println("[PAYMENT DEBUG] SUCCESS - Processing payment for user " + user.getId() + ", adding "
+                + addCredits + " credits (current: " + current + ")");
         user.setCredit(current + addCredits);
         req.setStatus(CreditTopupRequest.TopupStatus.paid);
         req.setPaidAt(LocalDateTime.now());
@@ -168,7 +180,26 @@ public class PaymentService {
         tx.setUser(user);
         tx.setStatus(PaymentTransaction.TransactionStatus.processed);
         transactionRepository.save(tx);
-        }
+
+        // Log payment success to activity logs
+        activityLoggingService.logPaymentSuccess(
+                user.getId(),
+                user.getEmail(),
+                tx.getId(),
+                payload.getTransferAmount(),
+                addCredits);
+
+        // Create notification for successful credit top-up
+        notificationService.createNotification(
+                user.getId(),
+                NotificationService.TYPE_CREDIT_TOPUP_SUCCESS,
+                "Credit Top-up Successful",
+                "Your top-up of " + addCredits + " credits has been completed successfully.",
+                "payment",
+                tx.getId().toString(),
+                "/dashboard",
+                "View Credits");
+    }
 
     private String generateUniqueCode() {
         String code;
@@ -183,22 +214,22 @@ public class PaymentService {
         if (content == null || content.isEmpty()) {
             return candidates;
         }
-        
+
         String cleaned = content.toUpperCase();
-        
+
         // Split by common delimiters: hyphen, space, underscore, etc.
         String[] tokens = cleaned.split("[\\s\\-_,;:|/\\\\]+");
-        
+
         // Extract all alphanumeric tokens that match our code length (10-16 characters)
         for (String token : tokens) {
             // Remove any non-alphanumeric characters from token
             String alphanumeric = token.replaceAll("[^A-Z0-9]", "");
-            
+
             if (alphanumeric.length() >= 10 && alphanumeric.length() <= 16) {
                 candidates.add(alphanumeric);
             }
         }
-        
+
         // Also try removing ALL non-alphanumeric and extracting patterns
         // This handles cases where code might be embedded without clear delimiters
         String fullyClean = cleaned.replaceAll("[^A-Z0-9]", "");
@@ -209,7 +240,7 @@ public class PaymentService {
                 candidates.add(candidate);
             }
         }
-        
+
         return candidates;
     }
 

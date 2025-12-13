@@ -76,6 +76,13 @@ public class AiResponseParser {
      */
     public ActionList parseActionList(String json) {
         ActionList actionList = new ActionList();
+        
+        // Add null/empty check first
+        if (json == null || json.trim().isEmpty()) {
+            System.err.println("[parseActionList] Received null or empty JSON string");
+            return actionList;
+        }
+        
         try {
             JsonNode root = objectMapper.readTree(json);
             JsonNode actionsNode = root.get("actions");
@@ -86,12 +93,18 @@ public class AiResponseParser {
                         if (action != null) {
                             actionList.getActions().add(action);
                         }
-                    } catch (Exception ignore) {
+                    } catch (Exception e) {
+                        System.err.println("[parseActionList] Failed to parse individual action: " + e.getMessage());
+                        e.printStackTrace();
                         // skip invalid action entry
                     }
                 }
+            } else {
+                System.err.println("[parseActionList] 'actions' array not found in JSON");
             }
         } catch (Exception e) {
+            System.err.println("[parseActionList] Failed to parse JSON: " + e.getMessage());
+            e.printStackTrace();
             // return empty list on failure
         }
         return actionList;

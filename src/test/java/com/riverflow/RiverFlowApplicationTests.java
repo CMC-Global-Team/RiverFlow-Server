@@ -5,8 +5,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.mongodb.gridfs.GridFsTemplate;
 import org.springframework.data.mongodb.core.convert.MongoConverter;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class RiverFlowApplicationTests {
 
     @MockBean
@@ -41,6 +43,9 @@ class RiverFlowApplicationTests {
 
     @MockBean
     private MongoConverter mongoConverter;
+
+    @MockBean
+    private com.riverflow.repository.logging.ActivityLogRepository activityLogRepository;
 
     @Test
     void contextLoads() {

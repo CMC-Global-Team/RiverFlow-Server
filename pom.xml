@@ -162,6 +162,12 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Auth0/OIDC JWT Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Flyway Database Migration -->
         <dependency>
             <groupId>org.flywaydb</groupId>
