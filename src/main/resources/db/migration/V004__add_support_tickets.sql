@@ -10,8 +10,8 @@
 -- ==============================================================================
 -- Description: Main support ticket table
 CREATE TABLE IF NOT EXISTS support_tickets (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
     ticket_number VARCHAR(20) NOT NULL UNIQUE COMMENT 'Unique ticket identifier (e.g., TKT-20231213-001)',
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     status ENUM('NEW', 'IN_PROGRESS', 'ON_HOLD', 'WAITING_FOR_RESPONSE', 'RESOLVED', 'CLOSED') NOT NULL DEFAULT 'NEW',
     
     -- Assignment
-    assigned_to BIGINT UNSIGNED NULL COMMENT 'Admin/Support staff user ID',
+    assigned_to BIGINT NULL COMMENT 'Admin/Support staff user ID',
     
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -46,9 +46,9 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 -- ==============================================================================
 -- Description: Messages/replies in support ticket thread
 CREATE TABLE IF NOT EXISTS support_ticket_messages (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    ticket_id BIGINT UNSIGNED NOT NULL,
-    sender_id BIGINT UNSIGNED NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id BIGINT NOT NULL,
+    sender_id BIGINT NOT NULL,
     message TEXT NOT NULL,
     is_internal_note BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'If true, only visible to admin/support staff',
     
@@ -67,12 +67,12 @@ CREATE TABLE IF NOT EXISTS support_ticket_messages (
 -- ==============================================================================
 -- Description: File attachments for support ticket messages
 CREATE TABLE IF NOT EXISTS support_ticket_attachments (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    message_id BIGINT UNSIGNED NOT NULL,
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    message_id BIGINT NOT NULL,
     file_name VARCHAR(255) NOT NULL,
     mime_type VARCHAR(100) NOT NULL,
     file_data LONGBLOB NOT NULL COMMENT 'Binary file data (max 10MB)',
-    file_size BIGINT UNSIGNED NOT NULL COMMENT 'File size in bytes',
+    file_size BIGINT NOT NULL COMMENT 'File size in bytes',
     
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
@@ -83,3 +83,4 @@ CREATE TABLE IF NOT EXISTS support_ticket_attachments (
 -- ==============================================================================
 -- END OF MIGRATION
 -- ==============================================================================
+
