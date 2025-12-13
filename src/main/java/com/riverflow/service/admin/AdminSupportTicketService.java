@@ -9,6 +9,7 @@ import com.riverflow.repository.SupportTicketAttachmentRepository;
 import com.riverflow.repository.SupportTicketMessageRepository;
 import com.riverflow.repository.SupportTicketRepository;
 import com.riverflow.repository.UserRepository;
+import com.riverflow.service.NotificationService;
 import com.riverflow.service.SupportTicketService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class AdminSupportTicketService {
     private final SupportTicketAttachmentRepository attachmentRepository;
     private final UserRepository userRepository;
     private final SupportTicketService supportTicketService;
+    private final NotificationService notificationService;
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     private static final int MAX_ATTACHMENTS_PER_MESSAGE = 5;
@@ -213,6 +215,20 @@ public class AdminSupportTicketService {
 
         if (updated) {
             ticket = ticketRepository.save(ticket);
+
+            // Notify ticket owner about status update
+            if (request.getStatus() != null) {
+                notificationService.createNotification(
+                        ticket.getUser().getId(),
+                        NotificationService.TYPE_TICKET_UPDATE,
+                        "Ticket Status Updated",
+                        "Your ticket #" + ticket.getTicketNumber() + " status has been updated to "
+                                + ticket.getStatus().name(),
+                        "ticket",
+                        ticket.getId().toString(),
+                        "/dashboard/tickets/" + ticket.getId(),
+                        "View Ticket");
+            }
         }
 
         return supportTicketService.mapToResponse(ticket, true);
@@ -257,6 +273,19 @@ public class AdminSupportTicketService {
         log.info("Admin {} {} to ticket {}", adminId,
                 message.getIsInternalNote() ? "added internal note" : "replied",
                 ticket.getTicketNumber());
+
+        // Notify ticket owner about admin response (only for non-internal notes)
+        if (!message.getIsInternalNote()) {
+            notificationService.createNotification(
+                    ticket.getUser().getId(),
+                    NotificationService.TYPE_TICKET_RESPONSE,
+                    "New Response on Ticket",
+                    "Admin has responded to your ticket #" + ticket.getTicketNumber(),
+                    "ticket",
+                    ticket.getId().toString(),
+                    "/dashboard/tickets/" + ticket.getId(),
+                    "View Response");
+        }
 
         return supportTicketService.mapToMessageResponse(message);
     }

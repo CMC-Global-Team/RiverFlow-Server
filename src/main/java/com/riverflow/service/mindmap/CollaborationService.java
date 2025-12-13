@@ -10,6 +10,7 @@ import com.riverflow.model.mindmap.subdocuments.Collaborator;
 import com.riverflow.repository.UserRepository;
 import com.riverflow.repository.mindmap.CollaborationInvitationRepository;
 import com.riverflow.repository.mindmap.MindmapRepository;
+import com.riverflow.service.NotificationService;
 import com.riverflow.service.SmtpEmailService;
 import com.riverflow.service.realtime.RealtimeService;
 
@@ -30,6 +31,7 @@ public class CollaborationService {
     private final UserRepository userRepository;
     private final SmtpEmailService smtpEmailService;
     private final RealtimeService realtimeService;
+    private final NotificationService notificationService;
 
     /**
      * Mời cộng tác viên mới
@@ -97,10 +99,10 @@ public class CollaborationService {
         }
 
         // Gửi email mời
-        try {
-            User ownerUser = userRepository.findById(ownerId).orElse(null);
-            String inviterName = (ownerUser != null) ? ownerUser.getFullName() : "Someone";
+        User ownerUser = userRepository.findById(ownerId).orElse(null);
+        String inviterName = (ownerUser != null) ? ownerUser.getFullName() : "Someone";
 
+        try {
             smtpEmailService.sendInvitationEmail(
                     emailToInvite,
                     token,
@@ -108,6 +110,19 @@ public class CollaborationService {
                     mindmap.getTitle());
         } catch (Exception e) {
             // Không throw exception, vì lời mời đã được tạo
+        }
+
+        // Create notification for invited user if they exist
+        if (invitedUserId != null) {
+            notificationService.createNotification(
+                    invitedUserId,
+                    NotificationService.TYPE_PROJECT_INVITE,
+                    "Project Invitation",
+                    inviterName + " invited you to collaborate on \"" + mindmap.getTitle() + "\"",
+                    "mindmap",
+                    mindmapId,
+                    "/invitation/" + token,
+                    "View Invitation");
         }
 
         return savedInvitation;
@@ -212,6 +227,19 @@ public class CollaborationService {
         // Emit collaborator removed event for real-time redirect
         if (removedUserId != null) {
             realtimeService.emitCollaboratorRemoved(mindmapId, removedUserId, email);
+
+            // Create notification for removed user
+            User owner = userRepository.findById(userId).orElse(null);
+            String ownerName = (owner != null) ? owner.getFullName() : "The owner";
+            notificationService.createNotification(
+                    removedUserId,
+                    NotificationService.TYPE_PROJECT_REMOVED,
+                    "Removed from Project",
+                    ownerName + " removed you from \"" + mindmap.getTitle() + "\"",
+                    "mindmap",
+                    mindmapId,
+                    null,
+                    null);
         }
     }
 
@@ -345,5 +373,19 @@ public class CollaborationService {
         }
 
         mindmapRepository.save(mindmap);
+
+        // Notify project owner that user left
+        Long ownerId = mindmap.getMysqlUserId();
+        User leavingUser = userRepository.findById(userId).orElse(null);
+        String leavingUserName = (leavingUser != null) ? leavingUser.getFullName() : "A collaborator";
+        notificationService.createNotification(
+                ownerId,
+                NotificationService.TYPE_PROJECT_LEFT,
+                "Collaborator Left",
+                leavingUserName + " has left your project \"" + mindmap.getTitle() + "\"",
+                "mindmap",
+                mindmapId,
+                "/mindmap/" + mindmapId,
+                "View Project");
     }
 }
