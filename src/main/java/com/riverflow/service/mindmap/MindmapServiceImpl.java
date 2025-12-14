@@ -228,13 +228,28 @@ public class MindmapServiceImpl implements MindmapService {
         List<Mindmap> ownedMindmaps = mindmapRepository
                 .findByMysqlUserIdAndStatusOrderByUpdatedAtDesc(userId, "active");
 
-        // Get mindmaps where user is an accepted collaborator
+        // Get user email for collaborator lookup
+        User currentUser = userRepository.findById(userId).orElse(null);
+        String userEmail = currentUser != null ? currentUser.getEmail() : null;
+
+        // Get mindmaps where user is an accepted collaborator (by userId OR email)
         Query collaboratorQuery = new Query();
-        collaboratorQuery.addCriteria(
-                Criteria.where("collaborators").elemMatch(
-                        Criteria.where("mysqlUserId").is(userId)
-                                .and("status").is("accepted"))
-                        .and("status").is("active"));
+        Criteria collaboratorCriteria;
+
+        if (userEmail != null) {
+            // Search by both mysqlUserId and email
+            collaboratorCriteria = Criteria.where("collaborators").elemMatch(
+                    new Criteria().orOperator(
+                            Criteria.where("mysqlUserId").is(userId).and("status").is("accepted"),
+                            Criteria.where("email").is(userEmail).and("status").is("accepted")))
+                    .and("status").is("active");
+        } else {
+            // Search by mysqlUserId only
+            collaboratorCriteria = Criteria.where("collaborators").elemMatch(
+                    Criteria.where("mysqlUserId").is(userId).and("status").is("accepted")).and("status").is("active");
+        }
+
+        collaboratorQuery.addCriteria(collaboratorCriteria);
         List<Mindmap> collaboratedMindmaps = mongoTemplate.find(collaboratorQuery, Mindmap.class);
 
         // Combine results and remove duplicates
