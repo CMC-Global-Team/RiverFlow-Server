@@ -3,6 +3,7 @@ package com.riverflow.controller;
 import com.riverflow.config.jwt.CustomUserDetailsService;
 import com.riverflow.dto.invitation.InvitationResponse;
 import com.riverflow.model.User;
+import com.riverflow.model.mindmap.subdocuments.Collaborator;
 import com.riverflow.model.mindmap.CollaborationInvitation;
 import com.riverflow.model.mindmap.Mindmap;
 import com.riverflow.repository.UserRepository;
@@ -138,20 +139,54 @@ public class InvitationController {
                             Map.of("success", false, "message", "Invitation is no longer pending"));
                 }
 
-                // Mark as accepted (user will get access when they register/login)
+                // Check if the invited email has an existing account
+                User existingUser = userRepository.findByEmail(invitation.getInvitedEmail()).orElse(null);
+                Long acceptedByUserId = existingUser != null ? existingUser.getId() : null;
+
+                // Get the mindmap and add collaborator
+                Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId()).orElse(null);
+                if (mindmap != null) {
+                    // Add collaborator to mindmap
+                    Collaborator collaborator = Collaborator.builder()
+                            .mysqlUserId(acceptedByUserId)
+                            .email(invitation.getInvitedEmail())
+                            .role(invitation.getRole().toString())
+                            .invitedBy(invitation.getInvitedByUserId())
+                            .invitedAt(invitation.getCreatedAt())
+                            .status("accepted")
+                            .acceptedAt(java.time.LocalDateTime.now())
+                            .build();
+
+                    // Check if collaborator already exists
+                    boolean collaboratorExists = mindmap.getCollaborators().stream()
+                            .anyMatch(c -> invitation.getInvitedEmail().equals(c.getEmail()));
+
+                    if (!collaboratorExists) {
+                        mindmap.getCollaborators().add(collaborator);
+                        mindmapRepository.save(mindmap);
+                    }
+                }
+
+                // Mark invitation as accepted
                 invitation.setStatus("accepted");
                 invitation.setAcceptedAt(java.time.LocalDateTime.now());
+                invitation.setAcceptedByUserId(acceptedByUserId);
                 invitationRepository.save(invitation);
 
                 // Notify the inviter
-                collaborationService.notifyInviterOfAcceptance(invitation, null);
-
-                Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId()).orElse(null);
+                collaborationService.notifyInviterOfAcceptance(invitation, acceptedByUserId);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("message",
-                        "Invitation accepted! Please sign in or create an account to access the mindmap.");
+
+                if (existingUser != null) {
+                    // User has an account - they can sign in and access immediately
+                    response.put("message", "Invitation accepted! Please sign in to access the mindmap.");
+                } else {
+                    // User doesn't have an account - they need to register
+                    response.put("message",
+                            "Invitation accepted! Please create an account with this email to access the mindmap.");
+                }
                 response.put("mindmapId", mindmap != null ? mindmap.getId() : null);
                 response.put("mindmapTitle", mindmap != null ? mindmap.getTitle() : null);
                 response.put("requiresAuth", true);
