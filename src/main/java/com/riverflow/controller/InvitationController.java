@@ -143,28 +143,36 @@ public class InvitationController {
                 User existingUser = userRepository.findByEmail(invitation.getInvitedEmail()).orElse(null);
                 Long acceptedByUserId = existingUser != null ? existingUser.getId() : null;
 
-                // Get the mindmap and add collaborator
+                // Get the mindmap and update collaborator status
                 Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId()).orElse(null);
-                if (mindmap != null) {
-                    // Add collaborator to mindmap
-                    Collaborator collaborator = Collaborator.builder()
-                            .mysqlUserId(acceptedByUserId)
-                            .email(invitation.getInvitedEmail())
-                            .role(invitation.getRole().toString())
-                            .invitedBy(invitation.getInvitedByUserId())
-                            .invitedAt(invitation.getCreatedAt())
-                            .status("accepted")
-                            .acceptedAt(java.time.LocalDateTime.now())
-                            .build();
+                if (mindmap != null && mindmap.getCollaborators() != null) {
+                    // Find existing collaborator by email
+                    Collaborator existingCollaborator = mindmap.getCollaborators().stream()
+                            .filter(c -> invitation.getInvitedEmail().equals(c.getEmail()))
+                            .findFirst()
+                            .orElse(null);
 
-                    // Check if collaborator already exists
-                    boolean collaboratorExists = mindmap.getCollaborators().stream()
-                            .anyMatch(c -> invitation.getInvitedEmail().equals(c.getEmail()));
-
-                    if (!collaboratorExists) {
+                    if (existingCollaborator != null) {
+                        // UPDATE existing collaborator status
+                        existingCollaborator.setStatus("accepted");
+                        existingCollaborator.setAcceptedAt(java.time.LocalDateTime.now());
+                        if (acceptedByUserId != null) {
+                            existingCollaborator.setMysqlUserId(acceptedByUserId);
+                        }
+                    } else {
+                        // Create new collaborator if doesn't exist
+                        Collaborator collaborator = Collaborator.builder()
+                                .mysqlUserId(acceptedByUserId)
+                                .email(invitation.getInvitedEmail())
+                                .role(invitation.getRole().toString())
+                                .invitedBy(invitation.getInvitedByUserId())
+                                .invitedAt(invitation.getCreatedAt())
+                                .status("accepted")
+                                .acceptedAt(java.time.LocalDateTime.now())
+                                .build();
                         mindmap.getCollaborators().add(collaborator);
-                        mindmapRepository.save(mindmap);
                     }
+                    mindmapRepository.save(mindmap);
                 }
 
                 // Mark invitation as accepted
