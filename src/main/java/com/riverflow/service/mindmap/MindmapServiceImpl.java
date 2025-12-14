@@ -566,21 +566,44 @@ public class MindmapServiceImpl implements MindmapService {
             return true;
         }
 
-        // Check if user is a collaborator (accepted or pending status)
+        // Get user email for email-based collaborator check
+        User currentUser = userRepository.findById(userId).orElse(null);
+        String userEmail = currentUser != null ? currentUser.getEmail() : null;
+
+        // Check if user is a collaborator (accepted or pending status) by userId OR
+        // email
         if (mindmap.getCollaborators() != null && !mindmap.getCollaborators().isEmpty()) {
             boolean hasAccess = mindmap.getCollaborators().stream()
-                    .anyMatch(collaborator -> collaborator.getMysqlUserId() != null &&
-                            collaborator.getMysqlUserId().equals(userId) &&
-                            ("accepted".equals(collaborator.getStatus())
-                                    || "pending".equals(collaborator.getStatus())));
+                    .anyMatch(collaborator -> {
+                        // Check by mysqlUserId
+                        boolean matchesUserId = collaborator.getMysqlUserId() != null &&
+                                collaborator.getMysqlUserId().equals(userId);
+
+                        // Check by email (for collaborators added before user registered)
+                        boolean matchesEmail = userEmail != null &&
+                                userEmail.equals(collaborator.getEmail());
+
+                        // Only accepted or pending collaborators have access
+                        boolean hasValidStatus = "accepted".equals(collaborator.getStatus()) ||
+                                "pending".equals(collaborator.getStatus());
+
+                        return (matchesUserId || matchesEmail) && hasValidStatus;
+                    });
+
             if (hasAccess) {
+                // If access is by email, update the collaborator's mysqlUserId for future
+                // checks
+                if (userEmail != null) {
+                    mindmap.getCollaborators().stream()
+                            .filter(c -> userEmail.equals(c.getEmail()) && c.getMysqlUserId() == null)
+                            .findFirst()
+                            .ifPresent(c -> {
+                                c.setMysqlUserId(userId);
+                                mindmapRepository.save(mindmap);
+                            });
+                }
                 return true;
             }
-
-            // Log all collaborators for debugging
-            mindmap.getCollaborators().forEach(c -> {
-            });
-        } else {
         }
 
         return false;
