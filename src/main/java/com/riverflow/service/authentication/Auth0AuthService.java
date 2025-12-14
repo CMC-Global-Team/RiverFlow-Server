@@ -89,6 +89,7 @@ public class Auth0AuthService {
                     .email(user.getEmail())
                     .fullName(user.getFullName())
                     .role(user.getRole() != null ? user.getRole().name().toUpperCase() : "USER")
+                    .credit(user.getCredit() != null ? user.getCredit() : 0L)
                     .avatar(avatarUrl)
                     .build();
 

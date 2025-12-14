@@ -95,6 +95,7 @@ public class GitHubAuthService {
                     .email(user.getEmail())
                     .fullName(user.getFullName())
                     .role(user.getRole() != null ? user.getRole().name().toUpperCase() : "USER")
+                    .credit(user.getCredit() != null ? user.getCredit() : 0L)
                     .avatar(userAvatarUrl)
                     .build();
         } catch (Exception ex) {
