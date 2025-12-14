@@ -36,6 +36,8 @@ public class NotificationService {
     public static final String TYPE_PROJECT_REMOVED = "PROJECT_REMOVED";
     public static final String TYPE_TICKET_RESPONSE = "TICKET_RESPONSE";
     public static final String TYPE_TICKET_UPDATE = "TICKET_UPDATE";
+    public static final String TYPE_INVITE_ACCEPTED = "INVITE_ACCEPTED";
+    public static final String TYPE_INVITE_DECLINED = "INVITE_DECLINED";
 
     /**
      * Create a new notification for a user
