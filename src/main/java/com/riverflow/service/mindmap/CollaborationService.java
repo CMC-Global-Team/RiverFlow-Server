@@ -299,6 +299,8 @@ public class CollaborationService {
         invitation.setAcceptedByUserId(userId);
         invitationRepository.save(invitation);
 
+        // Notify the inviter that invitation was accepted
+        notifyInviterOfAcceptance(invitation, userId);
     }
 
     /**
@@ -329,6 +331,8 @@ public class CollaborationService {
             }
         }
 
+        // Notify the inviter that invitation was rejected
+        notifyInviterOfRejection(invitation, userId);
     }
 
     /**
@@ -387,5 +391,65 @@ public class CollaborationService {
                 mindmapId,
                 "/mindmap/" + mindmapId,
                 "View Project");
+    }
+
+    /**
+     * Notify inviter when their invitation is accepted
+     */
+    public void notifyInviterOfAcceptance(CollaborationInvitation invitation, Long acceptedByUserId) {
+        if (invitation == null || invitation.getInvitedByUserId() == null) {
+            return;
+        }
+
+        Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId()).orElse(null);
+        String mindmapTitle = (mindmap != null) ? mindmap.getTitle() : "a mindmap";
+
+        String accepterName;
+        if (acceptedByUserId != null) {
+            User accepter = userRepository.findById(acceptedByUserId).orElse(null);
+            accepterName = (accepter != null) ? accepter.getFullName() : invitation.getInvitedEmail();
+        } else {
+            accepterName = invitation.getInvitedEmail();
+        }
+
+        notificationService.createNotification(
+                invitation.getInvitedByUserId(),
+                NotificationService.TYPE_INVITE_ACCEPTED,
+                "Invitation Accepted",
+                accepterName + " accepted your invitation to collaborate on \"" + mindmapTitle + "\"",
+                "mindmap",
+                invitation.getMindmapId(),
+                "/editor?id=" + invitation.getMindmapId(),
+                "View Project");
+    }
+
+    /**
+     * Notify inviter when their invitation is rejected/declined
+     */
+    public void notifyInviterOfRejection(CollaborationInvitation invitation, Long rejectedByUserId) {
+        if (invitation == null || invitation.getInvitedByUserId() == null) {
+            return;
+        }
+
+        Mindmap mindmap = mindmapRepository.findById(invitation.getMindmapId()).orElse(null);
+        String mindmapTitle = (mindmap != null) ? mindmap.getTitle() : "a mindmap";
+
+        String declinerName;
+        if (rejectedByUserId != null) {
+            User decliner = userRepository.findById(rejectedByUserId).orElse(null);
+            declinerName = (decliner != null) ? decliner.getFullName() : invitation.getInvitedEmail();
+        } else {
+            declinerName = invitation.getInvitedEmail();
+        }
+
+        notificationService.createNotification(
+                invitation.getInvitedByUserId(),
+                NotificationService.TYPE_INVITE_DECLINED,
+                "Invitation Declined",
+                declinerName + " declined your invitation to collaborate on \"" + mindmapTitle + "\"",
+                "mindmap",
+                invitation.getMindmapId(),
+                null,
+                null);
     }
 }
