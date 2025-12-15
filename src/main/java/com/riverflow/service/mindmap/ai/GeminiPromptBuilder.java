@@ -5,6 +5,10 @@ import org.springframework.util.StringUtils;
 
 import java.util.*;
 
+import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.dto.mindmap.ai.EvaluationResult;
+import com.riverflow.model.mindmap.Mindmap;
+
 /**
  * Builds prompts for Gemini AI in different scenarios
  */
@@ -442,6 +446,263 @@ public class GeminiPromptBuilder {
 
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.4);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    /**
+     * Build prompt for evaluation step (MaxMode).
+     * AI returns JSON with score, issues, and refinementHint.
+     */
+    public Map<String, Object> buildEvaluationPrompt(
+            Mindmap mindmap,
+            String originalPrompt,
+            String language,
+            String structureType,
+            Integer levels,
+            Integer firstLevelCount) {
+
+        String safeLang = StringUtils.hasText(language) ? language : "vi";
+        String safeStructure = StringUtils.hasText(structureType) ? structureType : "mindmap";
+
+        StringBuilder system = new StringBuilder();
+        system.append("You are a strict mindmap quality evaluator.\n");
+        system.append("Return PURE JSON only, no markdown.\n");
+        system.append("JSON schema:\n");
+        system.append("{\n");
+        system.append("  \"score\": 0.0-1.0,\n");
+        system.append("  \"summary\": \"short evaluation in ").append(safeLang).append("\",\n");
+        system.append("  \"refinementHint\": \"optional guidance in ").append(safeLang).append("\",\n");
+        system.append("  \"issues\": [\n");
+        system.append("    {\n");
+        system.append("      \"type\": \"DUPLICATE_BRANCH|DEPTH_IMBALANCE|OFF_TOPIC|WEAK_LEAF|STRUCTURE_MISMATCH\",\n");
+        system.append("      \"message\": \"description in ").append(safeLang).append("\",\n");
+        system.append("      \"severity\": \"info|warning|error\",\n");
+        system.append("      \"nodeIds\": [\"optional-node-id\"],\n");
+        system.append("      \"suggestion\": \"how to fix, in ").append(safeLang).append("\"\n");
+        system.append("    }\n");
+        system.append("  ]\n");
+        system.append("}\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("Original user prompt: ").append(originalPrompt).append("\n");
+        user.append("Language: ").append(safeLang).append("\n");
+        user.append("Desired structureType: ").append(safeStructure).append("\n");
+        user.append("Desired levels: ").append(levels != null ? levels : "unknown").append("\n");
+        user.append("Desired firstLevelCount: ").append(firstLevelCount != null ? firstLevelCount : "unknown").append("\n\n");
+        user.append("Current mindmap JSON:\n");
+        user.append(String.valueOf(mindmap != null ? mindmap : "null")).append("\n\n");
+        user.append("Evaluate along these axes:\n");
+        user.append("- structural balance (levels, branch distribution)\n");
+        user.append("- duplicate or overlapping branches\n");
+        user.append("- off-topic or irrelevant nodes\n");
+        user.append("- clarity and atomicity of leaf nodes\n");
+        user.append("- alignment with desired structure type\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.2);
+        generationConfig.put("maxOutputTokens", 4000);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    /**
+     * Build prompt for loop THINKING step (produces OTMZ JSON).
+     * This is an internal, JSON-only response used by the orchestrator.
+     */
+    public Map<String, Object> buildLoopThinkingPrompt(
+            String topic,
+            String language,
+            String structureType,
+            Integer levels,
+            Integer firstLevelCount,
+            java.util.List<String> tags,
+            String mode) {
+
+        String safeLang = StringUtils.hasText(language) ? language : "vi";
+        String safeStructure = StringUtils.hasText(structureType) ? structureType : "mindmap";
+
+        StringBuilder system = new StringBuilder();
+        system.append("You are an internal thinking module for a mindmap AI agent.\n");
+        system.append("You MUST return pure JSON OTMZ object, no markdown, no natural language around it.\n");
+        system.append("Your job: analyze the topic and design optimized mindmap parameters.\n");
+        system.append("JSON schema:\n");
+        system.append("{\n");
+        system.append("  \"meta\": {\n");
+        system.append("    \"language\": \"").append(safeLang).append("\",\n");
+        system.append("    \"mode\": \"").append(mode).append("\",\n");
+        system.append("    \"structureType\": \"").append(safeStructure).append("\"\n");
+        system.append("  },\n");
+        system.append("  \"promptAnalysis\": {\n");
+        system.append("    \"goal\": \"Short description of the learning goal in ").append(safeLang).append("\",\n");
+        system.append("    \"targetAudience\": \"Who this mindmap is for\",\n");
+        system.append("    \"difficulty\": \"beginner|intermediate|advanced\"\n");
+        system.append("  },\n");
+        system.append("  \"propertiesDesign\": {\n");
+        system.append("    \"topic\": \"Optimized topic string\",\n");
+        system.append("    \"title\": \"Optimized title for the mindmap\",\n");
+        system.append("    \"structureType\": \"mindmap|logic|brace|org|tree|timeline|fishbone\",\n");
+        system.append("    \"levels\": 2,\n");
+        system.append("    \"firstLevelCount\": 4,\n");
+        system.append("    \"tags\": [\"...\"]\n");
+        system.append("  },\n");
+        system.append("  \"optimizedContent\": {\n");
+        system.append("    \"mainBranches\": [\n");
+        system.append("      {\"label\": \"Branch 1\", \"description\": \"...\"}\n");
+        system.append("    ]\n");
+        system.append("  }\n");
+        system.append("}\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("Topic: ").append(topic).append("\n");
+        user.append("Language: ").append(safeLang).append("\n");
+        user.append("Requested structure: ").append(safeStructure).append("\n");
+        if (levels != null) {
+            user.append("Requested levels: ").append(levels).append("\n");
+        }
+        if (firstLevelCount != null) {
+            user.append("Requested firstLevelCount: ").append(firstLevelCount).append("\n");
+        }
+        if (tags != null && !tags.isEmpty()) {
+            user.append("Tags: ").append(String.join(", ", tags)).append("\n");
+        }
+        user.append("Mode: ").append(mode).append("\n\n");
+        user.append("Please fill all OTMZ fields with consistent, non-overlapping branches.\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        double temp = "max".equalsIgnoreCase(mode) ? 0.8 : 0.5;
+        generationConfig.put("temperature", temp);
+        generationConfig.put("maxOutputTokens", 4000);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    /**
+     * Build prompt for AGENT planning step.
+     * Consumes OTMZ and produces ActionList JSON with concrete operations.
+     */
+    public Map<String, Object> buildAgentActionPrompt(
+            Otmz otmz,
+            String language) {
+
+        String safeLang = StringUtils.hasText(language) ? language : "vi";
+
+        StringBuilder system = new StringBuilder();
+        system.append("You are an AI agent that converts an internal OTMZ analysis into concrete mindmap actions.\n");
+        system.append("Return PURE JSON with this shape (no markdown, no extra text):\n");
+        system.append("{\n");
+        system.append("  \"actions\": [\n");
+        system.append("    {\n");
+        system.append("      \"id\": \"a1\",\n");
+        system.append("      \"type\": \"add_node|update_node|delete_node|delete_subtree|add_edge|set_title|set_structureType\",\n");
+        system.append("      \"params\": { ... },\n");
+        system.append("      \"rationale\": \"Short reason in ").append(safeLang).append("\",\n");
+        system.append("      \"priority\": 1,\n");
+        system.append("      \"dependsOn\": [\"a0\"]\n");
+        system.append("    }\n");
+        system.append("  ]\n");
+        system.append("}\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("Language: ").append(safeLang).append("\n");
+        user.append("Here is the OTMZ object (internal thinking result):\n");
+        user.append(otmz != null ? otmz.toString() : "{}").append("\n\n");
+        user.append("Rules:\n");
+        user.append("- Actions at the same level MUST NOT overlap or contradict each other.\n");
+        user.append("- Prefer clear, atomic operations (each action changes one thing).\n");
+        user.append("- Use set_title and set_structureType at most once.\n");
+        user.append("- When adding nodes, always provide label, description, and visual properties if possible.\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.5);
+        generationConfig.put("maxOutputTokens", 4000);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
+    /**
+     * Build prompt for refinement step.
+     * Takes current mindmap + evaluation result and returns ActionList JSON.
+     */
+    public Map<String, Object> buildRefinementPrompt(
+            Mindmap mindmap,
+            EvaluationResult evaluation,
+            String language) {
+
+        String safeLang = StringUtils.hasText(language) ? language : "vi";
+
+        StringBuilder system = new StringBuilder();
+        system.append("You are a refinement agent for a mindmap AI.\n");
+        system.append("Your task is to FIX the issues listed in evaluation by producing concrete actions.\n");
+        system.append("Return PURE JSON in this shape (no markdown):\n");
+        system.append("{\n");
+        system.append("  \"actions\": [\n");
+        system.append("    {\n");
+        system.append("      \"id\": \"r1\",\n");
+        system.append("      \"type\": \"add_node|update_node|delete_node|delete_subtree|add_edge|set_title|set_structureType\",\n");
+        system.append("      \"params\": { ... },\n");
+        system.append("      \"rationale\": \"short reason in ").append(safeLang).append("\",\n");
+        system.append("      \"priority\": 1,\n");
+        system.append("      \"dependsOn\": []\n");
+        system.append("    }\n");
+        system.append("  ]\n");
+        system.append("}\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("Language: ").append(safeLang).append("\n");
+        user.append("Current mindmap object:\n");
+        user.append(String.valueOf(mindmap != null ? mindmap : "null")).append("\n\n");
+        user.append("Evaluation result:\n");
+        user.append(String.valueOf(evaluation != null ? evaluation : "null")).append("\n\n");
+        user.append("Please output the minimal set of high-impact actions that:\n");
+        user.append("- remove or merge duplicate branches,\n");
+        user.append("- balance depth where needed,\n");
+        user.append("- delete or reword off-topic nodes,\n");
+        user.append("- clarify weak leaf nodes.\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+        generationConfig.put("maxOutputTokens", 4000);
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("systemInstruction", systemInstruction);

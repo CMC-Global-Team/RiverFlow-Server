@@ -8,6 +8,7 @@ import com.riverflow.dto.mindmap.ai.Otmz;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.exception.mindmap.InvalidMindmapDataException;
 import com.riverflow.repository.UserRepository;
+import com.riverflow.service.mindmap.ai.AiResponseParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +37,7 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final GeminiPromptBuilder promptBuilder;
+    private final AiResponseParser responseParser;
 
     @Value("${gemini.model:gemini-2.0-flash-exp}")
     private String model;
@@ -474,7 +476,23 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
      */
     @Override
     public Otmz think(String topic, String language, String structureType, Integer levels, Integer firstLevelCount, List<String> tags, String mode) {
-        return new Otmz();
+        // Build dedicated prompt for OTMZ thinking step
+        Map<String, Object> payload = promptBuilder.buildLoopThinkingPrompt(
+                topic,
+                language,
+                structureType,
+                levels,
+                firstLevelCount,
+                tags,
+                mode
+        );
+
+        // Non-streaming call is enough for internal thinking JSON
+        String aiResponse = callGeminiNoStream(payload);
+        String json = promptBuilder.ensureJson(aiResponse);
+
+        // Parse into Otmz DTO (resilient to malformed JSON)
+        return responseParser.parseOtmz(json);
     }
 
     /**
@@ -482,7 +500,21 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
      */
     @Override
     public ActionList plan(Otmz otmz, String language) {
-        return new ActionList();
+        if (otmz == null) {
+            return new ActionList();
+        }
+
+        // Build prompt for AGENT planning step from OTMZ
+        Map<String, Object> payload = promptBuilder.buildAgentActionPrompt(
+                otmz,
+                language
+        );
+
+        String aiResponse = callGeminiNoStream(payload);
+        String json = promptBuilder.ensureJson(aiResponse);
+
+        // Convert JSON into ActionList DTO for executor
+        return responseParser.parseActionList(json);
     }
 }
 
