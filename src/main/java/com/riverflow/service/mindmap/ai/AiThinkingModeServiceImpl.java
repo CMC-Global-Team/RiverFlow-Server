@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.ai.ThinkingModeRequest;
 import com.riverflow.dto.mindmap.ai.ThinkingModeResponse;
+import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.exception.mindmap.InvalidMindmapDataException;
 import com.riverflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -464,6 +466,23 @@ public class AiThinkingModeServiceImpl implements AiThinkingModeService {
         } catch (Exception e) {
             throw new RuntimeException("Thinking Mode AI service failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Simplified think step for loop orchestrator.
+     * Placeholder that can be enhanced with a dedicated prompt later.
+     */
+    @Override
+    public Otmz think(String topic, String language, String structureType, Integer levels, Integer firstLevelCount, List<String> tags, String mode) {
+        return new Otmz();
+    }
+
+    /**
+     * Simplified plan step for loop orchestrator.
+     */
+    @Override
+    public ActionList plan(Otmz otmz, String language) {
+        return new ActionList();
     }
 }
 
