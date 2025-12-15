@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.riverflow.dto.mindmap.ai.Action;
 import com.riverflow.dto.mindmap.ai.ActionList;
 import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.dto.mindmap.ai.LoopPlan;
+import com.riverflow.dto.mindmap.ai.LoopTask;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -108,6 +110,43 @@ public class AiResponseParser {
             // return empty list on failure
         }
         return actionList;
+    }
+
+    /**
+     * Parse loop planner response into LoopPlan DTO.
+     */
+    public LoopPlan parseLoopPlan(String json) {
+        LoopPlan plan = new LoopPlan();
+
+        if (json == null || json.trim().isEmpty()) {
+            return plan;
+        }
+
+        try {
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode iterationsNode = root.get("iterations");
+            if (iterationsNode != null && iterationsNode.isInt()) {
+                plan.setIterations(iterationsNode.asInt());
+            }
+
+            JsonNode tasksNode = root.get("tasks");
+            if (tasksNode != null && tasksNode.isArray()) {
+                for (JsonNode t : tasksNode) {
+                    try {
+                        LoopTask task = objectMapper.convertValue(t, LoopTask.class);
+                        if (task != null) {
+                            plan.getTasks().add(task);
+                        }
+                    } catch (Exception ignored) {
+                        // ignore malformed task entries to keep flow resilient
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // return empty plan on parse failure to avoid hard crash
+        }
+
+        return plan;
     }
 
     private Map<String, Object> nodeToMap(JsonNode node) {
