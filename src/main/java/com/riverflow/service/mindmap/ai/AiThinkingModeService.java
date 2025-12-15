@@ -2,6 +2,8 @@ package com.riverflow.service.mindmap.ai;
 
 import com.riverflow.dto.mindmap.ai.ThinkingModeRequest;
 import com.riverflow.dto.mindmap.ai.ThinkingModeResponse;
+import com.riverflow.dto.mindmap.ai.Otmz;
+import com.riverflow.dto.mindmap.ai.ActionList;
 
 /**
  * Service for Thinking Mode - AI-powered prompt optimization
@@ -27,4 +29,20 @@ public interface AiThinkingModeService {
      * @return Optimized specification and action list
      */
     ThinkingModeResponse analyzeAndOptimizeWithStreaming(ThinkingModeRequest request, Long userId, String mindmapId);
+
+    /**
+     * Lightweight thinking step for loop orchestrator.
+     */
+    Otmz think(String topic,
+               String language,
+               String structureType,
+               Integer levels,
+               Integer firstLevelCount,
+               java.util.List<String> tags,
+               String mode);
+
+    /**
+     * Plan concrete actions from an OTMZ analysis.
+     */
+    ActionList plan(Otmz otmz, String language);
 }
