@@ -403,6 +403,53 @@ public class GeminiPromptBuilder {
         return payload;
     }
 
+    /**
+     * Build prompt for loop planner (Max mode agent)
+     */
+    public Map<String, Object> buildLoopPlannerPrompt(
+            String prompt,
+            String language,
+            Map<String, Object> workspace,
+            Integer maxIterations) {
+
+        int iterations = (maxIterations != null && maxIterations > 0) ? maxIterations : 1;
+
+        StringBuilder system = new StringBuilder();
+        system.append("You are an AI planner that breaks a mindmap request into iterative tasks.\n");
+        system.append("Return JSON only. Format:\n");
+        system.append("{\n");
+        system.append("  \"iterations\": 2,\n");
+        system.append("  \"tasks\": [\n");
+        system.append("    {\"id\":\"t1\",\"topic\":\"...\",\"structureType\":\"mindmap|logic|brace|org|tree|timeline|fishbone\",");
+        system.append("\"levels\":2,\"firstLevelCount\":5,\"tags\":[\"...\"],\"dependsOn\":[\"tX\"]}\n");
+        system.append("  ]\n");
+        system.append("}\n");
+
+        StringBuilder user = new StringBuilder();
+        user.append("User prompt: ").append(prompt).append("\n");
+        user.append("Language: ").append(language).append("\n");
+        if (workspace != null && !workspace.isEmpty()) {
+            user.append("Workspace context: ").append(workspace).append("\n");
+        }
+        user.append("Max iterations: ").append(iterations).append("\n");
+        user.append("Please plan up to this number of iterations and tasks.\n");
+
+        Map<String, Object> systemInstruction = Map.of(
+                "parts", List.of(Map.of("text", system.toString())));
+        Map<String, Object> userContent = Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", user.toString())));
+
+        Map<String, Object> generationConfig = new HashMap<>();
+        generationConfig.put("temperature", 0.4);
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("systemInstruction", systemInstruction);
+        payload.put("contents", List.of(userContent));
+        payload.put("generationConfig", generationConfig);
+        return payload;
+    }
+
         /**
          * Build structure-specific guidance for AI
          */
